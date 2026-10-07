@@ -16,6 +16,11 @@ const CUTOUTS = cutouts as Record<string, string>;
 // dejando ver más brazalete por arriba y por abajo.
 const CUTOUT_WIDTH = 137; // % del ancho del cojín
 
+// Como en el estuche real: la caja del reloj descansa en la parte alta del cojín,
+// el brazalete apenas asoma por arriba (se va por detrás) y baja por delante.
+const HEAD_AT = 38; // centro de la caja del reloj, en % del alto del cojín
+const TOP_REACH = 4; // cuánto asoma el brazalete por encima del cojín, en % de su alto
+
 export function CollectionCase({ watches, lang, dict }: { watches: Watch[]; lang: Locale; dict: Dictionary }) {
   const cases = packIntoCases(watches);
 
@@ -56,10 +61,16 @@ function CaseSlot({ watch, slot, reach, lang, dict }: { watch: Watch; slot: Slot
       style={{ left: `${slot.x}%`, top: `${slot.y}%`, width: `${slot.w}%`, height: `${slot.h}%` }}
     >
       {cutout ? (
-        // El brazalete sobresale del cojín (hasta `reach`) y se difumina en las puntas
+        // Zona visible del reloj: desde un poco por encima del cojín hasta algo más abajo
+        // de su borde frontal (`reach`), con las puntas del brazalete difuminadas
         <span
-          className="absolute -left-1/4 -right-1/4 [mask-image:linear-gradient(to_bottom,transparent_0%,black_14%,black_86%,transparent_100%)]"
-          style={{ top: `-${reach}%`, bottom: `-${reach}%` }}
+          className="absolute -left-1/4 -right-1/4"
+          style={{
+            top: `-${TOP_REACH}%`,
+            bottom: `-${reach}%`,
+            maskImage: braceletMask(reach),
+            WebkitMaskImage: braceletMask(reach),
+          }}
         >
           <Image
             src={cutout}
@@ -67,8 +78,11 @@ function CaseSlot({ watch, slot, reach, lang, dict }: { watch: Watch; slot: Slot
             width={600}
             height={1200}
             sizes="(min-width: 1152px) 260px, 22vw"
-            className="absolute left-1/2 top-1/2 h-auto max-w-none -translate-x-1/2 -translate-y-1/2 drop-shadow-[0_14px_14px_rgba(0,0,0,0.65)] transition duration-500 group-hover:-translate-y-[51.5%] group-hover:brightness-110 group-focus-visible:brightness-110"
-            style={{ width: `${(CUTOUT_WIDTH / 150) * 100}%` }}
+            className="absolute left-1/2 h-auto max-w-none -translate-x-1/2 -translate-y-1/2 drop-shadow-[0_14px_14px_rgba(0,0,0,0.65)] transition duration-500 group-hover:-translate-y-[51.5%] group-hover:brightness-110 group-focus-visible:brightness-110"
+            style={{
+              width: `${(CUTOUT_WIDTH / 150) * 100}%`,
+              top: `${((HEAD_AT + TOP_REACH) / (100 + TOP_REACH + reach)) * 100}%`,
+            }}
           />
         </span>
       ) : (
@@ -91,4 +105,12 @@ function CaseSlot({ watch, slot, reach, lang, dict }: { watch: Watch; slot: Slot
       </span>
     </Link>
   );
+}
+
+// Difuminado del brazalete: corto arriba (se va por detrás del cojín) y más largo abajo
+function braceletMask(reach: number) {
+  const total = 100 + TOP_REACH + reach;
+  const topFade = ((TOP_REACH * 2) / total) * 100;
+  const bottomFade = ((reach + 6) / total) * 100;
+  return `linear-gradient(to bottom, transparent 0%, black ${topFade}%, black ${100 - bottomFade}%, transparent 100%)`;
 }
