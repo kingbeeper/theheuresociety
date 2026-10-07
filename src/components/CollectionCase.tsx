@@ -29,24 +29,29 @@ export function CollectionCase({ watches, lang, dict }: { watches: Watch[]; lang
   }
 
   return (
-    <div className="space-y-16">
+    <div className="space-y-6">
       {cases.map(({ layout, items }, i) => (
+        // El estuche se presenta entero sobre la "mesa": centrado, con aire y un halo de luz
         <div
           key={`${layout.id}-${i}`}
-          className="relative mx-auto max-w-6xl overflow-hidden shadow-[0_40px_80px_-20px_rgba(0,0,0,0.8)]"
-          style={{ aspectRatio: `${layout.width} / ${layout.height}` }}
+          className="bg-[radial-gradient(ellipse_60%_55%_at_50%_50%,rgba(31,58,45,0.55),transparent_75%)] px-2 py-12 sm:px-8 sm:py-16"
+        >
+        <div
+          className="relative mx-auto w-full overflow-hidden rounded-[6px] shadow-[0_45px_70px_-25px_rgba(0,0,0,0.95),0_0_0_1px_rgba(0,0,0,0.4)]"
+          style={{ aspectRatio: `${layout.width} / ${layout.height}`, maxWidth: layout.maxWidth }}
         >
           <Image
             src={layout.image}
             alt=""
             fill
             priority={i === 0}
-            sizes="(min-width: 1152px) 1152px, 100vw"
+            sizes={`(min-width: ${layout.maxWidth}px) ${layout.maxWidth}px, 100vw`}
             className="object-cover"
           />
           {items.map((watch, s) => (
             <CaseSlot key={watch.slug} watch={watch} slot={layout.slots[s]} reach={layout.reach} lang={lang} dict={dict} />
           ))}
+        </div>
         </div>
       ))}
     </div>
