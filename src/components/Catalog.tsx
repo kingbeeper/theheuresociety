@@ -49,7 +49,7 @@ export function Catalog({
     <>
       {/* Filtros */}
       <div className="sticky top-0 z-20 -mx-5 border-b border-line bg-ink/90 px-5 py-4 backdrop-blur md:-mx-10 md:px-10">
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
+        <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-4">
           <div className="-mx-1 flex gap-2 overflow-x-auto px-1" role="group" aria-label={t.brand}>
             <button type="button" className={chip(brand === null)} onClick={() => setBrand(null)}>
               {t.all}
@@ -61,7 +61,7 @@ export function Catalog({
             ))}
           </div>
 
-          <div className="ml-auto flex items-center gap-6">
+          <div className="flex items-center gap-6">
             <label className="flex cursor-pointer items-center gap-2 text-[0.7rem] tracking-[0.16em] uppercase text-stone">
               <input
                 type="checkbox"

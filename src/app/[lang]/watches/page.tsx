@@ -6,6 +6,7 @@ import { getDictionary } from "../dictionaries";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Catalog } from "@/components/Catalog";
+import { GoldMonogram } from "@/components/GoldMonogram";
 
 export async function generateMetadata({ params }: PageProps<"/[lang]/watches">): Promise<Metadata> {
   const { lang } = await params;
@@ -27,11 +28,25 @@ export default async function WatchesPage({ params }: PageProps<"/[lang]/watches
     <>
       <Header lang={lang} dict={dict} />
       <main className="mx-auto max-w-7xl px-5 pb-28 pt-36 md:px-10 md:pt-44">
-        <p className="eyebrow">{dict.catalog.eyebrow}</p>
-        <h1 className="mt-5 max-w-3xl font-display text-5xl font-light leading-[1.05] md:text-6xl">
-          {dict.catalog.title}
-        </h1>
-        <p className="mt-6 max-w-lg leading-relaxed text-stone">{dict.catalog.lead}</p>
+        <header className="text-center">
+          <GoldMonogram height={60} />
+          <p className="eyebrow mt-6">{dict.catalog.eyebrow}</p>
+          <h1 className="mt-5 font-display text-6xl font-light leading-none tracking-[0.02em] md:text-8xl">
+            {dict.catalog.titleA}{" "}
+            <em className="bg-[linear-gradient(135deg,#f3e2b0_0%,#c8a960_35%,#a8873f_60%,#e3c98a_85%)] bg-clip-text font-light text-transparent">
+              {dict.catalog.titleB}
+            </em>
+          </h1>
+          {/* Ornamento: filetes dorados con un rombo, como en la tira de marcas */}
+          <div className="mx-auto mt-8 flex max-w-xs items-center gap-4" aria-hidden>
+            <span className="h-px flex-1 bg-gradient-to-r from-transparent to-brass/70" />
+            <span className="h-1.5 w-1.5 rotate-45 bg-brass" />
+            <span className="h-px flex-1 bg-gradient-to-l from-transparent to-brass/70" />
+          </div>
+          <p className="mx-auto mt-8 max-w-md font-display text-xl font-light italic leading-relaxed text-ivory/80 md:text-2xl">
+            {dict.catalog.lead}
+          </p>
+        </header>
 
         <div className="mt-14">
           <Catalog watches={await getWatches()} brands={await getBrands()} lang={lang} dict={dict} />

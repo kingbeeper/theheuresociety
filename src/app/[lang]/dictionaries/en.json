@@ -143,9 +143,9 @@
     "disclaimer": "The Heure Society is an independent dealer and is not affiliated with the brands it offers."
   },
   "catalog": {
-    "eyebrow": "The collection",
+    "eyebrow": "The Heure Society",
     "title": "Every piece, in one place",
-    "lead": "Authenticated watches, available to view in our office or by video call.",
+    "lead": "Every piece authenticated and chosen by hand. Presented as it deserves.",
     "all": "All",
     "brand": "Brand",
     "availability": "Availability",
@@ -161,7 +161,9 @@
     "view": "View",
     "viewCase": "Case",
     "viewGrid": "Grid",
-    "caseEmpty": "Pieces will appear in the case as soon as their photos are ready. Meanwhile, see them in the grid view."
+    "caseEmpty": "Pieces will appear in the case as soon as their photos are ready. Meanwhile, see them in the grid view.",
+    "titleA": "The",
+    "titleB": "Collection"
   },
   "detail": {
     "back": "Back to the collection",

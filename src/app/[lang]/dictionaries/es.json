@@ -143,9 +143,9 @@
     "disclaimer": "The Heure Society es un distribuidor independiente y no está afiliado a las marcas que ofrece."
   },
   "catalog": {
-    "eyebrow": "La colección",
+    "eyebrow": "The Heure Society",
     "title": "Todas las piezas, en un solo lugar",
-    "lead": "Relojes autenticados, disponibles para ver en nuestra oficina o por videollamada.",
+    "lead": "Cada pieza, autenticada y elegida a mano. Presentada como se merece.",
     "all": "Todas",
     "brand": "Marca",
     "availability": "Disponibilidad",
@@ -161,7 +161,9 @@
     "view": "Vista",
     "viewCase": "Estuche",
     "viewGrid": "Cuadrícula",
-    "caseEmpty": "Las piezas aparecerán en el estuche en cuanto sus fotos estén listas. Mientras tanto, véalas en la vista de cuadrícula."
+    "caseEmpty": "Las piezas aparecerán en el estuche en cuanto sus fotos estén listas. Mientras tanto, véalas en la vista de cuadrícula.",
+    "titleA": "La",
+    "titleB": "Colección"
   },
   "detail": {
     "back": "Volver a la colección",
