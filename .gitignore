@@ -49,3 +49,7 @@ next-env.d.ts
 /assets/edits/lid-a.png
 /assets/edits/lid-b.png
 /assets/edits/daytona-cutout.png
+
+# Fotos originales del estuche del cliente (se ven las cerraduras) y variantes de diseño descartadas
+/assets/case-photos/
+/assets/edits/cases/

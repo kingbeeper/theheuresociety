@@ -5,6 +5,7 @@ import type { Locale } from "@/lib/i18n";
 import type { Dictionary } from "@/app/[lang]/dictionaries";
 import type { Watch } from "@/lib/watches";
 import { WatchCard } from "./WatchCard";
+import { CollectionCase } from "./CollectionCase";
 
 type Sort = "new" | "priceAsc" | "priceDesc";
 
@@ -23,6 +24,7 @@ export function Catalog({
   const [brand, setBrand] = useState<string | null>(null);
   const [onlyAvailable, setOnlyAvailable] = useState(false);
   const [sort, setSort] = useState<Sort>("new");
+  const [view, setView] = useState<"case" | "grid">("case");
 
   const list = useMemo(() => {
     const filtered = watches.filter(
@@ -85,16 +87,39 @@ export function Catalog({
         </div>
       </div>
 
-      <p className="mt-8 text-xs tracking-[0.18em] uppercase text-stone">
-        {list.length === 1 ? t.countOne : t.count.replace("{n}", String(list.length))}
-      </p>
-
-      {list.length > 0 ? (
-        <div className="mt-8 grid gap-x-8 gap-y-14 sm:grid-cols-2 lg:grid-cols-3">
-          {list.map((w) => (
-            <WatchCard key={w.slug} watch={w} lang={lang} dict={dict} />
+      <div className="mt-8 flex items-center justify-between gap-4">
+        <p className="text-xs tracking-[0.18em] uppercase text-stone">
+          {list.length === 1 ? t.countOne : t.count.replace("{n}", String(list.length))}
+        </p>
+        <div className="flex border border-line" role="group" aria-label={t.view}>
+          {(["case", "grid"] as const).map((v) => (
+            <button
+              key={v}
+              type="button"
+              aria-pressed={view === v}
+              onClick={() => setView(v)}
+              className={`px-4 py-2 text-[0.66rem] tracking-[0.2em] uppercase transition-colors ${
+                view === v ? "bg-moss text-ivory" : "text-stone hover:text-ivory"
+              }`}
+            >
+              {v === "case" ? t.viewCase : t.viewGrid}
+            </button>
           ))}
         </div>
+      </div>
+
+      {list.length > 0 ? (
+        view === "case" ? (
+          <div className="mt-10">
+            <CollectionCase watches={list} lang={lang} dict={dict} />
+          </div>
+        ) : (
+          <div className="mt-8 grid gap-x-8 gap-y-14 sm:grid-cols-2 lg:grid-cols-3">
+            {list.map((w) => (
+              <WatchCard key={w.slug} watch={w} lang={lang} dict={dict} />
+            ))}
+          </div>
+        )
       ) : (
         <div className="py-24 text-center">
           <p className="font-display text-2xl text-stone">{t.empty}</p>

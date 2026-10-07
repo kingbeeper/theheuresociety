@@ -157,7 +157,10 @@
     "count": "{n} pieces",
     "countOne": "1 piece",
     "empty": "No pieces match these filters.",
-    "reset": "Clear filters"
+    "reset": "Clear filters",
+    "view": "View",
+    "viewCase": "Case",
+    "viewGrid": "Grid"
   },
   "detail": {
     "back": "Back to the collection",

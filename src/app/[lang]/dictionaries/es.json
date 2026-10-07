@@ -157,7 +157,10 @@
     "count": "{n} piezas",
     "countOne": "1 pieza",
     "empty": "Ninguna pieza coincide con estos filtros.",
-    "reset": "Quitar filtros"
+    "reset": "Quitar filtros",
+    "view": "Vista",
+    "viewCase": "Estuche",
+    "viewGrid": "Cuadrícula"
   },
   "detail": {
     "back": "Volver a la colección",
