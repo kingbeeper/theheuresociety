@@ -3,22 +3,23 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { hasLocale } from "@/lib/i18n";
-import { formatPrice, getWatch, watches, whatsappLink } from "@/lib/watches";
+import { formatPrice, whatsappLink } from "@/lib/watches";
+import { getWatch, getWatches } from "@/lib/inventory";
 import { getDictionary } from "../../dictionaries";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Gallery } from "@/components/Gallery";
 import { WatchCard } from "@/components/WatchCard";
 
-export function generateStaticParams() {
-  return watches.map((w) => ({ slug: w.slug }));
+export async function generateStaticParams() {
+  return (await getWatches()).map((w) => ({ slug: w.slug }));
 }
 
 export async function generateMetadata({
   params,
 }: PageProps<"/[lang]/watches/[slug]">): Promise<Metadata> {
   const { lang, slug } = await params;
-  const watch = getWatch(slug);
+  const watch = await getWatch(slug);
   if (!hasLocale(lang) || !watch) return {};
   const name = `${watch.brand} ${watch.model} ${watch.reference}`;
   return {
@@ -40,7 +41,7 @@ export default function WatchPage({ params }: PageProps<"/[lang]/watches/[slug]"
 async function WatchDetail({ params }: { params: PageProps<"/[lang]/watches/[slug]">["params"] }) {
   const { lang, slug } = await params;
   if (!hasLocale(lang)) notFound();
-  const watch = getWatch(slug);
+  const watch = await getWatch(slug);
   if (!watch) notFound();
   const dict = await getDictionary(lang);
   const t = dict.detail;
@@ -60,7 +61,7 @@ async function WatchDetail({ params }: { params: PageProps<"/[lang]/watches/[slu
     [t.set, set || t.notIncluded],
   ];
 
-  const related = watches
+  const related = (await getWatches())
     .filter((w) => w.slug !== watch.slug)
     .sort((a, b) => Number(b.brand === watch.brand) - Number(a.brand === watch.brand))
     .slice(0, 3);

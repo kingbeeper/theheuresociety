@@ -1,0 +1,360 @@
+import "server-only";
+import { revalidateTag } from "next/cache";
+import { adminDb, PHOTO_BUCKET } from "./supabase";
+import { INVENTORY_TAG } from "./inventory";
+import { analyzeWatch, type WatchDraft } from "./watch-ai";
+import { downloadFile, escapeHtml as h, keyboard, sendMessage, sendPhoto, tg } from "./telegram";
+import { toSlug } from "./watches";
+
+// ───────────────────────── Tipos de Telegram (solo lo que usamos) ─────────────────────────
+type TgPhoto = { file_id: string; width: number; height: number };
+export type TgMessage = {
+  message_id: number;
+  chat: { id: number };
+  from?: { id: number; first_name?: string };
+  text?: string;
+  caption?: string;
+  photo?: TgPhoto[];
+  media_group_id?: string;
+};
+export type TgCallback = {
+  id: string;
+  from: { id: number };
+  data?: string;
+  message?: { message_id: number; chat: { id: number } };
+};
+
+type Draft = {
+  id: string;
+  chat_id: number;
+  status: "collecting" | "analyzing" | "ready" | "published" | "cancelled";
+  caption: string | null;
+  data: WatchDraft | null;
+  awaiting: string | null;
+};
+
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://theheuresociety.vercel.app";
+const OPEN = ["collecting", "analyzing", "ready"];
+
+const HELP = `<b>The Heure Society · Publicar relojes</b>
+
+1. Envíame las fotos del reloj (de 1 a 10).
+2. Escribe una nota con la referencia, el precio y los extras.
+   <i>Ej.: Rolex 126610LN, 14500, caja y papeles, excelente estado</i>
+3. Revisa la ficha que preparo y pulsa <b>Publicar</b>.
+
+<b>Órdenes</b>
+/lista — últimos relojes publicados
+/vendido <i>referencia</i> — marcar como vendido
+/reservado <i>referencia</i> — marcar como reservado
+/disponible <i>referencia</i> — volver a disponible
+/cancelar — descartar el borrador actual`;
+
+// ───────────────────────────── Borradores ─────────────────────────────
+async function openDraft(chatId: number): Promise<Draft | null> {
+  const { data } = await adminDb().from("bot_drafts").select("*").eq("chat_id", chatId).in("status", OPEN).maybeSingle();
+  return data as Draft | null;
+}
+
+async function getOrCreateDraft(chatId: number): Promise<Draft> {
+  const existing = await openDraft(chatId);
+  if (existing) return existing;
+  const { data, error } = await adminDb().from("bot_drafts").insert({ chat_id: chatId }).select().single();
+  // Si llegan varias fotos a la vez, otra petición pudo crearlo primero (índice único)
+  if (error?.code === "23505") return (await openDraft(chatId))!;
+  if (error) throw error;
+  return data as Draft;
+}
+
+async function updateDraft(id: string, fields: Partial<Draft>) {
+  const { error } = await adminDb().from("bot_drafts").update({ ...fields, updated_at: new Date().toISOString() }).eq("id", id);
+  if (error) throw error;
+}
+
+async function draftPhotos(draftId: string) {
+  const { data } = await adminDb().from("bot_draft_photos").select("url").eq("draft_id", draftId).order("tg_message");
+  return (data ?? []).map((p) => p.url as string);
+}
+
+// ───────────────────────────── Mensajes ─────────────────────────────
+export async function handleMessage(msg: TgMessage) {
+  const chatId = msg.chat.id;
+
+  if (msg.photo?.length) return handlePhoto(msg);
+
+  const text = (msg.text ?? "").trim();
+  if (!text) return;
+
+  if (text.startsWith("/")) return handleCommand(chatId, text);
+
+  const draft = await openDraft(chatId);
+
+  // Respuesta a "Cambiar precio"
+  if (draft?.awaiting === "price" && draft.data) {
+    const price = parsePrice(text);
+    if (price === undefined) return sendMessage(chatId, "No entendí el precio. Escribe un número (ej. <code>14500</code>) o <code>consultar</code>.");
+    await updateDraft(draft.id, { awaiting: null, data: { ...draft.data, price } });
+    return sendPreview(chatId, draft.id);
+  }
+
+  if (!draft) return sendMessage(chatId, "Primero envíame las fotos del reloj. Escribe /ayuda para ver cómo funciona.");
+
+  const photos = await draftPhotos(draft.id);
+  if (!photos.length) return sendMessage(chatId, "Aún no tengo fotos de este reloj. Envíamelas y después la nota.");
+
+  await updateDraft(draft.id, { caption: text });
+  return analyze(chatId, draft.id);
+}
+
+async function handlePhoto(msg: TgMessage) {
+  const chatId = msg.chat.id;
+  const draft = await getOrCreateDraft(chatId);
+  const db = adminDb();
+
+  // Guardar la foto más grande en Supabase Storage
+  const best = msg.photo!.reduce((a, b) => (b.width * b.height > a.width * a.height ? b : a));
+  const bytes = await downloadFile(best.file_id);
+  const path = `drafts/${draft.id}/${msg.message_id}.jpg`;
+  const { error: upErr } = await db.storage.from(PHOTO_BUCKET).upload(path, bytes, { contentType: "image/jpeg", upsert: true });
+  if (upErr) throw upErr;
+  const url = db.storage.from(PHOTO_BUCKET).getPublicUrl(path).data.publicUrl;
+  await db.from("bot_draft_photos").upsert({ draft_id: draft.id, path, url, tg_message: msg.message_id }, { onConflict: "draft_id,tg_message", ignoreDuplicates: true });
+
+  // Si ya había una ficha preparada, las fotos nuevas obligan a revisarla de nuevo
+  if (draft.status === "ready") await updateDraft(draft.id, { status: "collecting" });
+
+  if (msg.caption?.trim()) {
+    await updateDraft(draft.id, { caption: msg.caption.trim() });
+    // En un álbum las demás fotos llegan en paralelo: se espera un momento antes de analizar
+    if (msg.media_group_id) await new Promise((r) => setTimeout(r, 3500));
+    return analyze(chatId, draft.id);
+  }
+
+  const photos = await draftPhotos(draft.id);
+  if (photos.length === 1 && !draft.caption) {
+    await sendMessage(
+      chatId,
+      "📸 Fotos recibidas. Ahora escríbeme la referencia, el precio y los extras.\n<i>Ej.: Rolex 126610LN, 14500, caja y papeles</i>"
+    );
+  }
+}
+
+async function analyze(chatId: number, draftId: string) {
+  const db = adminDb();
+  const { data: d } = await db.from("bot_drafts").select("*").eq("id", draftId).single();
+  const draft = d as Draft;
+  if (draft.status === "analyzing") return; // ya hay un análisis en curso
+
+  await updateDraft(draftId, { status: "analyzing" });
+  await tg("sendChatAction", { chat_id: chatId, action: "typing" });
+  await sendMessage(chatId, "🔎 Analizando las fotos y preparando la ficha…");
+
+  try {
+    const photos = await draftPhotos(draftId);
+    const data = await analyzeWatch(photos, draft.caption ?? "");
+    await updateDraft(draftId, { status: "ready", data, awaiting: null });
+    await sendPreview(chatId, draftId);
+  } catch (e) {
+    await updateDraft(draftId, { status: "collecting" });
+    await sendMessage(chatId, `⚠️ No pude preparar la ficha: ${h((e as Error).message)}\nPuedes volver a enviar la nota para reintentar.`);
+  }
+}
+
+async function sendPreview(chatId: number, draftId: string) {
+  const { data: d } = await adminDb().from("bot_drafts").select("*").eq("id", draftId).single();
+  const draft = d as Draft;
+  const w = draft.data!;
+  const photos = await draftPhotos(draftId);
+
+  const price = w.price == null ? "Precio a consultar" : `${w.currency} ${w.price.toLocaleString("en-US")}`;
+  const set = [w.hasBox && "caja", w.hasPapers && "papeles"].filter(Boolean).join(" y ") || "solo reloj";
+  const specs = [
+    `Caja: ${w.caseSize} · ${w.material.es}`,
+    w.dial && `Esfera: ${w.dial.es}`,
+    w.bracelet && `Brazalete: ${w.bracelet.es}`,
+    w.movement && `Movimiento: ${w.movement}${w.powerReserve ? ` · ${w.powerReserve}` : ""}`,
+    w.waterResistance && `Hermeticidad: ${w.waterResistance}`,
+  ].filter(Boolean) as string[];
+
+  const caption = [
+    `<b>${h(w.brand)} ${h(w.model)}</b>`,
+    `Ref. ${h(w.reference)}${w.year ? ` · ${w.year}` : ""}`,
+    `<b>${h(price)}</b> · ${set}`,
+    "",
+    ...specs.map(h),
+  ].join("\n");
+  await sendPhoto(chatId, photos[0], caption.slice(0, 1024));
+
+  const warnings = w.warnings.length
+    ? `\n\n⚠️ <b>Revisar</b> (confianza ${w.confidence === "high" ? "alta" : w.confidence === "medium" ? "media" : "baja"}):\n${w.warnings.map((x) => `• ${h(x)}`).join("\n")}`
+    : "";
+
+  await sendMessage(
+    chatId,
+    `<b>ES</b> ${h(w.description.es)}\n\n<b>EN</b> ${h(w.description.en)}\n\n📷 ${photos.length} foto(s)${warnings}`,
+    {
+      reply_markup: keyboard([
+        [{ text: "✅ Publicar", callback_data: `pub:${draftId}` }],
+        [
+          { text: "💲 Cambiar precio", callback_data: `price:${draftId}` },
+          { text: "❌ Cancelar", callback_data: `cancel:${draftId}` },
+        ],
+      ]),
+    }
+  );
+}
+
+// ───────────────────────────── Botones ─────────────────────────────
+export async function handleCallback(cb: TgCallback) {
+  const chatId = cb.message?.chat.id;
+  const [action, draftId] = (cb.data ?? "").split(":");
+  if (!chatId || !draftId) return tg("answerCallbackQuery", { callback_query_id: cb.id });
+
+  const { data: d } = await adminDb().from("bot_drafts").select("*").eq("id", draftId).maybeSingle();
+  const draft = d as Draft | null;
+  const removeButtons = () =>
+    tg("editMessageReplyMarkup", { chat_id: chatId, message_id: cb.message!.message_id, reply_markup: keyboard([]) }).catch(() => {});
+
+  if (!draft || !OPEN.includes(draft.status)) {
+    await tg("answerCallbackQuery", { callback_query_id: cb.id, text: "Este borrador ya no está activo." });
+    return removeButtons();
+  }
+
+  if (action === "pub") {
+    await tg("answerCallbackQuery", { callback_query_id: cb.id, text: "Publicando…" });
+    await removeButtons();
+    const slug = await publish(draft);
+    return sendMessage(chatId, `✅ <b>Publicado.</b> Ya está en la colección:\n${SITE_URL}/es/watches/${slug}`);
+  }
+
+  if (action === "price") {
+    await updateDraft(draft.id, { awaiting: "price" });
+    await tg("answerCallbackQuery", { callback_query_id: cb.id });
+    return sendMessage(chatId, "Escribe el nuevo precio (ej. <code>14500</code>) o <code>consultar</code> para mostrar «Precio a consultar».");
+  }
+
+  if (action === "cancel") {
+    await updateDraft(draft.id, { status: "cancelled", awaiting: null });
+    await tg("answerCallbackQuery", { callback_query_id: cb.id, text: "Borrador descartado" });
+    await removeButtons();
+    return sendMessage(chatId, "Borrador descartado. Envíame fotos cuando quieras publicar otro reloj.");
+  }
+
+  return tg("answerCallbackQuery", { callback_query_id: cb.id });
+}
+
+async function publish(draft: Draft) {
+  const db = adminDb();
+  const w = draft.data!;
+  const images = await draftPhotos(draft.id);
+
+  // Slug único: si ya existe (otra pieza igual), se añade un número
+  const base = toSlug(w.brand, w.model, w.reference);
+  const { data: taken } = await db.from("watches").select("slug").like("slug", `${base}%`);
+  const used = new Set((taken ?? []).map((r) => r.slug as string));
+  let slug = base;
+  for (let n = 2; used.has(slug); n++) slug = `${base}-${n}`;
+
+  const now = new Date().toISOString();
+  const { data: row, error } = await db
+    .from("watches")
+    .insert({
+      slug,
+      status: "available",
+      brand: w.brand,
+      model: w.model,
+      reference: w.reference,
+      year: w.year,
+      has_box: w.hasBox,
+      has_papers: w.hasPapers,
+      price: w.price,
+      currency: w.currency,
+      case_size: w.caseSize,
+      material: w.material,
+      dial: w.dial,
+      bracelet: w.bracelet,
+      description: w.description,
+      movement: w.movement,
+      power_reserve: w.powerReserve,
+      water_resistance: w.waterResistance,
+      images,
+      source: "telegram",
+      published_at: now,
+    })
+    .select("id")
+    .single();
+  if (error) throw error;
+
+  await updateDraft(draft.id, { status: "published", watch_id: row.id } as Partial<Draft>);
+  revalidateTag(INVENTORY_TAG, { expire: 0 });
+  return slug;
+}
+
+// ───────────────────────────── Órdenes ─────────────────────────────
+async function handleCommand(chatId: number, text: string) {
+  const [cmd, ...rest] = text.split(/\s+/);
+  const arg = rest.join(" ").trim();
+  const command = cmd.toLowerCase().replace(/@.*$/, "");
+
+  switch (command) {
+    case "/start":
+    case "/ayuda":
+    case "/help":
+      return sendMessage(chatId, HELP);
+
+    case "/cancelar": {
+      const draft = await openDraft(chatId);
+      if (draft) await updateDraft(draft.id, { status: "cancelled", awaiting: null });
+      return sendMessage(chatId, draft ? "Borrador descartado." : "No hay ningún borrador abierto.");
+    }
+
+    case "/lista": {
+      const { data } = await adminDb()
+        .from("watches")
+        .select("brand, model, reference, status, price, currency")
+        .in("status", ["available", "reserved", "sold"])
+        .order("published_at", { ascending: false })
+        .limit(15);
+      if (!data?.length) return sendMessage(chatId, "Todavía no hay relojes publicados.");
+      const icon = { available: "🟢", reserved: "🟡", sold: "⚫" } as Record<string, string>;
+      const lines = data.map(
+        (r) => `${icon[r.status]} ${h(r.brand)} ${h(r.model)} · <code>${h(r.reference)}</code>${r.price ? ` · ${r.currency} ${Number(r.price).toLocaleString("en-US")}` : ""}`
+      );
+      return sendMessage(chatId, `<b>Últimos publicados</b>\n🟢 disponible · 🟡 reservado · ⚫ vendido\n\n${lines.join("\n")}`);
+    }
+
+    case "/vendido":
+    case "/reservado":
+    case "/disponible": {
+      const status = { "/vendido": "sold", "/reservado": "reserved", "/disponible": "available" }[command]!;
+      if (!arg) return sendMessage(chatId, `Indica la referencia. Ej.: <code>${command} 126610LN</code>`);
+      const { data } = await adminDb()
+        .from("watches")
+        .select("id, brand, model, reference, slug")
+        .in("status", ["available", "reserved", "sold"])
+        .or(`reference.ilike.%${arg.replace(/[,()%]/g, "")}%,slug.ilike.%${toSlug(arg)}%`);
+      if (!data?.length) return sendMessage(chatId, `No encontré ningún reloj publicado con «${h(arg)}».`);
+      if (data.length > 1)
+        return sendMessage(chatId, `Hay ${data.length} relojes que coinciden. Sé más específico:\n${data.map((r) => `• <code>${h(r.slug)}</code>`).join("\n")}`);
+      await adminDb().from("watches").update({ status, updated_at: new Date().toISOString() }).eq("id", data[0].id);
+      revalidateTag(INVENTORY_TAG, { expire: 0 });
+      const label = { sold: "vendido", reserved: "reservado", available: "disponible" }[status];
+      return sendMessage(chatId, `Hecho: ${h(data[0].brand)} ${h(data[0].model)} (${h(data[0].reference)}) ahora figura como <b>${label}</b>.`);
+    }
+
+    default:
+      return sendMessage(chatId, "No conozco esa orden. Escribe /ayuda para ver las opciones.");
+  }
+}
+
+// "14500", "14.500", "14,500", "14.5k", "$14,500" -> 14500 · "consultar" -> null · otra cosa -> undefined
+function parsePrice(text: string): number | null | undefined {
+  const t = text.toLowerCase().trim();
+  if (/consult|request|n\/a/.test(t)) return null;
+  const k = /k\b/.test(t);
+  const digits = t.replace(/[^\d.,]/g, "");
+  if (!digits) return undefined;
+  const normalized = k ? digits.replace(",", ".") : digits.replace(/[.,](?=\d{3}\b)/g, "").replace(",", ".");
+  const n = Number(normalized) * (k ? 1000 : 1);
+  return Number.isFinite(n) && n > 0 ? Math.round(n) : undefined;
+}

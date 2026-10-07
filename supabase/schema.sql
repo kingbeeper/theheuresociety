@@ -1,52 +1,49 @@
 -- The Heure Society: esquema de base de datos (Supabase / Postgres)
--- Ejecutar en Supabase > SQL Editor.
+-- Ejecutar completo en Supabase > SQL Editor, y después supabase/seed.sql.
 
+-- ─────────────────────────── Inventario ───────────────────────────
 create type watch_status as enum ('draft', 'available', 'reserved', 'sold');
-create type watch_condition as enum ('new', 'unworn', 'excellent', 'very_good', 'good');
 
 create table watches (
-  id            uuid primary key default gen_random_uuid(),
-  slug          text unique not null,
-  status        watch_status not null default 'draft',
+  id               uuid primary key default gen_random_uuid(),
+  slug             text unique not null,
+  status           watch_status not null default 'draft',
 
-  -- Datos que confirma el cliente al publicar
-  brand         text not null,
-  model         text not null,
-  reference     text not null,
-  year          int,
-  condition     watch_condition,
-  has_box       boolean default false,
-  has_papers    boolean default false,
-  price         numeric(12, 2),
-  currency      text not null default 'USD',
+  brand            text not null,
+  model            text not null,
+  reference        text not null,
+  year             int,
+  has_box          boolean not null default false,
+  has_papers       boolean not null default false,
+  price            numeric(12, 2),            -- null = "Precio a consultar"
+  currency         text not null default 'USD',
+  case_size        text not null default '',
 
-  -- Ficha técnica generada por IA (revisada por el cliente)
-  specs         jsonb not null default '{}'::jsonb,  -- {case_size, case_material, movement, ...}
+  -- Textos bilingües: {"en": "...", "es": "..."}
+  material         jsonb not null default '{"en":"","es":""}',
+  dial             jsonb,
+  bracelet         jsonb,
+  description      jsonb,
 
-  -- Textos bilingües generados por IA
-  title_en       text,
-  title_es       text,
-  description_en text,
-  description_es text,
+  movement         text,
+  power_reserve    text,
+  water_resistance text,
 
-  featured      boolean not null default false,
-  published_at  timestamptz,
-  created_at    timestamptz not null default now(),
-  updated_at    timestamptz not null default now()
+  -- Rutas locales (/watches/x.jpg) o URLs públicas de Supabase Storage, en orden
+  images           text[] not null default '{}',
+
+  source           text not null default 'manual',  -- 'manual' | 'seed' | 'telegram'
+  created_at       timestamptz not null default now(),
+  updated_at       timestamptz not null default now(),
+  published_at     timestamptz
 );
 
-create table watch_images (
-  id         uuid primary key default gen_random_uuid(),
-  watch_id   uuid not null references watches(id) on delete cascade,
-  path       text not null,          -- ruta en Supabase Storage (bucket "watches")
-  alt_en     text,
-  alt_es     text,
-  position   int not null default 0
-);
+create index watches_status_published_idx on watches (status, published_at desc);
 
--- Solicitudes de "Vende tu reloj"
+-- ─────────────────────── Solicitudes de clientes ───────────────────────
 create table sell_requests (
   id          uuid primary key default gen_random_uuid(),
+  kind        text not null default 'sell',   -- 'sell' | 'trade' | 'consign'
   name        text not null,
   email       text,
   phone       text,
@@ -54,33 +51,51 @@ create table sell_requests (
   model       text,
   reference   text,
   message     text,
-  image_paths text[] default '{}',
+  image_paths text[] not null default '{}',
   created_at  timestamptz not null default now()
 );
 
-create index on watches (status, published_at desc);
-create index on watch_images (watch_id, position);
+-- ─────────────────────── Robot de Telegram ───────────────────────
+-- Borrador de publicación: se crea al recibir fotos y se publica al confirmar.
+create table bot_drafts (
+  id          uuid primary key default gen_random_uuid(),
+  chat_id     bigint not null,
+  status      text not null default 'collecting',  -- collecting | analyzing | ready | published | cancelled
+  caption     text,                                -- texto del administrador (modelo, precio, extras)
+  data        jsonb,                               -- propuesta de la IA, editable
+  awaiting    text,                                -- p. ej. 'price' cuando el bot espera un precio
+  watch_id    uuid references watches(id),
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
 
--- Seguridad: el público solo lee relojes publicados; solo el admin escribe.
-alter table watches       enable row level security;
-alter table watch_images  enable row level security;
-alter table sell_requests enable row level security;
+-- Solo un borrador abierto por chat (evita duplicados cuando llega un álbum de fotos)
+create unique index bot_drafts_one_open_per_chat
+  on bot_drafts (chat_id) where status in ('collecting', 'analyzing', 'ready');
+
+create table bot_draft_photos (
+  id          uuid primary key default gen_random_uuid(),
+  draft_id    uuid not null references bot_drafts(id) on delete cascade,
+  path        text not null,           -- ruta dentro del bucket "watches"
+  url         text not null,           -- URL pública
+  tg_message  bigint not null,         -- id del mensaje de Telegram (orden de llegada)
+  created_at  timestamptz not null default now(),
+  unique (draft_id, tg_message)
+);
+
+-- ─────────────────────────── Seguridad ───────────────────────────
+-- El público solo puede leer relojes publicados. Todo lo demás lo hace el
+-- servidor con la clave secreta (que ignora estas reglas).
+alter table watches          enable row level security;
+alter table sell_requests    enable row level security;
+alter table bot_drafts       enable row level security;
+alter table bot_draft_photos enable row level security;
 
 create policy "public read published watches" on watches
   for select using (status in ('available', 'reserved', 'sold'));
 
-create policy "public read images of published watches" on watch_images
-  for select using (exists (
-    select 1 from watches w
-    where w.id = watch_id and w.status in ('available', 'reserved', 'sold')
-  ));
-
-create policy "public can submit sell requests" on sell_requests
-  for insert with check (true);
-
-create policy "admin full access watches" on watches
-  for all to authenticated using (true) with check (true);
-create policy "admin full access images" on watch_images
-  for all to authenticated using (true) with check (true);
-create policy "admin read sell requests" on sell_requests
-  for select to authenticated using (true);
+-- ─────────────────────────── Fotos ───────────────────────────
+-- Bucket público para las fotos del inventario
+insert into storage.buckets (id, name, public)
+values ('watches', 'watches', true)
+on conflict (id) do nothing;

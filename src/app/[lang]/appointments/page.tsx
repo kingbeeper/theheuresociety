@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { hasLocale } from "@/lib/i18n";
-import { watches } from "@/lib/watches";
+import { getWatches } from "@/lib/inventory";
 import { getDictionary } from "../dictionaries";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
@@ -25,7 +25,7 @@ export default async function AppointmentsPage({ params }: PageProps<"/[lang]/ap
   const dict = await getDictionary(lang);
 
   // Solo piezas que se pueden ver (no vendidas)
-  const pieces = watches
+  const pieces = (await getWatches())
     .filter((w) => w.status !== "sold")
     .map((w) => ({ slug: w.slug, brand: w.brand, model: w.model, reference: w.reference, image: w.images[0] }));
 

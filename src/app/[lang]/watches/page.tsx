@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { hasLocale } from "@/lib/i18n";
-import { brands, watches } from "@/lib/watches";
+import { getBrands, getWatches } from "@/lib/inventory";
 import { getDictionary } from "../dictionaries";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
@@ -34,7 +34,7 @@ export default async function WatchesPage({ params }: PageProps<"/[lang]/watches
         <p className="mt-6 max-w-lg leading-relaxed text-stone">{dict.catalog.lead}</p>
 
         <div className="mt-14">
-          <Catalog watches={watches} brands={brands} lang={lang} dict={dict} />
+          <Catalog watches={await getWatches()} brands={await getBrands()} lang={lang} dict={dict} />
         </div>
       </main>
       <Footer lang={lang} dict={dict} />
