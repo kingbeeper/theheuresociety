@@ -53,3 +53,6 @@ next-env.d.ts
 # Fotos originales del estuche del cliente (se ven las cerraduras) y variantes de diseño descartadas
 /assets/case-photos/
 /assets/edits/cases/
+
+# Fotos de trabajo de los recortes
+/assets/edits/new/
