@@ -29,6 +29,7 @@ console.log("Órdenes:", await call("setMyCommands", {
   commands: [
     { command: "ayuda", description: "Cómo publicar un reloj" },
     { command: "lista", description: "Últimos relojes publicados" },
+    { command: "vista", description: "Volver a ver la ficha del borrador" },
     { command: "vendido", description: "Marcar como vendido (referencia)" },
     { command: "reservado", description: "Marcar como reservado (referencia)" },
     { command: "disponible", description: "Volver a disponible (referencia)" },

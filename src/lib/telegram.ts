@@ -31,8 +31,24 @@ export function sendMessage(chatId: number, text: string, extra: Record<string, 
   });
 }
 
-export function sendPhoto(chatId: number, photo: string, caption: string, extra: Record<string, unknown> = {}) {
-  return tg<{ message_id: number }>("sendPhoto", { chat_id: chatId, photo, caption, parse_mode: "HTML", ...extra });
+// Envía una foto por su URL. Si Telegram no logra descargarla (le pasa a veces con
+// almacenamiento externo), la descargamos nosotros y se la subimos directamente.
+export async function sendPhoto(chatId: number, photo: string, caption: string) {
+  try {
+    return await tg<{ message_id: number }>("sendPhoto", { chat_id: chatId, photo, caption, parse_mode: "HTML" });
+  } catch {
+    const img = await fetch(photo);
+    if (!img.ok) throw new Error(`No se pudo leer la foto (${img.status})`);
+    const form = new FormData();
+    form.append("chat_id", String(chatId));
+    form.append("photo", new Blob([await img.arrayBuffer()], { type: "image/jpeg" }), "photo.jpg");
+    form.append("caption", caption);
+    form.append("parse_mode", "HTML");
+    const res = await fetch(api("sendPhoto"), { method: "POST", body: form });
+    const json = (await res.json()) as { ok: boolean; result: { message_id: number }; description?: string };
+    if (!json.ok) throw new Error(`Telegram sendPhoto: ${json.description}`);
+    return json.result;
+  }
 }
 
 // Descarga una foto recibida (Telegram envía varios tamaños; se usa el mayor)

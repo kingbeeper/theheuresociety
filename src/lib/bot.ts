@@ -45,6 +45,7 @@ const HELP = `<b>The Heure Society · Publicar relojes</b>
 
 <b>Órdenes</b>
 /lista — últimos relojes publicados
+/vista — volver a ver la ficha del borrador actual
 /vendido <i>referencia</i> — marcar como vendido
 /reservado <i>referencia</i> — marcar como reservado
 /disponible <i>referencia</i> — volver a disponible
@@ -153,11 +154,13 @@ async function analyze(chatId: number, draftId: string) {
     const photos = await draftPhotos(draftId);
     const data = await analyzeWatch(photos, draft.caption ?? "");
     await updateDraft(draftId, { status: "ready", data, awaiting: null });
-    await sendPreview(chatId, draftId);
   } catch (e) {
     await updateDraft(draftId, { status: "collecting" });
     await sendMessage(chatId, `⚠️ No pude preparar la ficha: ${h((e as Error).message)}\nPuedes volver a enviar la nota para reintentar.`);
+    return;
   }
+  // Fuera del try: un fallo al mostrar la vista previa no descarta la ficha ya preparada
+  await sendPreview(chatId, draftId);
 }
 
 async function sendPreview(chatId: number, draftId: string) {
@@ -183,7 +186,14 @@ async function sendPreview(chatId: number, draftId: string) {
     "",
     ...specs.map(h),
   ].join("\n");
-  await sendPhoto(chatId, photos[0], caption.slice(0, 1024));
+  // Si la foto no se puede enviar, la ficha llega igual (no se pierde el trabajo de la IA)
+  const photoSent = await sendPhoto(chatId, photos[0], caption.slice(0, 1024)).then(
+    () => true,
+    (e) => {
+      console.error("Vista previa sin foto:", e);
+      return false;
+    }
+  );
 
   const warnings = w.warnings.length
     ? `\n\n⚠️ <b>Revisar</b> (confianza ${w.confidence === "high" ? "alta" : w.confidence === "medium" ? "media" : "baja"}):\n${w.warnings.map((x) => `• ${h(x)}`).join("\n")}`
@@ -191,7 +201,7 @@ async function sendPreview(chatId: number, draftId: string) {
 
   await sendMessage(
     chatId,
-    `<b>ES</b> ${h(w.description.es)}\n\n<b>EN</b> ${h(w.description.en)}\n\n📷 ${photos.length} foto(s)${warnings}`,
+    `${photoSent ? "" : `${caption}\n\n`}<b>ES</b> ${h(w.description.es)}\n\n<b>EN</b> ${h(w.description.en)}\n\n📷 ${photos.length} foto(s)${warnings}`,
     {
       reply_markup: keyboard([
         [{ text: "✅ Publicar", callback_data: `pub:${draftId}` }],
@@ -301,6 +311,14 @@ async function handleCommand(chatId: number, text: string) {
     case "/ayuda":
     case "/help":
       return sendMessage(chatId, HELP);
+
+    case "/vista": {
+      // Reenvía la ficha ya preparada (sin volver a llamar a la IA)
+      const draft = await openDraft(chatId);
+      if (!draft?.data) return sendMessage(chatId, "No hay ninguna ficha preparada. Envíame fotos y la nota del reloj.");
+      if (draft.status !== "ready") await updateDraft(draft.id, { status: "ready" });
+      return sendPreview(chatId, draft.id);
+    }
 
     case "/cancelar": {
       const draft = await openDraft(chatId);
