@@ -10,6 +10,9 @@ export type CaseLayout = {
   width: number; // px de la imagen, para la proporción
   height: number;
   slots: Slot[];
+  // Cuánto puede sobresalir el brazalete por arriba y por abajo del cojín, en % de su alto,
+  // sin pisar el cojín vecino (depende del espacio entre filas de cada estuche)
+  reach: number;
 };
 
 const px = (x: number, y: number, w: number, h: number, W: number, H: number): Slot => ({
@@ -31,6 +34,7 @@ const CASE_4: CaseLayout = {
   width: 2233,
   height: 777,
   slots: grid([255, 208, 2233, 777], [375, 893, 1417, 1937], [308], 375, 520),
+  reach: 16,
 };
 
 const CASE_6: CaseLayout = {
@@ -39,6 +43,7 @@ const CASE_6: CaseLayout = {
   width: 1689,
   height: 995,
   slots: grid([181, 165, 1689, 995], [376, 861, 1339], [270, 709], 322, 350),
+  reach: 16,
 };
 
 const CASE_12: CaseLayout = {
@@ -47,6 +52,7 @@ const CASE_12: CaseLayout = {
   width: 1984,
   height: 1387,
   slots: grid([219, 183, 1984, 1387], [366, 792, 1227, 1662], [268, 652, 1045], 300, 335),
+  reach: 11,
 };
 
 export const CASES: CaseLayout[] = [CASE_4, CASE_6, CASE_12];

@@ -12,8 +12,9 @@ import { Monogram } from "./Monogram";
 const CUTOUTS = cutouts as Record<string, string>;
 
 // Los recortes son 600×1200 con la caja del reloj ocupando el 62 % del ancho.
-// Con este ancho (respecto al cojín) la caja del reloj ocupa ~95 % del cojín.
-const CUTOUT_WIDTH = 153; // % del ancho del cojín
+// Con este ancho (respecto al cojín) la caja del reloj ocupa ~85 % del cojín,
+// dejando ver más brazalete por arriba y por abajo.
+const CUTOUT_WIDTH = 137; // % del ancho del cojín
 
 export function CollectionCase({ watches, lang, dict }: { watches: Watch[]; lang: Locale; dict: Dictionary }) {
   const cases = packIntoCases(watches);
@@ -35,7 +36,7 @@ export function CollectionCase({ watches, lang, dict }: { watches: Watch[]; lang
             className="object-cover"
           />
           {items.map((watch, s) => (
-            <CaseSlot key={watch.slug} watch={watch} slot={layout.slots[s]} lang={lang} dict={dict} />
+            <CaseSlot key={watch.slug} watch={watch} slot={layout.slots[s]} reach={layout.reach} lang={lang} dict={dict} />
           ))}
         </div>
       ))}
@@ -43,7 +44,7 @@ export function CollectionCase({ watches, lang, dict }: { watches: Watch[]; lang
   );
 }
 
-function CaseSlot({ watch, slot, lang, dict }: { watch: Watch; slot: Slot; lang: Locale; dict: Dictionary }) {
+function CaseSlot({ watch, slot, reach, lang, dict }: { watch: Watch; slot: Slot; reach: number; lang: Locale; dict: Dictionary }) {
   const cutout = CUTOUTS[watch.slug];
   const name = `${watch.brand} ${watch.model}`;
 
@@ -55,9 +56,10 @@ function CaseSlot({ watch, slot, lang, dict }: { watch: Watch; slot: Slot; lang:
       style={{ left: `${slot.x}%`, top: `${slot.y}%`, width: `${slot.w}%`, height: `${slot.h}%` }}
     >
       {cutout ? (
-        // La correa "se va" por los bordes curvos del cojín: se difumina arriba y abajo
+        // El brazalete sobresale del cojín (hasta `reach`) y se difumina en las puntas
         <span
-          className="absolute inset-y-0 -left-1/4 -right-1/4 [mask-image:linear-gradient(to_bottom,transparent_0%,black_9%,black_91%,transparent_100%)]"
+          className="absolute -left-1/4 -right-1/4 [mask-image:linear-gradient(to_bottom,transparent_0%,black_14%,black_86%,transparent_100%)]"
+          style={{ top: `-${reach}%`, bottom: `-${reach}%` }}
         >
           <Image
             src={cutout}
