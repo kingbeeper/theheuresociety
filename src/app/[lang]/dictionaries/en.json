@@ -1,0 +1,327 @@
+{
+  "meta": {
+    "title": "The Heure Society — Luxury Watches",
+    "description": "A private collection of Rolex, Audemars Piguet, Patek Philippe, Cartier and Richard Mille. Authenticated pieces, viewed by appointment."
+  },
+  "nav": {
+    "collection": "Collection",
+    "sell": "Sell Your Watch",
+    "about": "The Society",
+    "contact": "Contact",
+    "book": "Book a Viewing",
+    "consign": "Consignment"
+  },
+  "box": {
+    "open": "Open the case",
+    "close": "Close the case"
+  },
+  "hero": {
+    "eyebrow": "Private watch collection",
+    "title": "Time, kept in good company.",
+    "lead": "Authenticated pieces from the world's great maisons, presented privately in our office or by video call.",
+    "ctaPrimary": "View the Collection",
+    "ctaSecondary": "Book a Viewing"
+  },
+  "featured": {
+    "eyebrow": "Now in the collection",
+    "title": "New arrivals",
+    "viewAll": "View all pieces"
+  },
+  "watch": {
+    "boxPapers": "Box & papers",
+    "box": "Box only",
+    "none": "Watch only",
+    "available": "Available",
+    "reserved": "Reserved",
+    "sold": "Sold",
+    "inquire": "Inquire"
+  },
+  "trust": {
+    "items": [
+      {
+        "title": "Authenticated",
+        "text": "Every piece is inspected and verified before it is listed."
+      },
+      {
+        "title": "By appointment",
+        "text": "Private viewings in our office or by live video call."
+      },
+      {
+        "title": "Fair offers",
+        "text": "Sell or trade your watch with a transparent, same-day offer."
+      },
+      {
+        "title": "Insured delivery",
+        "text": "Fully insured, discreet shipping worldwide."
+      }
+    ]
+  },
+  "appointment": {
+    "eyebrow": "Private viewing",
+    "title": "See it in person — or from anywhere.",
+    "lead": "Choose a time that suits you. We'll prepare the pieces you're interested in before you arrive.",
+    "office": "At our office",
+    "officeText": "A private, one-on-one viewing by appointment.",
+    "video": "Video call",
+    "videoText": "A live, detailed look at any piece from wherever you are.",
+    "cta": "Choose a time"
+  },
+  "sell": {
+    "eyebrow": "Sell or trade",
+    "title": "Your watch deserves a fair offer.",
+    "lead": "Send us a few photos and the reference. We review every request personally and respond with an offer the same day.",
+    "cta": "Get an offer",
+    "stepsTitle": "How it works",
+    "steps": [
+      {
+        "title": "Tell us about your watch",
+        "text": "Brand, reference, condition and a few photos. It takes two minutes."
+      },
+      {
+        "title": "Receive an offer",
+        "text": "A specialist reviews it and sends a clear, no-obligation offer the same day."
+      },
+      {
+        "title": "Inspection & payment",
+        "text": "We authenticate the watch in person or via insured shipping, and pay immediately once verified."
+      }
+    ],
+    "buyTitle": "What we buy",
+    "buyText": "Rolex, Audemars Piguet, Patek Philippe, Richard Mille, Cartier and other fine watches — with or without box and papers.",
+    "formTitle": "Request an offer",
+    "watchSection": "Your watch",
+    "brand": "Brand",
+    "brandPick": "Select a brand",
+    "other": "Other",
+    "model": "Model (e.g. Submariner Date)",
+    "reference": "Reference (e.g. 126610LN)",
+    "year": "Year of purchase",
+    "condition": "Condition",
+    "conditions": {
+      "new": "New / unworn",
+      "excellent": "Excellent",
+      "good": "Good",
+      "fair": "Visible wear"
+    },
+    "set": "Included",
+    "box": "Box",
+    "papers": "Papers / warranty card",
+    "service": "Recent service",
+    "price": "Your asking price (optional)",
+    "intent": "I would like to",
+    "intentSell": "Sell",
+    "intentTrade": "Trade for another piece",
+    "photos": "Photos",
+    "photosHint": "Front of the dial, case back, clasp, and the papers if you have them. Up to 6.",
+    "addPhotos": "Add photos",
+    "remove": "Remove",
+    "contactSection": "Your details",
+    "name": "Full name",
+    "phone": "Phone / WhatsApp",
+    "email": "Email",
+    "note": "Anything else we should know?",
+    "contactHint": "Please leave a phone number or an email.",
+    "submit": "Send request",
+    "missing": "Complete: {fields}",
+    "missingBrand": "brand",
+    "missingModel": "model or reference",
+    "missingName": "name",
+    "missingContact": "phone or email",
+    "privacy": "Your details and photos are only used to evaluate your watch.",
+    "doneTitle": "Request ready",
+    "doneShared": "Your request and photos were shared. We will reply with an offer the same day.",
+    "doneText": "WhatsApp should have opened with your request. Please attach your photos in the chat before sending.",
+    "doneRetry": "Open WhatsApp again",
+    "doneNew": "Send another watch",
+    "msgTitle": "Offer request — The Heure Society",
+    "msgPhotos": "Photos: {n} (attached)",
+    "msgNote": "Note"
+  },
+  "footer": {
+    "tagline": "A private collection of exceptional timepieces.",
+    "rights": "All rights reserved.",
+    "disclaimer": "The Heure Society is an independent dealer and is not affiliated with the brands it offers."
+  },
+  "catalog": {
+    "eyebrow": "The collection",
+    "title": "Every piece, in one place",
+    "lead": "Authenticated watches, available to view in our office or by video call.",
+    "all": "All",
+    "brand": "Brand",
+    "availability": "Availability",
+    "onlyAvailable": "Available only",
+    "sort": "Sort",
+    "sortNew": "Newest",
+    "sortPriceAsc": "Price: low to high",
+    "sortPriceDesc": "Price: high to low",
+    "count": "{n} pieces",
+    "countOne": "1 piece",
+    "empty": "No pieces match these filters.",
+    "reset": "Clear filters"
+  },
+  "detail": {
+    "back": "Back to the collection",
+    "reference": "Reference",
+    "specs": "Specifications",
+    "case": "Case",
+    "material": "Material",
+    "dial": "Dial",
+    "bracelet": "Bracelet",
+    "movement": "Movement",
+    "powerReserve": "Power reserve",
+    "waterResistance": "Water resistance",
+    "year": "Year",
+    "set": "Box & papers",
+    "boxYes": "Box",
+    "papersYes": "Papers",
+    "notIncluded": "Watch only",
+    "whatsapp": "Inquire on WhatsApp",
+    "book": "Book a private viewing",
+    "whatsappMessage": "Hello, I am interested in the {watch} (ref. {ref}) on The Heure Society.",
+    "assurance": [
+      "Authenticity guaranteed",
+      "Viewing by appointment or video call",
+      "Fully insured delivery"
+    ],
+    "related": "You may also like",
+    "photo": "Photo"
+  },
+  "booking": {
+    "eyebrow": "Private viewing",
+    "title": "Book an appointment",
+    "lead": "Choose how you would like to see the pieces, and a time that suits you. We will confirm your appointment personally.",
+    "step1": "How would you like to meet?",
+    "office": "At our office",
+    "officeText": "A private, one-on-one viewing. The exact address is shared when we confirm.",
+    "video": "Video call",
+    "videoText": "A live, detailed look at each piece from wherever you are.",
+    "step2": "Pieces you would like to see",
+    "step2Hint": "Optional — select as many as you like.",
+    "step3": "Choose a day and time",
+    "closed": "Closed",
+    "duration": "{n}-minute appointment",
+    "pickDay": "Select a day to see available times.",
+    "step4": "Your details",
+    "name": "Full name",
+    "phone": "Phone / WhatsApp",
+    "email": "Email",
+    "note": "Anything we should know?",
+    "contactHint": "Please leave a phone number or an email.",
+    "summary": "Your appointment",
+    "type": "Type",
+    "when": "When",
+    "pieces": "Pieces",
+    "none": "To be discussed",
+    "submit": "Send request via WhatsApp",
+    "missing": "Complete: {fields}",
+    "missingType": "type",
+    "missingSlot": "day and time",
+    "missingName": "name",
+    "missingContact": "phone or email",
+    "privacy": "Your details are only used to arrange this appointment.",
+    "doneTitle": "Request ready",
+    "doneText": "WhatsApp should have opened with your request. Send the message and we will confirm your appointment shortly.",
+    "doneRetry": "Open WhatsApp again",
+    "doneNew": "Book another appointment",
+    "msgTitle": "Appointment request — The Heure Society",
+    "msgOffice": "Office visit",
+    "msgVideo": "Video call",
+    "msgNote": "Note"
+  },
+  "marquee": "The houses we curate",
+  "consign": {
+    "eyebrow": "Consignment",
+    "title": "Sell at the right price, without the rush.",
+    "lead": "Leave your watch with us and we will sell it on your behalf to our private clientele — at a price you approve, fully insured until the day it sells.",
+    "cta": "Start a consignment",
+    "whyTitle": "Why consign",
+    "why": [
+      {
+        "title": "A higher price",
+        "text": "Selling to a collector instead of to a dealer usually means a stronger result for you."
+      },
+      {
+        "title": "You stay in control",
+        "text": "We agree on the price together, and nothing is sold without your approval."
+      },
+      {
+        "title": "No effort on your side",
+        "text": "Authentication, photography, listing, viewings and negotiation — we handle all of it."
+      }
+    ],
+    "stepsTitle": "How it works",
+    "steps": [
+      {
+        "title": "Tell us about your watch",
+        "text": "Send the reference, condition and a few photos."
+      },
+      {
+        "title": "Agree on a price",
+        "text": "We study the current market and propose a sale price for your approval."
+      },
+      {
+        "title": "We present it",
+        "text": "Your watch is authenticated, professionally photographed and offered to our clients, in a safe and insured."
+      },
+      {
+        "title": "You get paid",
+        "text": "As soon as it sells, we pay you the agreed amount."
+      }
+    ],
+    "compareTitle": "Sell or consign?",
+    "compareSell": "Sell to us",
+    "compareConsign": "Consign",
+    "compareRows": [
+      [
+        "Payment",
+        "Immediate",
+        "When the watch sells"
+      ],
+      [
+        "Price",
+        "Our offer",
+        "Market price, approved by you"
+      ],
+      [
+        "Best for",
+        "You need liquidity now",
+        "You want the best result"
+      ]
+    ],
+    "compareSellCta": "Prefer to sell now?",
+    "termsNote": "Commission and agreement terms are discussed privately and confirmed in writing before we receive your watch.",
+    "faqTitle": "Questions",
+    "faq": [
+      {
+        "q": "Who sets the price?",
+        "a": "We propose a price based on the current market, and you approve it. It is never changed without your agreement."
+      },
+      {
+        "q": "Where is my watch while it is with us?",
+        "a": "Stored in a safe and insured for its full agreed value for as long as it is in our care."
+      },
+      {
+        "q": "How long does it take to sell?",
+        "a": "It depends on the model and the price. Highly sought-after references often sell quickly; we keep you informed throughout."
+      },
+      {
+        "q": "Can I take my watch back?",
+        "a": "Yes. You can withdraw your watch under the terms of your consignment agreement."
+      }
+    ],
+    "formTitle": "Start a consignment",
+    "priceLabel": "Price you would like to get (optional)",
+    "msgTitle": "Consignment request — The Heure Society",
+    "teaser": {
+      "eyebrow": "Consignment",
+      "title": "Sell at the right price, without the rush.",
+      "text": "We sell your watch on your behalf to our private clientele, fully insured and at a price you approve.",
+      "cta": "How it works"
+    }
+  },
+  "home": {
+    "collectionEyebrow": "The collection",
+    "collectionTitle": "Chosen one by one.",
+    "collectionText": "Every piece in our collection is authenticated and available to view privately, in our office or by video call."
+  }
+}

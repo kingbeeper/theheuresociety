@@ -1,0 +1,327 @@
+{
+  "meta": {
+    "title": "The Heure Society — Relojes de Lujo",
+    "description": "Una colección privada de Rolex, Audemars Piguet, Patek Philippe, Cartier y Richard Mille. Piezas autenticadas, con cita previa."
+  },
+  "nav": {
+    "collection": "Colección",
+    "sell": "Vende tu reloj",
+    "about": "La Sociedad",
+    "contact": "Contacto",
+    "book": "Agendar cita",
+    "consign": "Consignación"
+  },
+  "box": {
+    "open": "Abrir el estuche",
+    "close": "Cerrar el estuche"
+  },
+  "hero": {
+    "eyebrow": "Colección privada de relojes",
+    "title": "El tiempo, en buena compañía.",
+    "lead": "Piezas autenticadas de las grandes casas relojeras, presentadas en privado en nuestra oficina o por videollamada.",
+    "ctaPrimary": "Ver la colección",
+    "ctaSecondary": "Agendar cita"
+  },
+  "featured": {
+    "eyebrow": "Recién llegados",
+    "title": "Novedades",
+    "viewAll": "Ver todas las piezas"
+  },
+  "watch": {
+    "boxPapers": "Caja y papeles",
+    "box": "Solo caja",
+    "none": "Solo reloj",
+    "available": "Disponible",
+    "reserved": "Reservado",
+    "sold": "Vendido",
+    "inquire": "Consultar"
+  },
+  "trust": {
+    "items": [
+      {
+        "title": "Autenticados",
+        "text": "Cada pieza se inspecciona y verifica antes de publicarse."
+      },
+      {
+        "title": "Con cita previa",
+        "text": "Visitas privadas en nuestra oficina o por videollamada."
+      },
+      {
+        "title": "Ofertas justas",
+        "text": "Vende o intercambia tu reloj con una oferta clara el mismo día."
+      },
+      {
+        "title": "Envío asegurado",
+        "text": "Envíos discretos y totalmente asegurados a todo el mundo."
+      }
+    ]
+  },
+  "appointment": {
+    "eyebrow": "Visita privada",
+    "title": "Véalo en persona, o desde cualquier lugar.",
+    "lead": "Elija el horario que le convenga. Prepararemos las piezas que le interesan antes de su llegada.",
+    "office": "En nuestra oficina",
+    "officeText": "Una visita privada y personalizada con cita previa.",
+    "video": "Videollamada",
+    "videoText": "Un recorrido en vivo y en detalle de cualquier pieza, desde donde esté.",
+    "cta": "Elegir horario"
+  },
+  "sell": {
+    "eyebrow": "Vende o intercambia",
+    "title": "Su reloj merece una oferta justa.",
+    "lead": "Envíenos unas fotos y la referencia. Revisamos cada solicitud de forma personal y respondemos con una oferta el mismo día.",
+    "cta": "Recibir oferta",
+    "stepsTitle": "Cómo funciona",
+    "steps": [
+      {
+        "title": "Cuéntenos sobre su reloj",
+        "text": "Marca, referencia, estado y unas fotos. Le tomará dos minutos."
+      },
+      {
+        "title": "Reciba una oferta",
+        "text": "Un especialista lo revisa y le envía una oferta clara y sin compromiso el mismo día."
+      },
+      {
+        "title": "Inspección y pago",
+        "text": "Autenticamos el reloj en persona o con envío asegurado, y pagamos de inmediato tras verificarlo."
+      }
+    ],
+    "buyTitle": "Qué compramos",
+    "buyText": "Rolex, Audemars Piguet, Patek Philippe, Richard Mille, Cartier y otros relojes finos, con o sin caja y papeles.",
+    "formTitle": "Solicitar una oferta",
+    "watchSection": "Su reloj",
+    "brand": "Marca",
+    "brandPick": "Seleccione una marca",
+    "other": "Otra",
+    "model": "Modelo (ej. Submariner Date)",
+    "reference": "Referencia (ej. 126610LN)",
+    "year": "Año de compra",
+    "condition": "Estado",
+    "conditions": {
+      "new": "Nuevo / sin uso",
+      "excellent": "Excelente",
+      "good": "Bueno",
+      "fair": "Uso visible"
+    },
+    "set": "Incluye",
+    "box": "Caja",
+    "papers": "Papeles / tarjeta de garantía",
+    "service": "Servicio reciente",
+    "price": "Precio que espera (opcional)",
+    "intent": "Me gustaría",
+    "intentSell": "Vender",
+    "intentTrade": "Cambiarlo por otra pieza",
+    "photos": "Fotos",
+    "photosHint": "Frente de la esfera, fondo de la caja, cierre y los papeles si los tiene. Hasta 6.",
+    "addPhotos": "Añadir fotos",
+    "remove": "Quitar",
+    "contactSection": "Sus datos",
+    "name": "Nombre completo",
+    "phone": "Teléfono / WhatsApp",
+    "email": "Correo electrónico",
+    "note": "¿Algo más que debamos saber?",
+    "contactHint": "Deje un teléfono o un correo electrónico.",
+    "submit": "Enviar solicitud",
+    "missing": "Complete: {fields}",
+    "missingBrand": "marca",
+    "missingModel": "modelo o referencia",
+    "missingName": "nombre",
+    "missingContact": "teléfono o correo",
+    "privacy": "Sus datos y fotos solo se usan para evaluar su reloj.",
+    "doneTitle": "Solicitud preparada",
+    "doneShared": "Su solicitud y sus fotos se compartieron. Le responderemos con una oferta el mismo día.",
+    "doneText": "Se abrió WhatsApp con su solicitud. Adjunte sus fotos en el chat antes de enviar.",
+    "doneRetry": "Abrir WhatsApp de nuevo",
+    "doneNew": "Enviar otro reloj",
+    "msgTitle": "Solicitud de oferta — The Heure Society",
+    "msgPhotos": "Fotos: {n} (adjuntas)",
+    "msgNote": "Nota"
+  },
+  "footer": {
+    "tagline": "Una colección privada de relojes excepcionales.",
+    "rights": "Todos los derechos reservados.",
+    "disclaimer": "The Heure Society es un distribuidor independiente y no está afiliado a las marcas que ofrece."
+  },
+  "catalog": {
+    "eyebrow": "La colección",
+    "title": "Todas las piezas, en un solo lugar",
+    "lead": "Relojes autenticados, disponibles para ver en nuestra oficina o por videollamada.",
+    "all": "Todas",
+    "brand": "Marca",
+    "availability": "Disponibilidad",
+    "onlyAvailable": "Solo disponibles",
+    "sort": "Ordenar",
+    "sortNew": "Más recientes",
+    "sortPriceAsc": "Precio: menor a mayor",
+    "sortPriceDesc": "Precio: mayor a menor",
+    "count": "{n} piezas",
+    "countOne": "1 pieza",
+    "empty": "Ninguna pieza coincide con estos filtros.",
+    "reset": "Quitar filtros"
+  },
+  "detail": {
+    "back": "Volver a la colección",
+    "reference": "Referencia",
+    "specs": "Ficha técnica",
+    "case": "Caja",
+    "material": "Material",
+    "dial": "Esfera",
+    "bracelet": "Brazalete",
+    "movement": "Movimiento",
+    "powerReserve": "Reserva de marcha",
+    "waterResistance": "Hermeticidad",
+    "year": "Año",
+    "set": "Caja y papeles",
+    "boxYes": "Caja",
+    "papersYes": "Papeles",
+    "notIncluded": "Solo reloj",
+    "whatsapp": "Consultar por WhatsApp",
+    "book": "Agendar una visita privada",
+    "whatsappMessage": "Hola, me interesa el {watch} (ref. {ref}) de The Heure Society.",
+    "assurance": [
+      "Autenticidad garantizada",
+      "Visita con cita previa o videollamada",
+      "Envío totalmente asegurado"
+    ],
+    "related": "También le puede interesar",
+    "photo": "Foto"
+  },
+  "booking": {
+    "eyebrow": "Visita privada",
+    "title": "Agendar una cita",
+    "lead": "Elija cómo desea ver las piezas y el horario que le convenga. Confirmaremos su cita de forma personal.",
+    "step1": "¿Cómo prefiere reunirse?",
+    "office": "En nuestra oficina",
+    "officeText": "Una visita privada y personalizada. La dirección exacta se comparte al confirmar.",
+    "video": "Videollamada",
+    "videoText": "Un recorrido en vivo y en detalle de cada pieza, desde donde esté.",
+    "step2": "Piezas que desea ver",
+    "step2Hint": "Opcional: seleccione todas las que quiera.",
+    "step3": "Elija día y hora",
+    "closed": "Cerrado",
+    "duration": "Cita de {n} minutos",
+    "pickDay": "Seleccione un día para ver los horarios disponibles.",
+    "step4": "Sus datos",
+    "name": "Nombre completo",
+    "phone": "Teléfono / WhatsApp",
+    "email": "Correo electrónico",
+    "note": "¿Algo que debamos saber?",
+    "contactHint": "Deje un teléfono o un correo electrónico.",
+    "summary": "Su cita",
+    "type": "Tipo",
+    "when": "Cuándo",
+    "pieces": "Piezas",
+    "none": "Por definir",
+    "submit": "Enviar solicitud por WhatsApp",
+    "missing": "Complete: {fields}",
+    "missingType": "tipo",
+    "missingSlot": "día y hora",
+    "missingName": "nombre",
+    "missingContact": "teléfono o correo",
+    "privacy": "Sus datos solo se usan para organizar esta cita.",
+    "doneTitle": "Solicitud preparada",
+    "doneText": "Se abrió WhatsApp con su solicitud. Envíe el mensaje y le confirmaremos la cita en breve.",
+    "doneRetry": "Abrir WhatsApp de nuevo",
+    "doneNew": "Agendar otra cita",
+    "msgTitle": "Solicitud de cita — The Heure Society",
+    "msgOffice": "Visita en oficina",
+    "msgVideo": "Videollamada",
+    "msgNote": "Nota"
+  },
+  "marquee": "Las casas que seleccionamos",
+  "consign": {
+    "eyebrow": "Consignación",
+    "title": "Venda al precio justo, sin prisa.",
+    "lead": "Deje su reloj con nosotros y lo venderemos por usted a nuestra clientela privada, a un precio que usted aprueba y totalmente asegurado hasta el día de la venta.",
+    "cta": "Iniciar una consignación",
+    "whyTitle": "Por qué consignar",
+    "why": [
+      {
+        "title": "Un mejor precio",
+        "text": "Vender a un coleccionista en lugar de a un comerciante suele significar un mejor resultado para usted."
+      },
+      {
+        "title": "Usted decide",
+        "text": "Acordamos el precio juntos y nada se vende sin su aprobación."
+      },
+      {
+        "title": "Sin esfuerzo de su parte",
+        "text": "Autenticación, fotografía, publicación, visitas y negociación: nos encargamos de todo."
+      }
+    ],
+    "stepsTitle": "Cómo funciona",
+    "steps": [
+      {
+        "title": "Cuéntenos sobre su reloj",
+        "text": "Envíe la referencia, el estado y unas fotos."
+      },
+      {
+        "title": "Acordamos el precio",
+        "text": "Estudiamos el mercado actual y le proponemos un precio de venta para su aprobación."
+      },
+      {
+        "title": "Lo presentamos",
+        "text": "Su reloj se autentica, se fotografía de forma profesional y se ofrece a nuestros clientes, guardado en caja fuerte y asegurado."
+      },
+      {
+        "title": "Usted cobra",
+        "text": "En cuanto se vende, le pagamos el importe acordado."
+      }
+    ],
+    "compareTitle": "¿Vender o consignar?",
+    "compareSell": "Vendernos",
+    "compareConsign": "Consignar",
+    "compareRows": [
+      [
+        "Pago",
+        "Inmediato",
+        "Cuando el reloj se vende"
+      ],
+      [
+        "Precio",
+        "Nuestra oferta",
+        "Precio de mercado, aprobado por usted"
+      ],
+      [
+        "Ideal si",
+        "Necesita liquidez ahora",
+        "Busca el mejor resultado"
+      ]
+    ],
+    "compareSellCta": "¿Prefiere vender ahora?",
+    "termsNote": "La comisión y las condiciones del acuerdo se conversan en privado y se confirman por escrito antes de recibir su reloj.",
+    "faqTitle": "Preguntas",
+    "faq": [
+      {
+        "q": "¿Quién fija el precio?",
+        "a": "Le proponemos un precio según el mercado actual y usted lo aprueba. Nunca se cambia sin su acuerdo."
+      },
+      {
+        "q": "¿Dónde está mi reloj mientras lo tenemos?",
+        "a": "Guardado en caja fuerte y asegurado por su valor acordado durante todo el tiempo que esté con nosotros."
+      },
+      {
+        "q": "¿Cuánto tarda en venderse?",
+        "a": "Depende del modelo y del precio. Las referencias más buscadas suelen venderse rápido; le mantenemos informado en todo momento."
+      },
+      {
+        "q": "¿Puedo retirar mi reloj?",
+        "a": "Sí. Puede retirarlo según los términos de su acuerdo de consignación."
+      }
+    ],
+    "formTitle": "Iniciar una consignación",
+    "priceLabel": "Precio que le gustaría obtener (opcional)",
+    "msgTitle": "Solicitud de consignación — The Heure Society",
+    "teaser": {
+      "eyebrow": "Consignación",
+      "title": "Venda al precio justo, sin prisa.",
+      "text": "Vendemos su reloj por usted a nuestra clientela privada, asegurado y a un precio que usted aprueba.",
+      "cta": "Cómo funciona"
+    }
+  },
+  "home": {
+    "collectionEyebrow": "La colección",
+    "collectionTitle": "Elegidos uno a uno.",
+    "collectionText": "Cada pieza de nuestra colección está autenticada y disponible para verla en privado, en nuestra oficina o por videollamada."
+  }
+}
