@@ -160,7 +160,8 @@
     "reset": "Clear filters",
     "view": "View",
     "viewCase": "Case",
-    "viewGrid": "Grid"
+    "viewGrid": "Grid",
+    "caseEmpty": "Pieces will appear in the case as soon as their photos are ready. Meanwhile, see them in the grid view."
   },
   "detail": {
     "back": "Back to the collection",

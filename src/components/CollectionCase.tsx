@@ -7,7 +7,6 @@ import type { Locale } from "@/lib/i18n";
 import type { Dictionary } from "@/app/[lang]/dictionaries";
 import { formatPrice, type Watch } from "@/lib/watches";
 import { packIntoCases, type Slot } from "@/lib/cases";
-import { Monogram } from "./Monogram";
 
 const CUTOUTS = cutouts as Record<string, string>;
 
@@ -18,11 +17,16 @@ const CUTOUT_WIDTH = 137; // % del ancho del cojín
 
 // Como en el estuche real: la caja del reloj descansa en la parte alta del cojín,
 // el brazalete apenas asoma por arriba (se va por detrás) y baja por delante.
-const HEAD_AT = 38; // centro de la caja del reloj, en % del alto del cojín
-const TOP_REACH = 4; // cuánto asoma el brazalete por encima del cojín, en % de su alto
+const HEAD_AT = 46; // centro de la caja del reloj, en % del alto del cojín
+const TOP_REACH = 8; // cuánto asoma el brazalete por encima del cojín, en % de su alto
 
 export function CollectionCase({ watches, lang, dict }: { watches: Watch[]; lang: Locale; dict: Dictionary }) {
-  const cases = packIntoCases(watches);
+  // En el estuche solo van los relojes que ya tienen su recorte sin fondo
+  const cases = packIntoCases(watches.filter((w) => CUTOUTS[w.slug]));
+
+  if (!cases.length) {
+    return <p className="py-16 text-center text-sm text-stone">{dict.catalog.caseEmpty}</p>;
+  }
 
   return (
     <div className="space-y-16">
@@ -50,7 +54,7 @@ export function CollectionCase({ watches, lang, dict }: { watches: Watch[]; lang
 }
 
 function CaseSlot({ watch, slot, reach, lang, dict }: { watch: Watch; slot: Slot; reach: number; lang: Locale; dict: Dictionary }) {
-  const cutout = CUTOUTS[watch.slug];
+  const cutout = CUTOUTS[watch.slug]!;
   const name = `${watch.brand} ${watch.model}`;
 
   return (
@@ -60,10 +64,10 @@ function CaseSlot({ watch, slot, reach, lang, dict }: { watch: Watch; slot: Slot
       className="group absolute focus-visible:outline-none"
       style={{ left: `${slot.x}%`, top: `${slot.y}%`, width: `${slot.w}%`, height: `${slot.h}%` }}
     >
-      {cutout ? (
-        // Zona visible del reloj: desde un poco por encima del cojín hasta algo más abajo
-        // de su borde frontal (`reach`), con las puntas del brazalete difuminadas
-        <span
+      {/* Zona visible del reloj: desde un poco por encima del cojín hasta el hueco bajo
+          su borde frontal (`reach`). El brazalete es nítido sobre todo el cojín y solo
+          se difumina fuera de él, donde se mete por detrás o en el compartimento. */}
+      <span
           className="absolute -left-1/4 -right-1/4"
           style={{
             top: `-${TOP_REACH}%`,
@@ -85,11 +89,6 @@ function CaseSlot({ watch, slot, reach, lang, dict }: { watch: Watch; slot: Slot
             }}
           />
         </span>
-      ) : (
-        <span className="absolute inset-0 flex items-center justify-center opacity-30 transition-opacity group-hover:opacity-60">
-          <Monogram size={44} />
-        </span>
-      )}
 
       {watch.status !== "available" && (
         <span className="absolute left-1/2 top-[6%] -translate-x-1/2 whitespace-nowrap bg-ink/85 px-2 py-1 text-[0.5rem] tracking-[0.2em] uppercase text-brass sm:text-[0.6rem]">
@@ -107,10 +106,10 @@ function CaseSlot({ watch, slot, reach, lang, dict }: { watch: Watch; slot: Slot
   );
 }
 
-// Difuminado del brazalete: corto arriba (se va por detrás del cojín) y más largo abajo
+// Difuminado solo fuera del cojín: por encima (TOP_REACH) y por debajo (reach)
 function braceletMask(reach: number) {
   const total = 100 + TOP_REACH + reach;
-  const topFade = ((TOP_REACH * 2) / total) * 100;
-  const bottomFade = ((reach + 6) / total) * 100;
-  return `linear-gradient(to bottom, transparent 0%, black ${topFade}%, black ${100 - bottomFade}%, transparent 100%)`;
+  const top = (TOP_REACH / total) * 100;
+  const bottom = 100 - (reach / total) * 100;
+  return `linear-gradient(to bottom, transparent 0%, black ${top}%, black ${bottom}%, transparent 100%)`;
 }

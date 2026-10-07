@@ -160,7 +160,8 @@
     "reset": "Quitar filtros",
     "view": "Vista",
     "viewCase": "Estuche",
-    "viewGrid": "Cuadrícula"
+    "viewGrid": "Cuadrícula",
+    "caseEmpty": "Las piezas aparecerán en el estuche en cuanto sus fotos estén listas. Mientras tanto, véalas en la vista de cuadrícula."
   },
   "detail": {
     "back": "Volver a la colección",
