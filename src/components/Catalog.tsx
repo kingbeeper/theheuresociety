@@ -5,7 +5,7 @@ import type { Locale } from "@/lib/i18n";
 import type { Dictionary } from "@/app/[lang]/dictionaries";
 import type { Watch } from "@/lib/watches";
 import { WatchCard } from "./WatchCard";
-import { CollectionCase } from "./CollectionCase";
+import { CollectionCase, inCase } from "./CollectionCase";
 
 type Sort = "new" | "priceAsc" | "priceDesc";
 
@@ -89,7 +89,11 @@ export function Catalog({
 
       <div className="mt-8 flex items-center justify-between gap-4">
         <p className="text-xs tracking-[0.18em] uppercase text-stone">
-          {list.length === 1 ? t.countOne : t.count.replace("{n}", String(list.length))}
+          {(() => {
+            // El contador refleja lo que se ve: en el estuche, solo las piezas que contiene
+            const n = view === "case" ? list.filter(inCase).length : list.length;
+            return n === 1 ? t.countOne : t.count.replace("{n}", String(n));
+          })()}
         </p>
         <div className="flex border border-line" role="group" aria-label={t.view}>
           {(["case", "grid"] as const).map((v) => (

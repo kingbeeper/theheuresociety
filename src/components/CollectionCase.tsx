@@ -10,6 +10,10 @@ import { packIntoCases, type Slot } from "@/lib/cases";
 
 const CUTOUTS = cutouts as Record<string, string>;
 
+// Qué relojes van en el estuche: los que tienen recorte y no están vendidos.
+// Al marcar uno como vendido (p. ej. /vendido en Telegram) sale solo y el estuche se reajusta.
+export const inCase = (w: Watch) => w.status !== "sold" && Boolean(CUTOUTS[w.slug]);
+
 // Los recortes son 600×1200 con la caja del reloj ocupando el 62 % del ancho.
 // Con este ancho (respecto al cojín) la caja del reloj ocupa ~85 % del cojín,
 // dejando ver más brazalete por arriba y por abajo.
@@ -21,8 +25,7 @@ const HEAD_AT = 46; // centro de la caja del reloj, en % del alto del cojín
 const TOP_REACH = 8; // cuánto asoma el brazalete por encima del cojín, en % de su alto
 
 export function CollectionCase({ watches, lang, dict }: { watches: Watch[]; lang: Locale; dict: Dictionary }) {
-  // En el estuche solo van los relojes que ya tienen su recorte sin fondo
-  const cases = packIntoCases(watches.filter((w) => CUTOUTS[w.slug]));
+  const cases = packIntoCases(watches.filter(inCase));
 
   if (!cases.length) {
     return <p className="py-16 text-center text-sm text-stone">{dict.catalog.caseEmpty}</p>;
