@@ -7,6 +7,7 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Catalog } from "@/components/Catalog";
 import { GoldMonogram } from "@/components/GoldMonogram";
+import { CollectionTitle } from "@/components/CollectionTitle";
 
 export async function generateMetadata({ params }: PageProps<"/[lang]/watches">): Promise<Metadata> {
   const { lang } = await params;
@@ -31,12 +32,7 @@ export default async function WatchesPage({ params }: PageProps<"/[lang]/watches
         <header className="text-center">
           <GoldMonogram height={60} />
           <p className="eyebrow mt-6">{dict.catalog.eyebrow}</p>
-          <h1 className="mt-5 font-display text-6xl font-light leading-none tracking-[0.02em] md:text-8xl">
-            {dict.catalog.titleA}{" "}
-            <em className="bg-[linear-gradient(135deg,#f3e2b0_0%,#c8a960_35%,#a8873f_60%,#e3c98a_85%)] bg-clip-text font-light text-transparent">
-              {dict.catalog.titleB}
-            </em>
-          </h1>
+          <CollectionTitle first={dict.catalog.titleA} second={dict.catalog.titleB} />
           {/* Ornamento: filetes dorados con un rombo, como en la tira de marcas */}
           <div className="mx-auto mt-8 flex max-w-xs items-center gap-4" aria-hidden>
             <span className="h-px flex-1 bg-gradient-to-r from-transparent to-brass/70" />

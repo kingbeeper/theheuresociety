@@ -48,3 +48,48 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .marquee { animation: none; }
 }
+
+/* Título "La Colección": oro con un reflejo que sigue al ratón (--mx, --my) */
+@property --mx {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: -30%;
+}
+@property --my {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 45%;
+}
+.title-shine {
+  background-image:
+    radial-gradient(ellipse 1.1em 1.6em at var(--mx) var(--my), #fffdf5 0%, rgba(255, 240, 200, 0.85) 30%, rgba(240, 214, 150, 0.35) 55%, transparent 75%),
+    linear-gradient(135deg, #d8bf80 0%, #b08f4a 35%, #8a6d33 60%, #c4a462 85%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  padding-right: 0.08em; /* que la cursiva no se corte */
+  transition: filter 0.6s ease;
+  /* Al cargar, el reflejo cruza la palabra una vez */
+  animation: title-sweep 2.2s ease-out 0.5s 1;
+}
+.group:hover .title-shine {
+  filter: drop-shadow(0 0 18px rgba(200, 169, 96, 0.28));
+}
+@keyframes title-sweep {
+  from { --mx: -30%; }
+  to { --mx: 130%; }
+}
+/* Sin ratón (móvil, tableta): el reflejo pasa solo cada pocos segundos */
+@keyframes title-sweep-loop {
+  0% { --mx: -30%; }
+  35% { --mx: 130%; }
+  100% { --mx: 130%; }
+}
+@media (hover: none) {
+  .title-shine {
+    animation: title-sweep-loop 6s ease-in-out 0.5s infinite;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .title-shine { animation: none; }
+}
