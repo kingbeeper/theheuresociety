@@ -9,7 +9,8 @@ export function Header({ lang, dict }: { lang: Locale; dict: Dictionary }) {
     { href: `/${lang}/watches`, label: dict.nav.collection },
     { href: `/${lang}/sell`, label: dict.nav.sell },
     { href: `/${lang}/consign`, label: dict.nav.consign },
-    { href: `/${lang}/about`, label: dict.nav.about },
+    // La Sociedad (/about) oculta hasta tener la página
+    // { href: `/${lang}/about`, label: dict.nav.about },
     { href: `/${lang}/contact`, label: dict.nav.contact },
   ];
 
