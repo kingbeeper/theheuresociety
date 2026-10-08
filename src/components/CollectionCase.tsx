@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import cutouts from "@/data/cutouts.json";
 import type { Locale } from "@/lib/i18n";
 import type { Dictionary } from "@/app/[lang]/dictionaries";
@@ -26,6 +27,21 @@ const TOP_REACH = 8; // cuánto asoma el brazalete por encima del cojín, en % d
 
 export function CollectionCase({ watches, lang, dict }: { watches: Watch[]; lang: Locale; dict: Dictionary }) {
   const cases = packIntoCases(watches.filter(inCase));
+  // Reloj seleccionado: muestra su rótulo; un segundo clic abre la ficha
+  const [selected, setSelected] = useState<string | null>(null);
+
+  useEffect(() => {
+    const close = (e: Event) => {
+      if (e instanceof KeyboardEvent ? e.key === "Escape" : !(e.target as Element).closest("[data-case-slot]"))
+        setSelected(null);
+    };
+    document.addEventListener("click", close);
+    document.addEventListener("keydown", close);
+    return () => {
+      document.removeEventListener("click", close);
+      document.removeEventListener("keydown", close);
+    };
+  }, []);
 
   if (!cases.length) {
     return <p className="py-16 text-center text-sm text-stone">{dict.catalog.caseEmpty}</p>;
@@ -52,16 +68,42 @@ export function CollectionCase({ watches, lang, dict }: { watches: Watch[]; lang
             className="object-cover"
           />
           {items.map((watch, s) => (
-            <CaseSlot key={watch.slug} watch={watch} slot={layout.slots[s]} reach={layout.reach} lang={lang} dict={dict} />
+            <CaseSlot
+              key={watch.slug}
+              watch={watch}
+              slot={layout.slots[s]}
+              reach={layout.reach}
+              selected={selected === watch.slug}
+              onSelect={() => setSelected(watch.slug)}
+              lang={lang}
+              dict={dict}
+            />
           ))}
         </div>
         </div>
       ))}
+      <p className="text-center text-[0.68rem] tracking-[0.22em] uppercase text-stone/70">{dict.catalog.caseHint}</p>
     </div>
   );
 }
 
-function CaseSlot({ watch, slot, reach, lang, dict }: { watch: Watch; slot: Slot; reach: number; lang: Locale; dict: Dictionary }) {
+function CaseSlot({
+  watch,
+  slot,
+  reach,
+  selected,
+  onSelect,
+  lang,
+  dict,
+}: {
+  watch: Watch;
+  slot: Slot;
+  reach: number;
+  selected: boolean;
+  onSelect: () => void;
+  lang: Locale;
+  dict: Dictionary;
+}) {
   const cutout = CUTOUTS[watch.slug]!;
   const name = `${watch.brand} ${watch.model}`;
 
@@ -69,6 +111,14 @@ function CaseSlot({ watch, slot, reach, lang, dict }: { watch: Watch; slot: Slot
     <Link
       href={`/${lang}/watches/${watch.slug}`}
       aria-label={`${name}, ${formatPrice(watch, lang)}`}
+      data-case-slot
+      onClick={(e) => {
+        // Primer clic: mostrar el rótulo. Con el rótulo abierto, el clic abre la ficha.
+        if (!selected) {
+          e.preventDefault();
+          onSelect();
+        }
+      }}
       className="group absolute focus-visible:outline-none"
       style={{ left: `${slot.x}%`, top: `${slot.y}%`, width: `${slot.w}%`, height: `${slot.h}%` }}
     >
@@ -90,7 +140,7 @@ function CaseSlot({ watch, slot, reach, lang, dict }: { watch: Watch; slot: Slot
             width={600}
             height={1200}
             sizes="(min-width: 1152px) 260px, 22vw"
-            className="absolute left-1/2 h-auto max-w-none -translate-x-1/2 -translate-y-1/2 drop-shadow-[0_14px_14px_rgba(0,0,0,0.65)] transition duration-500 group-hover:-translate-y-[51.5%] group-hover:brightness-110 group-focus-visible:brightness-110"
+            className={`absolute left-1/2 h-auto max-w-none -translate-x-1/2 -translate-y-1/2 drop-shadow-[0_14px_14px_rgba(0,0,0,0.65)] transition duration-500 group-hover:-translate-y-[51.5%] group-hover:brightness-110 group-focus-visible:brightness-110 ${selected ? "-translate-y-[51.5%] brightness-110" : ""}`}
             style={{
               width: `${(CUTOUT_WIDTH / 150) * 100}%`,
               top: `${((HEAD_AT + TOP_REACH) / (100 + TOP_REACH + reach)) * 100}%`,
@@ -104,11 +154,16 @@ function CaseSlot({ watch, slot, reach, lang, dict }: { watch: Watch; slot: Slot
         </span>
       )}
 
-      {/* Rótulo: aparece al pasar el ratón; en pantallas táctiles, siempre visible */}
-      <span className="pointer-events-none absolute inset-x-[-12%] bottom-[3%] max-sm:hidden translate-y-1 bg-ink/85 px-2 py-2 text-center opacity-0 backdrop-blur-sm transition duration-300 group-hover:translate-y-0 group-hover:opacity-100 group-focus-visible:translate-y-0 group-focus-visible:opacity-100 [@media(hover:none)]:translate-y-0 [@media(hover:none)]:opacity-100">
+      {/* Rótulo: solo aparece al hacer clic en el reloj (o al llegar con el teclado) */}
+      <span
+        className={`absolute inset-x-[-12%] bottom-[3%] z-10 bg-ink/90 px-2 py-2 text-center backdrop-blur-sm transition duration-300 group-focus-visible:translate-y-0 group-focus-visible:opacity-100 ${
+          selected ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-1 opacity-0"
+        }`}
+      >
         <span className="block text-[0.5rem] tracking-[0.22em] uppercase text-brass sm:text-[0.6rem]">{watch.brand}</span>
         <span className="block truncate font-display text-xs leading-tight text-ivory sm:text-base">{watch.model}</span>
         <span className="mt-0.5 hidden text-[0.65rem] text-stone sm:block">{formatPrice(watch, lang)}</span>
+        <span className="mt-1 block text-[0.5rem] tracking-[0.2em] uppercase text-brass sm:text-[0.6rem]">{dict.catalog.viewPiece} →</span>
       </span>
     </Link>
   );
