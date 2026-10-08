@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import cutouts from "@/data/cutouts.json";
 import type { Locale } from "@/lib/i18n";
 import type { Dictionary } from "@/app/[lang]/dictionaries";
@@ -25,15 +25,21 @@ const CUTOUT_WIDTH = 137; // % del ancho del cojín
 const HEAD_AT = 46; // centro de la caja del reloj, en % del alto del cojín
 const TOP_REACH = 8; // cuánto asoma el brazalete por encima del cojín, en % de su alto
 
+// Interacción según cómo se usa, no según el dispositivo (hay portátiles táctiles):
+// - con ratón: pasar el cursor muestra el rótulo sobre el reloj; un clic abre la ficha
+// - con el dedo: tocar un reloj lo destaca y muestra una tarjeta bajo el estuche;
+//   tocarlo otra vez (o el botón de la tarjeta) abre la ficha
 export function CollectionCase({ watches, lang, dict }: { watches: Watch[]; lang: Locale; dict: Dictionary }) {
-  const cases = packIntoCases(watches.filter(inCase));
-  // Reloj seleccionado: muestra su rótulo; un segundo clic abre la ficha
+  const shown = watches.filter(inCase);
+  const cases = packIntoCases(shown);
+  const [hovered, setHovered] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
+  const root = useRef<HTMLDivElement>(null);
 
+  // Tocar fuera del estuche o pulsar Escape quita la selección
   useEffect(() => {
     const close = (e: Event) => {
-      if (e instanceof KeyboardEvent ? e.key === "Escape" : !(e.target as Element).closest("[data-case-slot]"))
-        setSelected(null);
+      if (e instanceof KeyboardEvent ? e.key === "Escape" : !root.current?.contains(e.target as Node)) setSelected(null);
     };
     document.addEventListener("click", close);
     document.addEventListener("keydown", close);
@@ -47,42 +53,66 @@ export function CollectionCase({ watches, lang, dict }: { watches: Watch[]; lang
     return <p className="py-16 text-center text-sm text-stone">{dict.catalog.caseEmpty}</p>;
   }
 
+  const picked = shown.find((w) => w.slug === selected);
+
   return (
-    <div className="space-y-6">
+    <div ref={root}>
       {cases.map(({ layout, items }, i) => (
         // El estuche se presenta entero sobre la "mesa": centrado, con aire y un halo de luz
         <div
           key={`${layout.id}-${i}`}
           className="bg-[radial-gradient(ellipse_60%_55%_at_50%_50%,rgba(31,58,45,0.55),transparent_75%)] px-2 py-12 sm:px-8 sm:py-16"
         >
-        <div
-          className="relative mx-auto w-full overflow-hidden rounded-[6px] shadow-[0_45px_70px_-25px_rgba(0,0,0,0.95),0_0_0_1px_rgba(0,0,0,0.4)]"
-          style={{ aspectRatio: `${layout.width} / ${layout.height}`, maxWidth: layout.maxWidth }}
-        >
-          <Image
-            src={layout.image}
-            alt=""
-            fill
-            priority={i === 0}
-            sizes={`(min-width: ${layout.maxWidth}px) ${layout.maxWidth}px, 100vw`}
-            className="object-cover"
-          />
-          {items.map((watch, s) => (
-            <CaseSlot
-              key={watch.slug}
-              watch={watch}
-              slot={layout.slots[s]}
-              reach={layout.reach}
-              selected={selected === watch.slug}
-              onSelect={() => setSelected(watch.slug)}
-              lang={lang}
-              dict={dict}
+          <div
+            className="relative mx-auto w-full overflow-hidden rounded-[6px] shadow-[0_45px_70px_-25px_rgba(0,0,0,0.95),0_0_0_1px_rgba(0,0,0,0.4)]"
+            style={{ aspectRatio: `${layout.width} / ${layout.height}`, maxWidth: layout.maxWidth }}
+          >
+            <Image
+              src={layout.image}
+              alt=""
+              fill
+              priority={i === 0}
+              sizes={`(min-width: ${layout.maxWidth}px) ${layout.maxWidth}px, 100vw`}
+              className="object-cover"
             />
-          ))}
-        </div>
+            {items.map((watch, s) => (
+              <CaseSlot
+                key={watch.slug}
+                watch={watch}
+                slot={layout.slots[s]}
+                reach={layout.reach}
+                hovered={hovered === watch.slug}
+                selected={selected === watch.slug}
+                onHover={(on) => setHovered(on ? watch.slug : null)}
+                onSelect={() => setSelected(watch.slug)}
+                lang={lang}
+                dict={dict}
+              />
+            ))}
+          </div>
         </div>
       ))}
-      <p className="text-center text-[0.68rem] tracking-[0.22em] uppercase text-stone/70">{dict.catalog.caseHint}</p>
+
+      {/* Tarjeta para pantallas táctiles: detalles del reloj tocado, fuera del estuche */}
+      <div aria-live="polite" className="mx-auto mt-2 min-h-24 max-w-md px-4 text-center">
+        {picked ? (
+          <div className="border border-line bg-forest/80 px-6 py-5 backdrop-blur">
+            <p className="text-[0.62rem] tracking-[0.26em] uppercase text-brass">{picked.brand}</p>
+            <p className="mt-1 font-display text-2xl leading-tight">{picked.model}</p>
+            <p className="mt-1 text-xs text-stone">
+              Ref. {picked.reference} · {formatPrice(picked, lang)}
+            </p>
+            <Link
+              href={`/${lang}/watches/${picked.slug}`}
+              className="mt-4 inline-block border border-brass/60 px-6 py-2.5 text-[0.66rem] tracking-[0.22em] uppercase text-ivory transition-colors hover:bg-brass hover:text-ink"
+            >
+              {dict.catalog.viewPiece} →
+            </Link>
+          </div>
+        ) : (
+          <p className="pt-3 text-[0.68rem] tracking-[0.22em] uppercase text-stone/70">{dict.catalog.caseHint}</p>
+        )}
+      </div>
     </div>
   );
 }
@@ -91,7 +121,9 @@ function CaseSlot({
   watch,
   slot,
   reach,
+  hovered,
   selected,
+  onHover,
   onSelect,
   lang,
   dict,
@@ -99,25 +131,32 @@ function CaseSlot({
   watch: Watch;
   slot: Slot;
   reach: number;
+  hovered: boolean;
   selected: boolean;
+  onHover: (on: boolean) => void;
   onSelect: () => void;
   lang: Locale;
   dict: Dictionary;
 }) {
   const cutout = CUTOUTS[watch.slug]!;
   const name = `${watch.brand} ${watch.model}`;
+  const pointer = useRef<string>("mouse");
+  const raised = hovered || selected;
 
   return (
     <Link
       href={`/${lang}/watches/${watch.slug}`}
       aria-label={`${name}, ${formatPrice(watch, lang)}`}
-      data-case-slot
+      onPointerDown={(e) => (pointer.current = e.pointerType)}
+      onPointerEnter={(e) => e.pointerType === "mouse" && onHover(true)}
+      onPointerLeave={(e) => e.pointerType === "mouse" && onHover(false)}
       onClick={(e) => {
-        // Primer clic: mostrar el rótulo. Con el rótulo abierto, el clic abre la ficha.
-        if (!selected) {
+        // Con el dedo, el primer toque solo selecciona; con ratón o teclado, abre la ficha
+        if (pointer.current !== "mouse" && !selected) {
           e.preventDefault();
           onSelect();
         }
+        pointer.current = "mouse";
       }}
       className="group absolute focus-visible:outline-none"
       style={{ left: `${slot.x}%`, top: `${slot.y}%`, width: `${slot.w}%`, height: `${slot.h}%` }}
@@ -126,27 +165,29 @@ function CaseSlot({
           su borde frontal (`reach`). El brazalete es nítido sobre todo el cojín y solo
           se difumina fuera de él, donde se mete por detrás o en el compartimento. */}
       <span
-          className="absolute -left-1/4 -right-1/4"
+        className="absolute -left-1/4 -right-1/4"
+        style={{
+          top: `-${TOP_REACH}%`,
+          bottom: `-${reach}%`,
+          maskImage: braceletMask(reach),
+          WebkitMaskImage: braceletMask(reach),
+        }}
+      >
+        <Image
+          src={cutout}
+          alt=""
+          width={600}
+          height={1200}
+          sizes="(min-width: 1152px) 260px, 22vw"
+          className={`absolute left-1/2 h-auto max-w-none -translate-x-1/2 drop-shadow-[0_14px_14px_rgba(0,0,0,0.65)] transition duration-500 group-focus-visible:brightness-110 ${
+            raised ? "-translate-y-[51.5%] brightness-110" : "-translate-y-1/2"
+          }`}
           style={{
-            top: `-${TOP_REACH}%`,
-            bottom: `-${reach}%`,
-            maskImage: braceletMask(reach),
-            WebkitMaskImage: braceletMask(reach),
+            width: `${(CUTOUT_WIDTH / 150) * 100}%`,
+            top: `${((HEAD_AT + TOP_REACH) / (100 + TOP_REACH + reach)) * 100}%`,
           }}
-        >
-          <Image
-            src={cutout}
-            alt=""
-            width={600}
-            height={1200}
-            sizes="(min-width: 1152px) 260px, 22vw"
-            className={`absolute left-1/2 h-auto max-w-none -translate-x-1/2 -translate-y-1/2 drop-shadow-[0_14px_14px_rgba(0,0,0,0.65)] transition duration-500 group-hover:-translate-y-[51.5%] group-hover:brightness-110 group-focus-visible:brightness-110 ${selected ? "-translate-y-[51.5%] brightness-110" : ""}`}
-            style={{
-              width: `${(CUTOUT_WIDTH / 150) * 100}%`,
-              top: `${((HEAD_AT + TOP_REACH) / (100 + TOP_REACH + reach)) * 100}%`,
-            }}
-          />
-        </span>
+        />
+      </span>
 
       {watch.status !== "available" && (
         <span className="absolute left-1/2 top-[6%] -translate-x-1/2 whitespace-nowrap bg-ink/85 px-2 py-1 text-[0.5rem] tracking-[0.2em] uppercase text-brass sm:text-[0.6rem]">
@@ -154,16 +195,15 @@ function CaseSlot({
         </span>
       )}
 
-      {/* Rótulo: solo aparece al hacer clic en el reloj (o al llegar con el teclado) */}
+      {/* Rótulo sobre el reloj: solo al pasar el ratón (o al llegar con el teclado) */}
       <span
-        className={`absolute inset-x-[-12%] bottom-[3%] z-10 bg-ink/90 px-2 py-2 text-center backdrop-blur-sm transition duration-300 group-focus-visible:translate-y-0 group-focus-visible:opacity-100 ${
-          selected ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-1 opacity-0"
+        className={`pointer-events-none absolute inset-x-[-12%] bottom-[3%] z-10 bg-ink/90 px-2 py-2 text-center backdrop-blur-sm transition duration-300 group-focus-visible:translate-y-0 group-focus-visible:opacity-100 ${
+          hovered ? "translate-y-0 opacity-100" : "translate-y-1 opacity-0"
         }`}
       >
         <span className="block text-[0.5rem] tracking-[0.22em] uppercase text-brass sm:text-[0.6rem]">{watch.brand}</span>
         <span className="block truncate font-display text-xs leading-tight text-ivory sm:text-base">{watch.model}</span>
         <span className="mt-0.5 hidden text-[0.65rem] text-stone sm:block">{formatPrice(watch, lang)}</span>
-        <span className="mt-1 block text-[0.5rem] tracking-[0.2em] uppercase text-brass sm:text-[0.6rem]">{dict.catalog.viewPiece} →</span>
       </span>
     </Link>
   );
