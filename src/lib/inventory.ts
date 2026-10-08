@@ -27,6 +27,7 @@ type WatchRow = {
   power_reserve: string | null;
   water_resistance: string | null;
   images: string[];
+  cutout?: string | null;
 };
 
 export function fromRow(r: WatchRow): Watch {
@@ -50,6 +51,7 @@ export function fromRow(r: WatchRow): Watch {
     powerReserve: r.power_reserve ?? undefined,
     waterResistance: r.water_resistance ?? undefined,
     images: r.images ?? [],
+    cutout: r.cutout ?? undefined,
   };
 }
 

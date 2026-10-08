@@ -33,9 +33,9 @@ export function sendMessage(chatId: number, text: string, extra: Record<string, 
 
 // Envía una foto por su URL. Si Telegram no logra descargarla (le pasa a veces con
 // almacenamiento externo), la descargamos nosotros y se la subimos directamente.
-export async function sendPhoto(chatId: number, photo: string, caption: string) {
+export async function sendPhoto(chatId: number, photo: string, caption: string, extra: Record<string, unknown> = {}) {
   try {
-    return await tg<{ message_id: number }>("sendPhoto", { chat_id: chatId, photo, caption, parse_mode: "HTML" });
+    return await tg<{ message_id: number }>("sendPhoto", { chat_id: chatId, photo, caption, parse_mode: "HTML", ...extra });
   } catch {
     const img = await fetch(photo);
     if (!img.ok) throw new Error(`No se pudo leer la foto (${img.status})`);
@@ -44,6 +44,7 @@ export async function sendPhoto(chatId: number, photo: string, caption: string) 
     form.append("photo", new Blob([await img.arrayBuffer()], { type: "image/jpeg" }), "photo.jpg");
     form.append("caption", caption);
     form.append("parse_mode", "HTML");
+    for (const [k, v] of Object.entries(extra)) form.append(k, typeof v === "string" ? v : JSON.stringify(v));
     const res = await fetch(api("sendPhoto"), { method: "POST", body: form });
     const json = (await res.json()) as { ok: boolean; result: { message_id: number }; description?: string };
     if (!json.ok) throw new Error(`Telegram sendPhoto: ${json.description}`);

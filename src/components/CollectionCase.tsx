@@ -12,9 +12,12 @@ import { GoldMonogram } from "./GoldMonogram";
 
 const CUTOUTS = cutouts as Record<string, string>;
 
+// Recorte del reloj: el que genera el robot al publicar o, si no, uno hecho a mano
+const cutoutOf = (w: Watch) => w.cutout ?? CUTOUTS[w.slug];
+
 // Qué relojes van en el estuche: los que tienen recorte y no están vendidos.
 // Al marcar uno como vendido (p. ej. /vendido en Telegram) sale solo y el estuche se reajusta.
-export const inCase = (w: Watch) => w.status !== "sold" && Boolean(CUTOUTS[w.slug]);
+export const inCase = (w: Watch) => w.status !== "sold" && Boolean(cutoutOf(w));
 
 // Los recortes son 600×1200 con la caja del reloj ocupando el 62 % del ancho.
 // Con este ancho (respecto al cojín) la caja del reloj ocupa ~85 % del cojín,
@@ -153,7 +156,7 @@ function CaseSlot({
   lang: Locale;
   dict: Dictionary;
 }) {
-  const cutout = CUTOUTS[watch.slug]!;
+  const cutout = cutoutOf(watch)!;
   const name = `${watch.brand} ${watch.model}`;
   const pointer = useRef<string>("mouse");
   const raised = hovered || selected;

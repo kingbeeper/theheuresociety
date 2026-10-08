@@ -20,6 +20,7 @@ export type Watch = {
   caseSize: string;
   material: Localized;
   images: string[]; // rutas locales o URLs públicas; vacío = se muestra el monograma
+  cutout?: string; // recorte 600×1200 para el estuche (lo genera el robot al publicar)
   // Ficha técnica (se muestran solo los campos presentes)
   dial?: Localized;
   bracelet?: Localized;

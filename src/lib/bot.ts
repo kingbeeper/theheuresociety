@@ -1,8 +1,10 @@
 import "server-only";
 import { revalidateTag } from "next/cache";
+import { after } from "next/server";
 import { adminDb, PHOTO_BUCKET } from "./supabase";
 import { INVENTORY_TAG } from "./inventory";
 import { analyzeWatch, type WatchDraft } from "./watch-ai";
+import { cutoutConfigured, cutoutPreview, makeCutout } from "./watch-cutout";
 import { downloadFile, escapeHtml as h, keyboard, sendMessage, sendPhoto, tg } from "./telegram";
 import { toSlug } from "./watches";
 
@@ -42,6 +44,10 @@ const HELP = `<b>The Heure Society · Publicar relojes</b>
 2. Escribe una nota con la referencia, el precio y los extras.
    <i>Ej.: Rolex 126610LN, 14500, caja y papeles, excelente estado</i>
 3. Revisa la ficha que preparo y pulsa <b>Publicar</b>.
+4. Preparo solo el recorte para el estuche de la web y te lo enseño.
+
+<b>Estuche</b>
+Para cambiar el recorte de un reloj ya publicado, envía una foto de frente con el texto <code>estuche</code> y su referencia (ej. <code>estuche 126610LN</code>). Sale mejor sobre una mesa, sin mano.
 
 <b>Órdenes</b>
 /lista — últimos relojes publicados
@@ -49,6 +55,7 @@ const HELP = `<b>The Heure Society · Publicar relojes</b>
 /vendido <i>referencia</i> — marcar como vendido
 /reservado <i>referencia</i> — marcar como reservado
 /disponible <i>referencia</i> — volver a disponible
+/estuche <i>referencia</i> — repetir el recorte con sus fotos
 /cancelar — descartar el borrador actual`;
 
 // ───────────────────────────── Borradores ─────────────────────────────
@@ -109,11 +116,16 @@ export async function handleMessage(msg: TgMessage) {
 
 async function handlePhoto(msg: TgMessage) {
   const chatId = msg.chat.id;
+  const best = msg.photo!.reduce((a, b) => (b.width * b.height > a.width * a.height ? b : a));
+
+  // «estuche 126610LN»: foto para el recorte de un reloj ya publicado (no abre borrador)
+  const forCase = msg.caption?.trim().match(/^\/?estuche\s+(.+)$/i);
+  if (forCase) return cutoutFromPhoto(chatId, forCase[1], best.file_id, msg.message_id);
+
   const draft = await getOrCreateDraft(chatId);
   const db = adminDb();
 
   // Guardar la foto más grande en Supabase Storage
-  const best = msg.photo!.reduce((a, b) => (b.width * b.height > a.width * a.height ? b : a));
   const bytes = await downloadFile(best.file_id);
   const path = `drafts/${draft.id}/${msg.message_id}.jpg`;
   const { error: upErr } = await db.storage.from(PHOTO_BUCKET).upload(path, bytes, { contentType: "image/jpeg", upsert: true });
@@ -220,6 +232,9 @@ export async function handleCallback(cb: TgCallback) {
   const [action, draftId] = (cb.data ?? "").split(":");
   if (!chatId || !draftId) return tg("answerCallbackQuery", { callback_query_id: cb.id });
 
+  // Botones del recorte del estuche: llevan el id del reloj publicado, no de un borrador
+  if (action === "cutdel" || action === "cutredo") return handleCutoutButton(cb, chatId, action, draftId);
+
   const { data: d } = await adminDb().from("bot_drafts").select("*").eq("id", draftId).maybeSingle();
   const draft = d as Draft | null;
   const removeButtons = () =>
@@ -233,8 +248,11 @@ export async function handleCallback(cb: TgCallback) {
   if (action === "pub") {
     await tg("answerCallbackQuery", { callback_query_id: cb.id, text: "Publicando…" });
     await removeButtons();
-    const slug = await publish(draft);
-    return sendMessage(chatId, `✅ <b>Publicado.</b> Ya está en la colección:\n${SITE_URL}/es/watches/${slug}`);
+    const { slug, id } = await publish(draft);
+    await sendMessage(chatId, `✅ <b>Publicado.</b> Ya está en la colección:\n${SITE_URL}/es/watches/${slug}`);
+    // El recorte tarda un poco: se prepara después de responder a Telegram
+    after(() => cutoutJob(chatId, id));
+    return;
   }
 
   if (action === "price") {
@@ -297,7 +315,116 @@ async function publish(draft: Draft) {
 
   await updateDraft(draft.id, { status: "published", watch_id: row.id } as Partial<Draft>);
   revalidateTag(INVENTORY_TAG, { expire: 0 });
-  return slug;
+  return { slug, id: row.id as string };
+}
+
+// ───────────────────────────── Recorte para el estuche ─────────────────────────────
+type PublishedWatch = { id: string; slug: string; brand: string; model: string; reference: string; case_size: string; images: string[] };
+const PUBLISHED_FIELDS = "id, slug, brand, model, reference, case_size, images";
+
+// Busca un reloj publicado por referencia o slug. Devuelve el reloj o un mensaje para el usuario.
+async function findPublished(arg: string): Promise<PublishedWatch | string> {
+  const { data } = await adminDb()
+    .from("watches")
+    .select(PUBLISHED_FIELDS)
+    .in("status", ["available", "reserved", "sold"])
+    .or(`reference.ilike.%${arg.replace(/[,()%]/g, "")}%,slug.ilike.%${toSlug(arg)}%`);
+  if (!data?.length) return `No encontré ningún reloj publicado con «${h(arg)}».`;
+  if (data.length > 1) return `Hay ${data.length} relojes que coinciden. Sé más específico:\n${data.map((r) => `• <code>${h(r.slug)}</code>`).join("\n")}`;
+  return data[0] as PublishedWatch;
+}
+
+// En segundo plano revalidateTag no tiene efecto: se pide a la propia web que se actualice
+async function refreshSite() {
+  await fetch(`${SITE_URL}/api/revalidate`, {
+    method: "POST",
+    headers: { "x-revalidate-secret": process.env.TELEGRAM_WEBHOOK_SECRET ?? "" },
+  }).catch((e) => console.error("No se pudo actualizar la web:", e));
+}
+
+const storagePath = (url: string) => url.split(`/object/public/${PHOTO_BUCKET}/`)[1];
+
+// Prepara el recorte (con las fotos indicadas o con las del reloj), lo publica y lo enseña
+async function cutoutJob(chatId: number, watchId: string, photos?: string[]) {
+  const db = adminDb();
+  const { data } = await db.from("watches").select(PUBLISHED_FIELDS).eq("id", watchId).single();
+  const w = data as PublishedWatch;
+  const name = `${h(w.brand)} ${h(w.model)}`;
+  const retry = `Envíame una foto del reloj de frente, mejor sobre una mesa y sin mano, con el texto <code>estuche ${h(w.reference)}</code>.`;
+
+  if (!cutoutConfigured) {
+    return sendMessage(chatId, `ℹ️ El recorte automático para el estuche aún no está activado, así que ${name} sale en la colección pero no en el estuche.`);
+  }
+
+  try {
+    await tg("sendChatAction", { chat_id: chatId, action: "upload_photo" });
+    const result = await makeCutout(photos ?? w.images, w.case_size);
+    if (!result.ok) {
+      return sendMessage(chatId, `✂️ <b>${name}</b>: no pude hacer el recorte para el estuche. ${h(result.reason)}\n\n${retry}\nMientras tanto sale en la colección, pero no en el estuche.`);
+    }
+
+    // Nombre nuevo en cada versión, para que nadie vea un recorte anterior guardado en caché
+    const stamp = Date.now();
+    const path = `cutouts/${w.slug}-${stamp}.png`;
+    const previewPath = `cutouts/preview/${w.slug}-${stamp}.jpg`;
+    const bucket = db.storage.from(PHOTO_BUCKET);
+    const up1 = await bucket.upload(path, result.png, { contentType: "image/png", upsert: true });
+    const up2 = await bucket.upload(previewPath, await cutoutPreview(result.png), { contentType: "image/jpeg", upsert: true });
+    if (up1.error || up2.error) throw up1.error ?? up2.error;
+
+    const url = bucket.getPublicUrl(path).data.publicUrl;
+    const { data: before } = await db.from("watches").select("cutout").eq("id", w.id).single();
+    const { error } = await db.from("watches").update({ cutout: url, updated_at: new Date().toISOString() }).eq("id", w.id);
+    if (error) throw error;
+    // El recorte anterior ya no se usa
+    if (before?.cutout && storagePath(before.cutout)) await bucket.remove([storagePath(before.cutout)]);
+    await refreshSite();
+
+    await sendPhoto(chatId, bucket.getPublicUrl(previewPath).data.publicUrl, `✂️ <b>${name}</b> ya está en el estuche.\nSi el recorte no está bien, quítalo o repítelo. ${retry}`, {
+      reply_markup: keyboard([
+        [
+          { text: "🔁 Repetir", callback_data: `cutredo:${w.id}` },
+          { text: "🗑 Quitar del estuche", callback_data: `cutdel:${w.id}` },
+        ],
+      ]),
+    });
+  } catch (e) {
+    console.error("Error en el recorte:", e);
+    await sendMessage(chatId, `⚠️ <b>${name}</b>: falló el recorte para el estuche (${h((e as Error).message)}).\n${retry}`);
+  }
+}
+
+// Foto enviada con «estuche referencia»: se guarda y se usa solo para el recorte
+async function cutoutFromPhoto(chatId: number, ref: string, fileId: string, messageId: number) {
+  const found = await findPublished(ref);
+  if (typeof found === "string") return sendMessage(chatId, found);
+  const db = adminDb();
+  const path = `cutouts/sources/${found.slug}-${messageId}.jpg`;
+  const { error } = await db.storage.from(PHOTO_BUCKET).upload(path, await downloadFile(fileId), { contentType: "image/jpeg", upsert: true });
+  if (error) throw error;
+  await sendMessage(chatId, `✂️ Preparando el recorte de ${h(found.brand)} ${h(found.model)} con esta foto…`);
+  return cutoutJob(chatId, found.id, [db.storage.from(PHOTO_BUCKET).getPublicUrl(path).data.publicUrl]);
+}
+
+async function handleCutoutButton(cb: TgCallback, chatId: number, action: string, watchId: string) {
+  const removeButtons = () =>
+    tg("editMessageReplyMarkup", { chat_id: chatId, message_id: cb.message!.message_id, reply_markup: keyboard([]) }).catch(() => {});
+
+  if (action === "cutredo") {
+    await tg("answerCallbackQuery", { callback_query_id: cb.id, text: "Repitiendo el recorte…" });
+    await removeButtons();
+    after(() => cutoutJob(chatId, watchId));
+    return;
+  }
+
+  const db = adminDb();
+  const { data } = await db.from("watches").select("cutout, brand, model").eq("id", watchId).single();
+  await db.from("watches").update({ cutout: null, updated_at: new Date().toISOString() }).eq("id", watchId);
+  if (data?.cutout && storagePath(data.cutout)) await db.storage.from(PHOTO_BUCKET).remove([storagePath(data.cutout)]);
+  revalidateTag(INVENTORY_TAG, { expire: 0 });
+  await tg("answerCallbackQuery", { callback_query_id: cb.id, text: "Quitado del estuche" });
+  await removeButtons();
+  return sendMessage(chatId, `${h(data?.brand ?? "")} ${h(data?.model ?? "")} ya no sale en el estuche (sigue en la colección). Para volver a ponerlo, envía una foto con el texto <code>estuche</code> y su referencia.`);
 }
 
 // ───────────────────────────── Órdenes ─────────────────────────────
@@ -346,18 +473,21 @@ async function handleCommand(chatId: number, text: string) {
     case "/disponible": {
       const status = { "/vendido": "sold", "/reservado": "reserved", "/disponible": "available" }[command]!;
       if (!arg) return sendMessage(chatId, `Indica la referencia. Ej.: <code>${command} 126610LN</code>`);
-      const { data } = await adminDb()
-        .from("watches")
-        .select("id, brand, model, reference, slug")
-        .in("status", ["available", "reserved", "sold"])
-        .or(`reference.ilike.%${arg.replace(/[,()%]/g, "")}%,slug.ilike.%${toSlug(arg)}%`);
-      if (!data?.length) return sendMessage(chatId, `No encontré ningún reloj publicado con «${h(arg)}».`);
-      if (data.length > 1)
-        return sendMessage(chatId, `Hay ${data.length} relojes que coinciden. Sé más específico:\n${data.map((r) => `• <code>${h(r.slug)}</code>`).join("\n")}`);
-      await adminDb().from("watches").update({ status, updated_at: new Date().toISOString() }).eq("id", data[0].id);
+      const found = await findPublished(arg);
+      if (typeof found === "string") return sendMessage(chatId, found);
+      await adminDb().from("watches").update({ status, updated_at: new Date().toISOString() }).eq("id", found.id);
       revalidateTag(INVENTORY_TAG, { expire: 0 });
       const label = { sold: "vendido", reserved: "reservado", available: "disponible" }[status];
-      return sendMessage(chatId, `Hecho: ${h(data[0].brand)} ${h(data[0].model)} (${h(data[0].reference)}) ahora figura como <b>${label}</b>.`);
+      return sendMessage(chatId, `Hecho: ${h(found.brand)} ${h(found.model)} (${h(found.reference)}) ahora figura como <b>${label}</b>.`);
+    }
+
+    case "/estuche": {
+      if (!arg) return sendMessage(chatId, "Indica la referencia. Ej.: <code>/estuche 126610LN</code>\nO envía una foto con el texto <code>estuche 126610LN</code>.");
+      const found = await findPublished(arg);
+      if (typeof found === "string") return sendMessage(chatId, found);
+      await sendMessage(chatId, `✂️ Preparando el recorte de ${h(found.brand)} ${h(found.model)}…`);
+      after(() => cutoutJob(chatId, found.id));
+      return;
     }
 
     default:

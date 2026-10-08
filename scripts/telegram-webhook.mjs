@@ -33,6 +33,7 @@ console.log("Órdenes:", await call("setMyCommands", {
     { command: "vendido", description: "Marcar como vendido (referencia)" },
     { command: "reservado", description: "Marcar como reservado (referencia)" },
     { command: "disponible", description: "Volver a disponible (referencia)" },
+    { command: "estuche", description: "Repetir el recorte del estuche (referencia)" },
     { command: "cancelar", description: "Descartar el borrador actual" },
   ],
 }));

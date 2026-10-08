@@ -31,6 +31,8 @@ create table watches (
 
   -- Rutas locales (/watches/x.jpg) o URLs públicas de Supabase Storage, en orden
   images           text[] not null default '{}',
+  -- Recorte 600×1200 para el estuche de la web (lo genera el robot al publicar)
+  cutout           text,
 
   source           text not null default 'manual',  -- 'manual' | 'seed' | 'telegram'
   created_at       timestamptz not null default now(),
