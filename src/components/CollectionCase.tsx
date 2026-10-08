@@ -38,19 +38,15 @@ export function CollectionCase({
   lang,
   dict,
   withLid = false,
-  single = false,
 }: {
   watches: Watch[];
   lang: Locale;
   dict: Dictionary;
   // Cada estuche con su tapa, que se abre al llegar a él
   withLid?: boolean;
-  // Portada: solo el primer estuche
-  single?: boolean;
 }) {
   const shown = watches.filter(inCase);
-  const packed = packIntoCases(shown);
-  const cases = single ? packed.slice(0, 1) : packed;
+  const cases = packIntoCases(shown);
   const [hovered, setHovered] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const root = useRef<HTMLDivElement>(null);
@@ -91,8 +87,7 @@ export function CollectionCase({
               src={layout.image}
               alt=""
               fill
-              // En la portada el estuche queda bajo la primera pantalla: no compite con el título
-              priority={i === 0 && !single}
+              priority={i === 0}
               sizes={`(min-width: ${layout.maxWidth}px) ${layout.maxWidth}px, 100vw`}
               className="object-cover"
             />
