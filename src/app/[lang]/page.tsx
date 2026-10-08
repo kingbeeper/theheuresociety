@@ -39,7 +39,7 @@ export default async function Home({ params }: PageProps<"/[lang]">) {
             <p className="mx-auto mt-7 max-w-lg text-base leading-relaxed text-stone md:text-lg">
               {dict.hero.lead}
             </p>
-            <div className="mt-10 flex flex-wrap justify-center gap-4">
+            <div className="mt-10 flex flex-wrap items-center justify-center gap-x-10 gap-y-6">
               <Link
                 href={`/${lang}/watches`}
                 className="bg-ivory px-8 py-4 text-[0.72rem] tracking-[0.24em] uppercase text-ink transition-colors hover:bg-brass"
@@ -48,7 +48,7 @@ export default async function Home({ params }: PageProps<"/[lang]">) {
               </Link>
               <Link
                 href={`/${lang}/appointments`}
-                className="border border-ivory/30 px-8 py-4 text-[0.72rem] tracking-[0.24em] uppercase text-ivory transition-colors hover:border-ivory"
+                className="border-b border-brass/60 pb-1 text-[0.72rem] tracking-[0.24em] uppercase text-ivory transition-colors hover:border-ivory"
               >
                 {dict.hero.ctaSecondary}
               </Link>
@@ -79,14 +79,15 @@ export default async function Home({ params }: PageProps<"/[lang]">) {
           </Link>
         </section>
 
-        {/* Confianza */}
-        <section className="bg-forest">
-          <div className="mx-auto grid max-w-7xl gap-px bg-line px-0 sm:grid-cols-2 lg:grid-cols-4">
+        {/* Confianza: fila abierta, sin casillas */}
+        <section className="mx-auto max-w-7xl px-5 pb-24 md:px-10 md:pb-32">
+          <Ornament />
+          <div className="mt-14 grid gap-12 text-center sm:grid-cols-2 lg:grid-cols-4 lg:gap-10">
             {dict.trust.items.map((item, i) => (
-              <div key={item.title} className="bg-forest px-8 py-14 md:px-10">
-                <p className="font-display text-3xl text-brass/80">0{i + 1}</p>
-                <h3 className="mt-5 text-[0.75rem] tracking-[0.24em] uppercase">{item.title}</h3>
-                <p className="mt-3 text-sm leading-relaxed text-stone">{item.text}</p>
+              <div key={item.title}>
+                <p className="font-display text-4xl font-light italic text-brass/80">0{i + 1}</p>
+                <h3 className="mt-4 text-[0.72rem] tracking-[0.26em] uppercase">{item.title}</h3>
+                <p className="mx-auto mt-3 max-w-[16rem] text-sm leading-relaxed text-stone">{item.text}</p>
               </div>
             ))}
           </div>
@@ -102,7 +103,7 @@ export default async function Home({ params }: PageProps<"/[lang]">) {
             <p className="mt-6 max-w-md leading-relaxed text-stone">{dict.appointment.lead}</p>
           </div>
 
-          <div className="grid gap-5 sm:grid-cols-2">
+          <div className="border-t border-brass/25">
             {[
               { title: dict.appointment.office, text: dict.appointment.officeText, type: "office" },
               { title: dict.appointment.video, text: dict.appointment.videoText, type: "video" },
@@ -110,13 +111,13 @@ export default async function Home({ params }: PageProps<"/[lang]">) {
               <Link
                 key={opt.type}
                 href={`/${lang}/appointments?type=${opt.type}`}
-                className="group flex flex-col justify-between border border-line bg-moss/40 p-8 transition-colors hover:border-brass/60"
+                className="group flex flex-col gap-4 border-b border-brass/25 py-8 sm:flex-row sm:items-center sm:justify-between sm:gap-8"
               >
                 <div>
-                  <h3 className="font-display text-2xl">{opt.title}</h3>
-                  <p className="mt-3 text-sm leading-relaxed text-stone">{opt.text}</p>
+                  <h3 className="font-display text-3xl font-light transition-colors group-hover:text-brass">{opt.title}</h3>
+                  <p className="mt-2 max-w-sm text-sm leading-relaxed text-stone">{opt.text}</p>
                 </div>
-                <span className="mt-10 text-[0.68rem] tracking-[0.24em] uppercase text-brass transition-transform group-hover:translate-x-1">
+                <span className="shrink-0 text-[0.68rem] tracking-[0.24em] uppercase text-brass transition-transform group-hover:translate-x-1">
                   {dict.appointment.cta} →
                 </span>
               </Link>
@@ -124,43 +125,45 @@ export default async function Home({ params }: PageProps<"/[lang]">) {
           </div>
         </section>
 
-        {/* Consignación */}
-        <section className="mx-auto max-w-7xl px-5 pb-24 md:px-10 md:pb-32">
-          <Link
-            href={`/${lang}/consign`}
-            className="group grid items-center gap-8 border border-line bg-forest/60 p-8 transition-colors hover:border-brass/50 md:grid-cols-[1fr_auto] md:p-12"
-          >
-            <div>
-              <p className="eyebrow">{dict.consign.teaser.eyebrow}</p>
-              <h2 className="mt-4 font-display text-3xl font-light md:text-4xl">{dict.consign.teaser.title}</h2>
-              <p className="mt-4 max-w-xl text-sm leading-relaxed text-stone">{dict.consign.teaser.text}</p>
+        {/* Vender o consignar: dos caminos, una sola sección */}
+        <section className="relative isolate overflow-hidden">
+          <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_60%_70%_at_50%_45%,var(--color-emerald)_0%,var(--color-ink)_75%)] opacity-60" />
+          <div className="mx-auto max-w-5xl px-5 py-24 text-center md:px-10 md:py-32">
+            <Ornament />
+            <h2 className="mx-auto mt-10 max-w-2xl font-display text-4xl font-light md:text-6xl">{dict.sell.title}</h2>
+            <div className="mt-16 grid gap-14 md:grid-cols-[1fr_auto_1fr] md:gap-12">
+              <div>
+                <p className="eyebrow">{dict.sell.eyebrow}</p>
+                <p className="mx-auto mt-5 max-w-sm leading-relaxed text-stone">{dict.sell.lead}</p>
+                <Link href={`/${lang}/sell`} className="mt-10 inline-block border-b border-brass/60 pb-1 text-[0.72rem] tracking-[0.24em] uppercase text-ivory transition-colors hover:border-ivory">
+                  {dict.sell.cta} →
+                </Link>
+              </div>
+              <span className="mx-auto hidden w-px bg-gradient-to-b from-transparent via-brass/50 to-transparent md:block" aria-hidden />
+              <div>
+                <p className="eyebrow">{dict.consign.teaser.eyebrow}</p>
+                <p className="mx-auto mt-5 max-w-sm leading-relaxed text-stone">{dict.consign.teaser.text}</p>
+                <Link href={`/${lang}/consign`} className="mt-10 inline-block border-b border-brass/60 pb-1 text-[0.72rem] tracking-[0.24em] uppercase text-ivory transition-colors hover:border-ivory">
+                  {dict.consign.teaser.cta} →
+                </Link>
+              </div>
             </div>
-            <span className="text-[0.7rem] tracking-[0.24em] uppercase text-brass transition-transform group-hover:translate-x-1">
-              {dict.consign.teaser.cta} →
-            </span>
-          </Link>
-        </section>
-
-        {/* Vende tu reloj */}
-        <section className="relative isolate overflow-hidden border-t border-line">
-          <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_20%_50%,var(--color-emerald)_0%,var(--color-ink)_70%)] opacity-70" />
-          <div className="mx-auto max-w-7xl px-5 py-24 text-center md:px-10 md:py-32">
-            <p className="eyebrow">{dict.sell.eyebrow}</p>
-            <h2 className="mx-auto mt-4 max-w-2xl font-display text-4xl font-light md:text-6xl">
-              {dict.sell.title}
-            </h2>
-            <p className="mx-auto mt-6 max-w-md leading-relaxed text-stone">{dict.sell.lead}</p>
-            <Link
-              href={`/${lang}/sell`}
-              className="mt-10 inline-block bg-ivory px-8 py-4 text-[0.72rem] tracking-[0.24em] uppercase text-ink transition-colors hover:bg-brass"
-            >
-              {dict.sell.cta}
-            </Link>
           </div>
         </section>
       </main>
 
       <Footer lang={lang} dict={dict} />
     </>
+  );
+}
+
+// Adorno de separación: línea fina, rombo dorado, línea fina
+function Ornament() {
+  return (
+    <div className="mx-auto flex max-w-xs items-center gap-4" aria-hidden>
+      <span className="h-px flex-1 bg-gradient-to-r from-transparent to-brass/70" />
+      <span className="h-1.5 w-1.5 rotate-45 bg-brass" />
+      <span className="h-px flex-1 bg-gradient-to-l from-transparent to-brass/70" />
+    </div>
   );
 }
