@@ -5,6 +5,8 @@ import { getDictionary } from "./dictionaries";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { BrandMarquee } from "@/components/BrandMarquee";
+import { CollectionCase } from "@/components/CollectionCase";
+import { getWatches } from "@/lib/inventory";
 
 export default async function Home({ params }: PageProps<"/[lang]">) {
   const { lang } = await params;
@@ -17,7 +19,7 @@ export default async function Home({ params }: PageProps<"/[lang]">) {
 
       <main>
         {/* Portada */}
-        <section className="relative isolate flex min-h-[88svh] items-center overflow-hidden">
+        <section className="relative isolate flex min-h-[72svh] items-center overflow-hidden">
           <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_70%_60%_at_50%_55%,var(--color-emerald)_0%,var(--color-forest)_50%,var(--color-ink)_100%)]" />
 
           <div className="mx-auto w-full max-w-7xl px-5 pb-20 pt-36 text-center md:px-10 md:pt-40">
@@ -43,6 +45,11 @@ export default async function Home({ params }: PageProps<"/[lang]">) {
               </Link>
             </div>
           </div>
+        </section>
+
+        {/* El estuche de la casa: se abre al llegar y muestra el inventario actual */}
+        <section className="mx-auto max-w-7xl px-2 pb-10 sm:px-5 md:px-10">
+          <CollectionCase watches={await getWatches()} lang={lang} dict={dict} withLid />
         </section>
 
         {/* Marcas */}

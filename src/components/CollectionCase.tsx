@@ -7,7 +7,8 @@ import cutouts from "@/data/cutouts.json";
 import type { Locale } from "@/lib/i18n";
 import type { Dictionary } from "@/app/[lang]/dictionaries";
 import { formatPrice, type Watch } from "@/lib/watches";
-import { packIntoCases, type Slot } from "@/lib/cases";
+import { packIntoCases, type CaseLayout, type Slot } from "@/lib/cases";
+import { GoldMonogram } from "./GoldMonogram";
 
 const CUTOUTS = cutouts as Record<string, string>;
 
@@ -29,9 +30,21 @@ const TOP_REACH = 8; // cuánto asoma el brazalete por encima del cojín, en % d
 // - con ratón: pasar el cursor muestra el rótulo sobre el reloj; un clic abre la ficha
 // - con el dedo: tocar un reloj lo destaca y muestra una tarjeta bajo el estuche;
 //   tocarlo otra vez (o el botón de la tarjeta) abre la ficha
-export function CollectionCase({ watches, lang, dict }: { watches: Watch[]; lang: Locale; dict: Dictionary }) {
+export function CollectionCase({
+  watches,
+  lang,
+  dict,
+  withLid = false,
+}: {
+  watches: Watch[];
+  lang: Locale;
+  dict: Dictionary;
+  // Portada: un solo estuche con tapa, que se abre al llegar a él
+  withLid?: boolean;
+}) {
   const shown = watches.filter(inCase);
-  const cases = packIntoCases(shown);
+  const packed = packIntoCases(shown);
+  const cases = withLid ? packed.slice(0, 1) : packed;
   const [hovered, setHovered] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const root = useRef<HTMLDivElement>(null);
@@ -63,6 +76,7 @@ export function CollectionCase({ watches, lang, dict }: { watches: Watch[]; lang
           key={`${layout.id}-${i}`}
           className="bg-[radial-gradient(ellipse_60%_55%_at_50%_50%,rgba(31,58,45,0.55),transparent_75%)] px-2 py-12 sm:px-8 sm:py-16"
         >
+          <CaseFrame layout={layout} withLid={withLid} lang={lang} dict={dict}>
           <div
             className="relative mx-auto w-full overflow-hidden rounded-[6px] shadow-[0_45px_70px_-25px_rgba(0,0,0,0.95),0_0_0_1px_rgba(0,0,0,0.4)]"
             style={{ aspectRatio: `${layout.width} / ${layout.height}`, maxWidth: layout.maxWidth }}
@@ -90,6 +104,7 @@ export function CollectionCase({ watches, lang, dict }: { watches: Watch[]; lang
               />
             ))}
           </div>
+          </CaseFrame>
         </div>
       ))}
 
@@ -215,4 +230,106 @@ function braceletMask(reach: number) {
   const top = (TOP_REACH / total) * 100;
   const bottom = 100 - (reach / total) * 100;
   return `linear-gradient(to bottom, transparent 0%, black ${top}%, black ${bottom}%, transparent 100%)`;
+}
+
+// Envuelve la bandeja. Con `withLid`, añade la tapa del estuche: cerrada al principio,
+// se abre (girando sobre la bisagra del fondo) cuando el estuche llega al centro de la pantalla.
+const OPEN_ANGLE = 106;
+
+function CaseFrame({
+  layout,
+  withLid,
+  lang,
+  dict,
+  children,
+}: {
+  layout: CaseLayout;
+  withLid: boolean;
+  lang: Locale;
+  dict: Dictionary;
+  children: React.ReactNode;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (!withLid || !ref.current) return;
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    let timer: ReturnType<typeof setTimeout>;
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          timer = setTimeout(() => setOpen(true), reduced ? 0 : 500);
+          io.disconnect();
+        }
+      },
+      { rootMargin: "-40% 0px -40% 0px" }
+    );
+    io.observe(ref.current);
+    return () => {
+      io.disconnect();
+      clearTimeout(timer);
+    };
+  }, [withLid]);
+
+  if (!withLid) return <>{children}</>;
+
+  const ratio = layout.height / layout.width;
+  return (
+    // Espacio arriba para la tapa abierta (padding en % del ancho = proporcional al estuche)
+    <div style={{ paddingTop: `${ratio * 34}%` }}>
+      <div
+        ref={ref}
+        className="relative mx-auto w-full"
+        style={{ maxWidth: layout.maxWidth, perspective: "2600px", perspectiveOrigin: "50% 60%" }}
+      >
+        {children}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 [transform-style:preserve-3d]"
+          style={{
+            transformOrigin: "50% 0%",
+            transform: open ? `rotateX(${OPEN_ANGLE}deg)` : "rotateX(0deg)",
+            transition: "transform 2.4s cubic-bezier(0.55, 0, 0.15, 1)",
+          }}
+        >
+          {/* Exterior: cuero de cocodrilo con el monograma dorado */}
+          <div className="absolute inset-0 overflow-hidden rounded-[6px] shadow-[0_30px_50px_-20px_rgba(0,0,0,0.9)] [backface-visibility:hidden]">
+            <Image src={`/cases/${layout.id}-lid-outer.jpg`} alt="" fill sizes={`${layout.maxWidth}px`} className="object-cover" />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <GoldMonogram height={Math.round(layout.maxWidth * ratio * 0.28)} className="drop-shadow-[0_1px_1px_rgba(0,0,0,0.7)]" />
+            </div>
+          </div>
+          {/* Interior: ante verde con el logo dorado, como el estuche real */}
+          <div className="absolute inset-0 overflow-hidden rounded-[6px] [backface-visibility:hidden] [transform:rotateX(180deg)]">
+            <Image src={`/cases/${layout.id}-lid-inner.jpg`} alt="" fill sizes={`${layout.maxWidth}px`} className="object-cover" />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <Wordmark className="w-[46%]" />
+            </div>
+          </div>
+        </div>
+      </div>
+      <p className="sr-only">{lang === "es" ? dict.box.open : dict.box.open}</p>
+    </div>
+  );
+}
+
+// Logo real "THE HEURE SOCIETY" (extraído de la foto de la tapa) pintado en latón
+function Wordmark({ className = "" }: { className?: string }) {
+  return (
+    <span
+      className={`block ${className}`}
+      style={{
+        aspectRatio: "2448 / 459",
+        background: "linear-gradient(135deg, #f3e2b0 0%, #c8a960 30%, #8f7136 55%, #d9bf7d 75%, #9c7c3c 100%)",
+        WebkitMaskImage: "url(/brand/wordmark-white.png)",
+        maskImage: "url(/brand/wordmark-white.png)",
+        WebkitMaskSize: "contain",
+        maskSize: "contain",
+        WebkitMaskRepeat: "no-repeat",
+        maskRepeat: "no-repeat",
+        filter: "drop-shadow(0 1px 0 rgba(0,0,0,0.45))",
+      }}
+    />
+  );
 }
