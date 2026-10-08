@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { hasLocale } from "@/lib/i18n";
+import { breadcrumbJsonLd, JsonLd, pageMetadata, SITE_URL } from "@/lib/seo";
 import { formatPrice, whatsappLink } from "@/lib/watches";
 import { getWatch, getWatches } from "@/lib/inventory";
 import { getDictionary } from "../../dictionaries";
@@ -22,12 +23,11 @@ export async function generateMetadata({
   const watch = await getWatch(slug);
   if (!hasLocale(lang) || !watch) return {};
   const name = `${watch.brand} ${watch.model} ${watch.reference}`;
-  return {
+  return pageMetadata(lang, `/watches/${slug}`, {
     title: `${name} — The Heure Society`,
     description: watch.description?.[lang] ?? `${name}, ${watch.caseSize}, ${watch.material[lang]}.`,
-    alternates: { languages: { en: `/en/watches/${slug}`, es: `/es/watches/${slug}` } },
-    openGraph: watch.images[0] ? { images: [watch.images[0]] } : undefined,
-  };
+    images: watch.images.slice(0, 1),
+  });
 }
 
 export default function WatchPage({ params }: PageProps<"/[lang]/watches/[slug]">) {
@@ -66,29 +66,47 @@ async function WatchDetail({ params }: { params: PageProps<"/[lang]/watches/[slu
     .sort((a, b) => Number(b.brand === watch.brand) - Number(a.brand === watch.brand))
     .slice(0, 3);
 
-  // Datos estructurados para que Google muestre la ficha como producto
+  // Datos estructurados para que Google muestre la ficha como producto. Una oferta sin precio
+  // no es válida para Google: con «Precio a consultar» se publica el producto sin oferta.
+  const url = `${SITE_URL}/${lang}/watches/${watch.slug}`;
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "Product",
     name: `${name} ${watch.reference}`,
+    url,
     brand: { "@type": "Brand", name: watch.brand },
     sku: watch.reference,
-    image: watch.images,
+    mpn: watch.reference,
+    image: watch.images.map((src) => (src.startsWith("http") ? src : `${SITE_URL}${src}`)),
     description: watch.description?.[lang],
-    offers: {
-      "@type": "Offer",
-      priceCurrency: watch.currency,
-      ...(watch.price != null && { price: watch.price }),
-      availability:
-        watch.status === "available" ? "https://schema.org/InStock" : "https://schema.org/SoldOut",
-      itemCondition: "https://schema.org/UsedCondition",
-    },
+    ...(watch.price != null && {
+      offers: {
+        "@type": "Offer",
+        url,
+        price: watch.price,
+        priceCurrency: watch.currency,
+        availability:
+          watch.status === "sold"
+            ? "https://schema.org/SoldOut"
+            : watch.status === "reserved"
+              ? "https://schema.org/LimitedAvailability"
+              : "https://schema.org/InStock",
+        itemCondition: "https://schema.org/UsedCondition",
+        seller: { "@id": `${SITE_URL}/#store` },
+      },
+    }),
   };
+  const breadcrumbs = breadcrumbJsonLd(lang, [
+    ["The Heure Society", ""],
+    [dict.nav.collection, "/watches"],
+    [`${name} ${watch.reference}`, `/watches/${watch.slug}`],
+  ]);
 
   return (
     <>
       <Header lang={lang} dict={dict} />
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <JsonLd data={jsonLd} />
+      <JsonLd data={breadcrumbs} />
 
       <main className="mx-auto max-w-7xl px-5 pb-28 pt-32 md:px-10 md:pt-40">
         <Link

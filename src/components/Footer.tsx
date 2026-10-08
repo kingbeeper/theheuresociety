@@ -31,7 +31,7 @@ export function Footer({ lang, dict }: { lang: Locale; dict: Dictionary }) {
         </ul>
 
         <ul className="space-y-3 text-sm text-stone">
-          <li><a className="hover:text-ivory" href="https://www.instagram.com/" target="_blank" rel="noreferrer">Instagram</a></li>
+          <li><a className="hover:text-ivory" href={contact.instagram} target="_blank" rel="noreferrer">Instagram</a></li>
           <li><a className="hover:text-ivory" href={`https://wa.me/${contact.whatsapp}`} target="_blank" rel="noreferrer">WhatsApp</a></li>
         </ul>
       </div>

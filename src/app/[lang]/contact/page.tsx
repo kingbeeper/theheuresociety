@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { hasLocale } from "@/lib/i18n";
+import { pageMetadata } from "@/lib/seo";
 import { contact } from "@/lib/site";
 import { getDictionary } from "../dictionaries";
 import { Header } from "@/components/Header";
@@ -12,11 +13,10 @@ export async function generateMetadata({ params }: PageProps<"/[lang]/contact">)
   const { lang } = await params;
   if (!hasLocale(lang)) return {};
   const dict = await getDictionary(lang);
-  return {
+  return pageMetadata(lang, "/contact", {
     title: `${dict.nav.contact} — The Heure Society`,
     description: dict.contact.lead,
-    alternates: { languages: { en: "/en/contact", es: "/es/contact" } },
-  };
+  });
 }
 
 export default async function ContactPage({ params }: PageProps<"/[lang]/contact">) {
@@ -25,23 +25,6 @@ export default async function ContactPage({ params }: PageProps<"/[lang]/contact
   const dict = await getDictionary(lang);
   const t = dict.contact;
   const a = contact.address;
-
-  // Datos estructurados: Google muestra la tienda con su dirección y teléfono
-  const jsonLd = {
-    "@context": "https://schema.org",
-    "@type": "JewelryStore",
-    name: "The Heure Society",
-    telephone: contact.phoneE164,
-    address: {
-      "@type": "PostalAddress",
-      streetAddress: a.street,
-      addressLocality: a.city,
-      addressRegion: a.region,
-      postalCode: a.postalCode,
-      addressCountry: a.country,
-    },
-    url: `${process.env.NEXT_PUBLIC_SITE_URL ?? "https://theheuresociety.com"}/${lang}`,
-  };
 
   const channels = [
     { label: t.call, value: contact.phoneDisplay, href: `tel:${contact.phoneE164}`, external: false },
@@ -52,7 +35,6 @@ export default async function ContactPage({ params }: PageProps<"/[lang]/contact
   return (
     <>
       <Header lang={lang} dict={dict} />
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
 
       <main className="mx-auto max-w-7xl px-5 pb-28 pt-36 md:px-10 md:pt-44">
         <header className="text-center">

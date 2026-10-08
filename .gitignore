@@ -56,3 +56,6 @@ next-env.d.ts
 
 # Fotos de trabajo de los recortes
 /assets/edits/new/
+
+# Vídeos promocionales (fuente y render)
+/promo/

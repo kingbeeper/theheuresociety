@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { hasLocale } from "@/lib/i18n";
+import { breadcrumbJsonLd, JsonLd, pageMetadata } from "@/lib/seo";
 import { getBrands, getWatches } from "@/lib/inventory";
 import { getDictionary } from "../dictionaries";
 import { Header } from "@/components/Header";
@@ -13,11 +14,10 @@ export async function generateMetadata({ params }: PageProps<"/[lang]/watches">)
   const { lang } = await params;
   if (!hasLocale(lang)) return {};
   const dict = await getDictionary(lang);
-  return {
+  return pageMetadata(lang, "/watches", {
     title: `${dict.nav.collection} — The Heure Society`,
     description: dict.catalog.lead,
-    alternates: { languages: { en: "/en/watches", es: "/es/watches" } },
-  };
+  });
 }
 
 export default async function WatchesPage({ params }: PageProps<"/[lang]/watches">) {
@@ -28,6 +28,7 @@ export default async function WatchesPage({ params }: PageProps<"/[lang]/watches
   return (
     <>
       <Header lang={lang} dict={dict} />
+      <JsonLd data={breadcrumbJsonLd(lang, [["The Heure Society", ""], [dict.nav.collection, "/watches"]])} />
       <main className="mx-auto max-w-7xl px-5 pb-28 pt-36 md:px-10 md:pt-44">
         <header className="text-center">
           <GoldMonogram height={60} />

@@ -1,12 +1,21 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { hasLocale } from "@/lib/i18n";
+import { pageMetadata } from "@/lib/seo";
 import { getDictionary } from "./dictionaries";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { BrandMarquee } from "@/components/BrandMarquee";
 import { CollectionCase } from "@/components/CollectionCase";
 import { getWatches } from "@/lib/inventory";
+
+export async function generateMetadata({ params }: PageProps<"/[lang]">): Promise<Metadata> {
+  const { lang } = await params;
+  if (!hasLocale(lang)) return {};
+  const dict = await getDictionary(lang);
+  return pageMetadata(lang, "", { title: dict.meta.title, description: dict.meta.description });
+}
 
 export default async function Home({ params }: PageProps<"/[lang]">) {
   const { lang } = await params;

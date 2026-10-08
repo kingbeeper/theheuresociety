@@ -31,4 +31,10 @@ export const contact = {
   },
   mapsUrl: "https://www.google.com/maps/search/?api=1&query=169+East+Flagler+St+Suite+1122+Miami+FL+33131",
   mapEmbed: "https://www.google.com/maps?q=169+East+Flagler+St,+Miami,+FL+33131&z=16&output=embed",
+  instagram: "https://www.instagram.com/theheuresociety",
+  // Horario para Google (datos estructurados). Debe coincidir con «hoursList» de los diccionarios.
+  openingHours: [
+    { days: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"], opens: "10:00", closes: "18:00" },
+    { days: ["Saturday"], opens: "10:00", closes: "14:00" },
+  ],
 };

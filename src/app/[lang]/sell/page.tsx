@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { hasLocale } from "@/lib/i18n";
+import { pageMetadata } from "@/lib/seo";
 import { getDictionary } from "../dictionaries";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
@@ -10,11 +11,10 @@ export async function generateMetadata({ params }: PageProps<"/[lang]/sell">): P
   const { lang } = await params;
   if (!hasLocale(lang)) return {};
   const dict = await getDictionary(lang);
-  return {
+  return pageMetadata(lang, "/sell", {
     title: `${dict.nav.sell} — The Heure Society`,
     description: dict.sell.lead,
-    alternates: { languages: { en: "/en/sell", es: "/es/sell" } },
-  };
+  });
 }
 
 export default async function SellPage({ params }: PageProps<"/[lang]/sell">) {

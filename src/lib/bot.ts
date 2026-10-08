@@ -283,6 +283,16 @@ async function publish(draft: Draft) {
   let slug = base;
   for (let n = 2; used.has(slug); n++) slug = `${base}-${n}`;
 
+  // Fotos con nombre descriptivo (rolex-land-dweller-127334-1.jpg) en vez de drafts/…/28.jpg:
+  // ayuda a salir en Google Imágenes. Se copian (el borrador conserva las suyas por si la
+  // publicación fallara); si alguna no se puede copiar, se usa la original.
+  const bucket = db.storage.from(PHOTO_BUCKET);
+  for (const [i, url] of images.entries()) {
+    const from = url.split(`/object/public/${PHOTO_BUCKET}/`)[1];
+    const to = `watches/${slug}-${i + 1}.jpg`;
+    if (from && !(await bucket.copy(from, to)).error) images[i] = bucket.getPublicUrl(to).data.publicUrl;
+  }
+
   const now = new Date().toISOString();
   const { data: row, error } = await db
     .from("watches")

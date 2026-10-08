@@ -91,7 +91,8 @@ export function CollectionCase({
               src={layout.image}
               alt=""
               fill
-              priority={i === 0}
+              // En la portada el estuche queda bajo la primera pantalla: no compite con el título
+              priority={i === 0 && !single}
               sizes={`(min-width: ${layout.maxWidth}px) ${layout.maxWidth}px, 100vw`}
               className="object-cover"
             />
@@ -301,14 +302,14 @@ function CaseFrame({
         >
           {/* Exterior: cuero de cocodrilo con el monograma dorado */}
           <div className="absolute inset-0 overflow-hidden rounded-[6px] shadow-[0_30px_50px_-20px_rgba(0,0,0,0.9)] [backface-visibility:hidden]">
-            <Image src={`/cases/${layout.id}-lid-outer.jpg`} alt="" fill sizes={`${layout.maxWidth}px`} className="object-cover" />
+            <Image src={`/cases/${layout.id}-lid-outer.jpg`} alt="" fill sizes={`(min-width: ${layout.maxWidth}px) ${layout.maxWidth}px, 100vw`} className="object-cover" />
             <div className="absolute inset-0 flex items-center justify-center">
               <GoldMonogram height={Math.round(layout.maxWidth * ratio * 0.28)} className="drop-shadow-[0_1px_1px_rgba(0,0,0,0.7)]" />
             </div>
           </div>
           {/* Interior: ante verde con el logo dorado, como el estuche real */}
           <div className="absolute inset-0 overflow-hidden rounded-[6px] [backface-visibility:hidden] [transform:rotateX(180deg)]">
-            <Image src={`/cases/${layout.id}-lid-inner.jpg`} alt="" fill sizes={`${layout.maxWidth}px`} className="object-cover" />
+            <Image src={`/cases/${layout.id}-lid-inner.jpg`} alt="" fill sizes={`(min-width: ${layout.maxWidth}px) ${layout.maxWidth}px, 100vw`} className="object-cover" />
             <div className="absolute inset-0 flex items-center justify-center">
               <Wordmark className="w-[46%]" />
             </div>
@@ -328,8 +329,8 @@ function Wordmark({ className = "" }: { className?: string }) {
       style={{
         aspectRatio: "2448 / 459",
         background: "linear-gradient(135deg, #f3e2b0 0%, #c8a960 30%, #8f7136 55%, #d9bf7d 75%, #9c7c3c 100%)",
-        WebkitMaskImage: "url(/brand/wordmark-white.png)",
-        maskImage: "url(/brand/wordmark-white.png)",
+        WebkitMaskImage: "url(/brand/wordmark-white.webp)",
+        maskImage: "url(/brand/wordmark-white.webp)",
         WebkitMaskSize: "contain",
         maskSize: "contain",
         WebkitMaskRepeat: "no-repeat",

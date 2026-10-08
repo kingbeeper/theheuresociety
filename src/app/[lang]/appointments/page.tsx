@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { hasLocale } from "@/lib/i18n";
+import { pageMetadata } from "@/lib/seo";
 import { getWatches } from "@/lib/inventory";
 import { getDictionary } from "../dictionaries";
 import { Header } from "@/components/Header";
@@ -12,11 +13,10 @@ export async function generateMetadata({ params }: PageProps<"/[lang]/appointmen
   const { lang } = await params;
   if (!hasLocale(lang)) return {};
   const dict = await getDictionary(lang);
-  return {
+  return pageMetadata(lang, "/appointments", {
     title: `${dict.booking.title} — The Heure Society`,
     description: dict.booking.lead,
-    alternates: { languages: { en: "/en/appointments", es: "/es/appointments" } },
-  };
+  });
 }
 
 export default async function AppointmentsPage({ params }: PageProps<"/[lang]/appointments">) {

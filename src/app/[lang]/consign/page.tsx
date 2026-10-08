@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { hasLocale } from "@/lib/i18n";
+import { pageMetadata } from "@/lib/seo";
 import { getDictionary } from "../dictionaries";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
@@ -11,11 +12,10 @@ export async function generateMetadata({ params }: PageProps<"/[lang]/consign">)
   const { lang } = await params;
   if (!hasLocale(lang)) return {};
   const dict = await getDictionary(lang);
-  return {
+  return pageMetadata(lang, "/consign", {
     title: `${dict.nav.consign} — The Heure Society`,
     description: dict.consign.lead,
-    alternates: { languages: { en: "/en/consign", es: "/es/consign" } },
-  };
+  });
 }
 
 export default async function ConsignPage({ params }: PageProps<"/[lang]/consign">) {
