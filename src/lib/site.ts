@@ -16,3 +16,19 @@ export const booking = {
   // Duración de la cita, en minutos (se muestra al cliente)
   durationMinutes: 45,
 };
+
+// Datos de contacto (también se usan en el pie de página y en los botones de WhatsApp)
+export const contact = {
+  phoneDisplay: "(305) 509-5767",
+  phoneE164: "+13055095767",
+  whatsapp: "13055095767", // formato de wa.me: código de país + número, sin "+"
+  address: {
+    street: "169 East Flagler St, Suite 1122",
+    city: "Miami",
+    region: "FL",
+    postalCode: "33131",
+    country: "US",
+  },
+  mapsUrl: "https://www.google.com/maps/search/?api=1&query=169+East+Flagler+St+Suite+1122+Miami+FL+33131",
+  mapEmbed: "https://www.google.com/maps?q=169+East+Flagler+St,+Miami,+FL+33131&z=16&output=embed",
+};

@@ -200,7 +200,7 @@
     "lead": "Elija cómo desea ver las piezas y el horario que le convenga. Confirmaremos su cita de forma personal.",
     "step1": "¿Cómo prefiere reunirse?",
     "office": "En nuestra oficina",
-    "officeText": "Una visita privada y personalizada. La dirección exacta se comparte al confirmar.",
+    "officeText": "Una visita privada y personalizada en nuestra oficina del centro de Miami.",
     "video": "Videollamada",
     "videoText": "Un recorrido en vivo y en detalle de cada pieza, desde donde esté.",
     "step2": "Piezas que desea ver",
@@ -331,5 +331,36 @@
     "collectionEyebrow": "La colección",
     "collectionTitle": "Elegidos uno a uno.",
     "collectionText": "Cada pieza de nuestra colección está autenticada y disponible para verla en privado, en nuestra oficina o por videollamada."
+  },
+  "contact": {
+    "titleA": "A su",
+    "titleB": "disposición",
+    "lead": "Atención personal por teléfono o WhatsApp, y visitas privadas en nuestra oficina de Miami, siempre con cita previa.",
+    "call": "Llámenos",
+    "visit": "Visita privada",
+    "visitValue": "Agendar una cita",
+    "whatsappValue": "Escríbanos",
+    "whatsappMessage": "Hola, me gustaría recibir más información sobre The Heure Society.",
+    "go": "Contactar",
+    "office": "Nuestra oficina",
+    "byAppointment": "Las visitas son solo con cita previa, para preparar las piezas que le interesan antes de su llegada.",
+    "hours": "Horario",
+    "hoursList": [
+      [
+        "Lunes a viernes",
+        "10:00 – 18:00"
+      ],
+      [
+        "Sábado",
+        "10:00 – 14:00"
+      ],
+      [
+        "Domingo",
+        "Cerrado"
+      ]
+    ],
+    "book": "Agendar una visita",
+    "directions": "Cómo llegar",
+    "mapTitle": "Mapa de la oficina de The Heure Society en Miami"
   }
 }

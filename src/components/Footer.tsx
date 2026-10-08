@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Locale } from "@/lib/i18n";
 import type { Dictionary } from "@/app/[lang]/dictionaries";
 import { Monogram } from "./Monogram";
+import { contact } from "@/lib/site";
 
 export function Footer({ lang, dict }: { lang: Locale; dict: Dictionary }) {
   return (
@@ -11,6 +12,14 @@ export function Footer({ lang, dict }: { lang: Locale; dict: Dictionary }) {
           <Monogram size={44} />
           <p className="font-display text-2xl tracking-[0.14em] uppercase">The Heure Society</p>
           <p className="max-w-xs text-sm text-stone">{dict.footer.tagline}</p>
+          <address className="space-y-1 text-sm not-italic text-stone">
+            <a className="block hover:text-ivory" href={contact.mapsUrl} target="_blank" rel="noreferrer">
+              {contact.address.street}
+              <br />
+              {contact.address.city}, {contact.address.region} {contact.address.postalCode}
+            </a>
+            <a className="block hover:text-ivory" href={`tel:${contact.phoneE164}`}>{contact.phoneDisplay}</a>
+          </address>
         </div>
 
         <ul className="space-y-3 text-sm text-stone">
@@ -23,7 +32,7 @@ export function Footer({ lang, dict }: { lang: Locale; dict: Dictionary }) {
 
         <ul className="space-y-3 text-sm text-stone">
           <li><a className="hover:text-ivory" href="https://www.instagram.com/" target="_blank" rel="noreferrer">Instagram</a></li>
-          <li><a className="hover:text-ivory" href="https://wa.me/" target="_blank" rel="noreferrer">WhatsApp</a></li>
+          <li><a className="hover:text-ivory" href={`https://wa.me/${contact.whatsapp}`} target="_blank" rel="noreferrer">WhatsApp</a></li>
         </ul>
       </div>
 

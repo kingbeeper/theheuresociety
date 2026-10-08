@@ -200,7 +200,7 @@
     "lead": "Choose how you would like to see the pieces, and a time that suits you. We will confirm your appointment personally.",
     "step1": "How would you like to meet?",
     "office": "At our office",
-    "officeText": "A private, one-on-one viewing. The exact address is shared when we confirm.",
+    "officeText": "A private, one-on-one viewing at our office in downtown Miami.",
     "video": "Video call",
     "videoText": "A live, detailed look at each piece from wherever you are.",
     "step2": "Pieces you would like to see",
@@ -331,5 +331,36 @@
     "collectionEyebrow": "The collection",
     "collectionTitle": "Chosen one by one.",
     "collectionText": "Every piece in our collection is authenticated and available to view privately, in our office or by video call."
+  },
+  "contact": {
+    "titleA": "At your",
+    "titleB": "service",
+    "lead": "Personal attention by phone or WhatsApp, and private viewings at our Miami office — always by appointment.",
+    "call": "Call us",
+    "visit": "Private viewing",
+    "visitValue": "Book a visit",
+    "whatsappValue": "Write to us",
+    "whatsappMessage": "Hello, I would like more information about The Heure Society.",
+    "go": "Contact",
+    "office": "Our office",
+    "byAppointment": "Viewings are by appointment only, so we can prepare the pieces you are interested in before you arrive.",
+    "hours": "Hours",
+    "hoursList": [
+      [
+        "Monday – Friday",
+        "10:00 – 18:00"
+      ],
+      [
+        "Saturday",
+        "10:00 – 14:00"
+      ],
+      [
+        "Sunday",
+        "Closed"
+      ]
+    ],
+    "book": "Book a viewing",
+    "directions": "Get directions",
+    "mapTitle": "Map of The Heure Society office in Miami"
   }
 }

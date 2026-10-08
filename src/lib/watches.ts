@@ -1,3 +1,5 @@
+import { contact } from "./site";
+
 // Tipos y utilidades del inventario que también se usan en el navegador.
 // La lectura de datos (Supabase o respaldo local) está en ./inventory.ts.
 
@@ -36,9 +38,10 @@ export function formatPrice(watch: Watch, locale: string) {
   }).format(watch.price);
 }
 
-// Enlace de WhatsApp con el mensaje ya escrito. El número se configura en .env.local
+// Enlace de WhatsApp con el mensaje ya escrito. El número sale de src/lib/site.ts
+// (NEXT_PUBLIC_WHATSAPP_NUMBER, si existe, tiene prioridad)
 export function whatsappLink(message: string) {
-  const number = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? "";
+  const number = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || contact.whatsapp;
   return `https://wa.me/${number}?text=${encodeURIComponent(message)}`;
 }
 
