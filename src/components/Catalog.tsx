@@ -115,7 +115,7 @@ export function Catalog({
       {list.length > 0 ? (
         view === "case" ? (
           <div className="mt-10">
-            <CollectionCase watches={list} lang={lang} dict={dict} />
+            <CollectionCase watches={list} lang={lang} dict={dict} withLid />
           </div>
         ) : (
           <div className="mt-8 grid gap-x-8 gap-y-14 sm:grid-cols-2 lg:grid-cols-3">

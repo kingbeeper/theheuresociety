@@ -49,7 +49,7 @@ export default async function Home({ params }: PageProps<"/[lang]">) {
 
         {/* El estuche de la casa: se abre al llegar y muestra el inventario actual */}
         <section className="mx-auto max-w-7xl px-2 pb-10 sm:px-5 md:px-10">
-          <CollectionCase watches={await getWatches()} lang={lang} dict={dict} withLid />
+          <CollectionCase watches={await getWatches()} lang={lang} dict={dict} withLid single />
         </section>
 
         {/* Marcas */}

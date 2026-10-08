@@ -38,16 +38,19 @@ export function CollectionCase({
   lang,
   dict,
   withLid = false,
+  single = false,
 }: {
   watches: Watch[];
   lang: Locale;
   dict: Dictionary;
-  // Portada: un solo estuche con tapa, que se abre al llegar a él
+  // Cada estuche con su tapa, que se abre al llegar a él
   withLid?: boolean;
+  // Portada: solo el primer estuche
+  single?: boolean;
 }) {
   const shown = watches.filter(inCase);
   const packed = packIntoCases(shown);
-  const cases = withLid ? packed.slice(0, 1) : packed;
+  const cases = single ? packed.slice(0, 1) : packed;
   const [hovered, setHovered] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const root = useRef<HTMLDivElement>(null);
