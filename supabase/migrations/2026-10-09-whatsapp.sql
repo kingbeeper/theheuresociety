@@ -47,3 +47,11 @@ create unique index if not exists appointments_slot_taken
 alter table wa_contacts  enable row level security;
 alter table wa_messages  enable row level security;
 alter table appointments enable row level security;
+
+-- Conexión con WhatsApp (la guarda la página de conexión de Meta): token, id del número, etc.
+create table if not exists wa_settings (
+  key        text primary key,
+  value      text not null,
+  updated_at timestamptz not null default now()
+);
+alter table wa_settings enable row level security;

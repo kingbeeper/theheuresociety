@@ -57,7 +57,12 @@ export function Footer({ lang, dict }: { lang: Locale; dict: Dictionary }) {
 
       <div className="border-t border-line">
         <div className="mx-auto flex max-w-5xl flex-col items-center gap-2 px-5 py-6 text-center text-[0.7rem] text-stone/70 md:px-10">
-          <p>© The Heure Society. {dict.footer.rights}</p>
+          <p>
+            © The Heure Society. {dict.footer.rights}{" "}
+            <Link className="underline-offset-4 hover:text-ivory hover:underline" href={`/${lang}/privacy`}>
+              {lang === "es" ? "Política de privacidad" : "Privacy policy"}
+            </Link>
+          </p>
           <p>{dict.footer.disclaimer}</p>
         </div>
       </div>

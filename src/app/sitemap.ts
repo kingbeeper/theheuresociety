@@ -4,7 +4,7 @@ import { SITE_URL } from "@/lib/seo";
 
 // Mapa del sitio para Google: páginas fijas y cada reloj, en los dos idiomas.
 // Usa el mismo inventario en caché que la web, así que un reloj publicado por Telegram aparece solo.
-const PAGES = ["", "/watches", "/appointments", "/sell", "/consign", "/contact"];
+const PAGES = ["", "/watches", "/appointments", "/sell", "/consign", "/contact", "/privacy"];
 
 const entry = (path: string, extra: Partial<MetadataRoute.Sitemap[number]> = {}): MetadataRoute.Sitemap =>
   (["es", "en"] as const).map((lang) => ({
