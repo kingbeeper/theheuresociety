@@ -134,7 +134,41 @@ async function segment(photo: { original: Buffer; w0: number; h0: number }, loc:
     luma[i] = (data[i * 4] + data[i * 4 + 1] + data[i * 4 + 2]) / 3;
     if (a < 250) alphaVaries = true;
   }
-  return alphaVaries ? alpha : luma;
+  return keepLargest(alphaVaries ? alpha : luma, info.width, info.height);
+}
+
+// Se queda solo con la pieza más grande de la máscara (el reloj) y borra motas sueltas
+function keepLargest(mask: Buffer, w: number, h: number) {
+  const label = new Int32Array(w * h);
+  const stack = new Int32Array(w * h);
+  let best = 0;
+  let bestSize = 0;
+  let next = 0;
+  for (let start = 0; start < mask.length; start++) {
+    if (mask[start] <= 127 || label[start]) continue;
+    next++;
+    let size = 0;
+    let top = 0;
+    stack[top++] = start;
+    label[start] = next;
+    while (top) {
+      const i = stack[--top];
+      size++;
+      const x = i % w;
+      for (const j of [x > 0 ? i - 1 : -1, x < w - 1 ? i + 1 : -1, i - w, i + w]) {
+        if (j >= 0 && j < mask.length && !label[j] && mask[j] > 127) {
+          label[j] = next;
+          stack[top++] = j;
+        }
+      }
+    }
+    if (size > bestSize) {
+      bestSize = size;
+      best = next;
+    }
+  }
+  for (let i = 0; i < mask.length; i++) if (label[i] !== best) mask[i] = 0;
+  return mask;
 }
 
 // ───────────────────────── 3. Afinar la geometría con la máscara ─────────────────────────
@@ -169,6 +203,37 @@ function refineCircle(mask: Buffer, w: number, h: number, loc: Locate) {
   const shift = Math.hypot(fit.x - loc.center.x, fit.y - loc.center.y);
   if (Math.abs(fit.r / loc.radius - 1) > 0.25 || shift > loc.radius * 0.3) return null;
   return fit;
+}
+
+// Afina hacia dónde apuntan las 12 con el eje de asas y brazalete (de las 12 a las 6),
+// que en la máscara es la dirección más alargada alrededor de la caja
+function refineAngle(mask: Buffer, w: number, h: number, c: { x: number; y: number; r: number }, estimate: number) {
+  let n = 0, sxx = 0, syy = 0, sxy = 0;
+  const r0 = c.r * 1.2;
+  const r1 = c.r * 2.2;
+  for (let y = Math.max(0, Math.floor(c.y - r1)); y < Math.min(h, c.y + r1); y += 2) {
+    for (let x = Math.max(0, Math.floor(c.x - r1)); x < Math.min(w, c.x + r1); x += 2) {
+      const dx = x - c.x;
+      const dy = y - c.y;
+      const d = Math.hypot(dx, dy);
+      if (d < r0 || d > r1 || mask[y * w + x] <= 127) continue;
+      n++; sxx += dx * dx; syy += dy * dy; sxy += dx * dy;
+    }
+  }
+  if (n < 500) return null;
+  // Eje principal de la nube de puntos y cuánto más largo es que ancho
+  const tr = sxx + syy;
+  const det = sxx * syy - sxy * sxy;
+  const l1 = tr / 2 + Math.sqrt(Math.max(0, (tr * tr) / 4 - det));
+  const l2 = tr - l1;
+  if (l1 < l2 * 2) return null;
+  const axis = (Math.atan2(l1 - sxx, sxy) * 180) / Math.PI; // dirección (dx, dy) = (sxy, l1 - sxx)
+  // Convertir a «grados desde arriba en sentido horario» y elegir el sentido más cercano a la estimación
+  const up = 90 + axis;
+  const diff = (a: number) => Math.abs(((a - estimate + 540) % 360) - 180);
+  const best = diff(up) < diff(up + 180) ? up : up + 180;
+  if (diff(best) > 15) return null;
+  return estimate + (((best - estimate + 540) % 360) - 180);
 }
 
 function range(from: number, to: number, step: number) {
@@ -262,6 +327,7 @@ export async function makeCutout(photoUrls: string[], caseSize: string): Promise
   const mask = await segment(photo, loc);
   const fit = refineCircle(mask, photo.w0, photo.h0, loc);
   const circle = fit ?? { x: loc.center.x, y: loc.center.y, r: loc.radius };
-  const png = await compose(photo, mask, circle, loc.angle, mm);
+  const angle = refineAngle(mask, photo.w0, photo.h0, circle, loc.angle) ?? loc.angle;
+  const png = await compose(photo, mask, circle, angle, mm);
   return { ok: true, png, source: url };
 }
