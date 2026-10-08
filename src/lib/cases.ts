@@ -41,24 +41,26 @@ const CASE_4: CaseLayout = {
   maxWidth: 880,
 };
 
+// El 6 y el 12 repiten los cojines altos del 4 (misma forma y separación), y su ancho máximo
+// hace que cada cojín mida en pantalla lo mismo que en el de 4: los relojes se ven igual en todos
 const CASE_6: CaseLayout = {
   id: "case-6",
   image: "/cases/case-6.jpg",
-  width: 1796,
-  height: 1157,
-  slots: grid([128, 105, 1796, 1157], [376, 861, 1339], [270, 709], 322, 350),
+  width: 2240,
+  height: 1792,
+  slots: grid([0, 0, 2240, 1792], [286, 903, 1520], [233, 1038], 430, 538),
   reach: 7,
-  maxWidth: 820,
+  maxWidth: 706,
 };
 
 const CASE_12: CaseLayout = {
   id: "case-12",
   image: "/cases/case-12.jpg",
-  width: 2079,
-  height: 1499,
-  slots: grid([130, 107, 2079, 1499], [366, 792, 1227, 1662], [268, 652, 1045], 300, 335),
-  reach: 6,
-  maxWidth: 1040,
+  width: 2048,
+  height: 2048,
+  slots: grid([0, 0, 2048, 2048], [200, 649, 1094, 1539], [202, 826, 1441], 317, 398),
+  reach: 7,
+  maxWidth: 875,
 };
 
 export const CASES: CaseLayout[] = [CASE_4, CASE_6, CASE_12];
