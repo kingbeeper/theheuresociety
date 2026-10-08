@@ -357,6 +357,8 @@ async function cutoutJob(chatId: number, watchId: string, photos?: string[]) {
   }
 
   try {
+    // Tarda alrededor de un minuto: se avisa para que no parezca que el robot se quedó parado
+    await sendMessage(chatId, `✂️ Agregando ${name} al estuche y generando la vista previa… Tarda alrededor de un minuto.`);
     await tg("sendChatAction", { chat_id: chatId, action: "upload_photo" });
     const result = await makeCutout(photos ?? w.images, w.case_size);
     if (!result.ok) {
@@ -402,7 +404,6 @@ async function cutoutFromPhoto(chatId: number, ref: string, fileId: string, mess
   const path = `cutouts/sources/${found.slug}-${messageId}.jpg`;
   const { error } = await db.storage.from(PHOTO_BUCKET).upload(path, await downloadFile(fileId), { contentType: "image/jpeg", upsert: true });
   if (error) throw error;
-  await sendMessage(chatId, `✂️ Preparando el recorte de ${h(found.brand)} ${h(found.model)} con esta foto…`);
   return cutoutJob(chatId, found.id, [db.storage.from(PHOTO_BUCKET).getPublicUrl(path).data.publicUrl]);
 }
 
@@ -485,7 +486,6 @@ async function handleCommand(chatId: number, text: string) {
       if (!arg) return sendMessage(chatId, "Indica la referencia. Ej.: <code>/estuche 126610LN</code>\nO envía una foto con el texto <code>estuche 126610LN</code>.");
       const found = await findPublished(arg);
       if (typeof found === "string") return sendMessage(chatId, found);
-      await sendMessage(chatId, `✂️ Preparando el recorte de ${h(found.brand)} ${h(found.model)}…`);
       after(() => cutoutJob(chatId, found.id));
       return;
     }
