@@ -119,7 +119,7 @@ export function CollectionCase({
       <div aria-live="polite" className="mx-auto mt-2 min-h-24 max-w-md px-4 text-center">
         {picked ? (
           <div className="border border-line bg-forest/80 px-6 py-5 backdrop-blur">
-            <p className="text-[0.62rem] tracking-[0.26em] uppercase text-brass">{picked.brand}</p>
+            <p className="text-[0.66rem] tracking-[0.26em] uppercase text-brass">{picked.brand}</p>
             <p className="mt-1 font-display text-2xl leading-tight">{picked.model}</p>
             <p className="mt-1 text-xs text-stone">
               Ref. {picked.reference} · {formatPrice(picked, lang)}

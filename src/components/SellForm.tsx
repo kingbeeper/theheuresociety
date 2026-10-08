@@ -211,7 +211,7 @@ export function SellForm({ dict, variant = "sell" }: { dict: Dictionary; variant
               className="flex aspect-square flex-col items-center justify-center gap-1 border border-dashed border-line text-stone transition-colors hover:border-brass/60 hover:text-ivory"
             >
               <span className="text-2xl leading-none">+</span>
-              <span className="px-1 text-center text-[0.58rem] tracking-[0.16em] uppercase">{t.addPhotos}</span>
+              <span className="px-1 text-center text-[0.64rem] tracking-[0.16em] uppercase">{t.addPhotos}</span>
             </button>
           )}
         </div>

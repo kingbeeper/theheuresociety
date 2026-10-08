@@ -63,7 +63,7 @@ export default async function ContactPage({ params }: PageProps<"/[lang]/contact
               <>
                 <span className="text-[0.66rem] tracking-[0.26em] uppercase text-brass">{c.label}</span>
                 <span className="mt-3 block font-display text-2xl">{c.value}</span>
-                <span className="mt-6 block text-[0.62rem] tracking-[0.24em] uppercase text-stone transition-colors group-hover:text-ivory">
+                <span className="mt-6 block text-[0.66rem] tracking-[0.24em] uppercase text-stone transition-colors group-hover:text-ivory">
                   {t.go} →
                 </span>
               </>

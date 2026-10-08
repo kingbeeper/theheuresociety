@@ -38,7 +38,7 @@ export function WatchCard({
         )}
 
         {watch.status !== "available" && (
-          <span className="absolute left-4 top-4 bg-ink/80 px-3 py-1.5 text-[0.62rem] tracking-[0.22em] uppercase text-brass backdrop-blur">
+          <span className="absolute left-4 top-4 bg-ink/80 px-3 py-1.5 text-[0.66rem] tracking-[0.22em] uppercase text-brass backdrop-blur">
             {dict.watch[watch.status]}
           </span>
         )}

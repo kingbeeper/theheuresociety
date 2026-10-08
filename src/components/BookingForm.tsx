@@ -147,7 +147,7 @@ export function BookingForm({ lang, dict, pieces }: { lang: Locale; dict: Dictio
         {/* 02 · Piezas */}
         <section>
           {heading("02", t.step2, t.step2Hint)}
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 min-[420px]:grid-cols-2 sm:grid-cols-3">
             {pieces.map((p) => {
               const on = selected.includes(p.slug);
               return (
@@ -164,8 +164,8 @@ export function BookingForm({ lang, dict, pieces }: { lang: Locale; dict: Dictio
                     {p.image && <Image src={p.image} alt="" fill sizes="44px" className="object-cover" />}
                   </span>
                   <span className="min-w-0">
-                    <span className="block text-[0.6rem] tracking-[0.2em] uppercase text-stone">{p.brand}</span>
-                    <span className="block truncate font-display text-base leading-tight">{p.model}</span>
+                    <span className="block text-[0.66rem] tracking-[0.2em] uppercase text-stone">{p.brand}</span>
+                    <span className="line-clamp-2 block font-display text-base leading-tight">{p.model}</span>
                   </span>
                 </button>
               );
@@ -190,9 +190,9 @@ export function BookingForm({ lang, dict, pieces }: { lang: Locale; dict: Dictio
                     on ? "border-brass bg-brass text-ink" : closed ? "border-line/50 text-stone/40" : "border-line hover:border-ivory/40"
                   }`}
                 >
-                  <span className="text-[0.6rem] tracking-[0.18em] uppercase">{fmtDay(d.date, { weekday: "short" })}</span>
+                  <span className="text-[0.66rem] tracking-[0.18em] uppercase">{fmtDay(d.date, { weekday: "short" })}</span>
                   <span className="mt-1 font-display text-2xl leading-none">{d.date.getDate()}</span>
-                  <span className="mt-1 text-[0.6rem] tracking-[0.14em] uppercase">
+                  <span className="mt-1 text-[0.66rem] tracking-[0.14em] uppercase">
                     {closed ? t.closed : fmtDay(d.date, { month: "short" })}
                   </span>
                 </button>
@@ -256,15 +256,15 @@ export function BookingForm({ lang, dict, pieces }: { lang: Locale; dict: Dictio
           <p className="eyebrow">{t.summary}</p>
           <dl className="mt-6 space-y-5 text-sm">
             <div>
-              <dt className="text-[0.62rem] tracking-[0.22em] uppercase text-stone">{t.type}</dt>
+              <dt className="text-[0.66rem] tracking-[0.22em] uppercase text-stone">{t.type}</dt>
               <dd className="mt-1">{kind ? (kind === "office" ? t.office : t.video) : "—"}</dd>
             </div>
             <div>
-              <dt className="text-[0.62rem] tracking-[0.22em] uppercase text-stone">{t.when}</dt>
+              <dt className="text-[0.66rem] tracking-[0.22em] uppercase text-stone">{t.when}</dt>
               <dd className="mt-1">{whenLabel ?? "—"}</dd>
             </div>
             <div>
-              <dt className="text-[0.62rem] tracking-[0.22em] uppercase text-stone">{t.pieces}</dt>
+              <dt className="text-[0.66rem] tracking-[0.22em] uppercase text-stone">{t.pieces}</dt>
               <dd className="mt-1 space-y-1">
                 {chosen.length ? chosen.map((p) => <p key={p.slug}>{p.brand} {p.model}</p>) : <p className="text-stone">{t.none}</p>}
               </dd>

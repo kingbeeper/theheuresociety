@@ -129,7 +129,7 @@ async function WatchDetail({ params }: { params: PageProps<"/[lang]/watches/[slu
             <div className="mt-8 flex items-center gap-4">
               <p className="text-2xl tracking-wide">{formatPrice(watch, lang)}</p>
               {watch.status !== "available" && (
-                <span className="border border-brass/50 px-3 py-1 text-[0.62rem] tracking-[0.22em] uppercase text-brass">
+                <span className="border border-brass/50 px-3 py-1 text-[0.66rem] tracking-[0.22em] uppercase text-brass">
                   {dict.watch[watch.status]}
                 </span>
               )}

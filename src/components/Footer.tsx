@@ -23,10 +23,10 @@ export function Footer({ lang, dict }: { lang: Locale; dict: Dictionary }) {
         <p className="mt-5 font-display text-2xl tracking-[0.14em] uppercase">The Heure Society</p>
         <p className="mt-3 max-w-xs text-sm text-stone">{dict.footer.tagline}</p>
 
-        <nav className="mt-10 flex flex-wrap items-center justify-center gap-x-6 gap-y-3 text-[0.7rem] tracking-[0.22em] uppercase">
+        <nav className="mt-10 flex flex-col items-center gap-4 text-[0.7rem] tracking-[0.22em] uppercase md:flex-row md:flex-wrap md:justify-center md:gap-x-6 md:gap-y-3">
           {nav.map((item, i) => (
             <span key={item.href} className="flex items-center gap-6">
-              {i > 0 && dot}
+              {i > 0 && <span className="hidden md:inline-flex">{dot}</span>}
               <Link className="text-ivory/85 transition-colors hover:text-brass" href={item.href}>
                 {item.label}
               </Link>
