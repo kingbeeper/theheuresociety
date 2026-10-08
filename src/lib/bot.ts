@@ -44,7 +44,7 @@ const HELP = `<b>The Heure Society · Publicar relojes</b>
 2. Escribe una nota con la referencia, el precio y los extras.
    <i>Ej.: Rolex 126610LN, 14500, caja y papeles, excelente estado</i>
 3. Revisa la ficha que preparo y pulsa <b>Publicar</b>.
-4. Preparo solo el recorte para el estuche de la web y te lo enseño.
+4. Preparo el recorte para el estuche de la web y te lo enseño: pulsa <b>Agregar al estuche</b> si te gusta.
 
 <b>Estuche</b>
 Para cambiar el recorte de un reloj ya publicado, envía una foto de frente con el texto <code>estuche</code> y su referencia (ej. <code>estuche 126610LN</code>). Sale mejor sobre una mesa, sin mano.
@@ -233,7 +233,7 @@ export async function handleCallback(cb: TgCallback) {
   if (!chatId || !draftId) return tg("answerCallbackQuery", { callback_query_id: cb.id });
 
   // Botones del recorte del estuche: llevan el id del reloj publicado, no de un borrador
-  if (action === "cutdel" || action === "cutredo") return handleCutoutButton(cb, chatId, action, draftId);
+  if (["cutok", "cutno", "cutredo", "cutdel"].includes(action)) return handleCutoutButton(cb, chatId, action, draftId);
 
   const { data: d } = await adminDb().from("bot_drafts").select("*").eq("id", draftId).maybeSingle();
   const draft = d as Draft | null;
@@ -334,17 +334,13 @@ async function findPublished(arg: string): Promise<PublishedWatch | string> {
   return data[0] as PublishedWatch;
 }
 
-// En segundo plano revalidateTag no tiene efecto: se pide a la propia web que se actualice
-async function refreshSite() {
-  await fetch(`${SITE_URL}/api/revalidate`, {
-    method: "POST",
-    headers: { "x-revalidate-secret": process.env.TELEGRAM_WEBHOOK_SECRET ?? "" },
-  }).catch((e) => console.error("No se pudo actualizar la web:", e));
-}
-
 const storagePath = (url: string) => url.split(`/object/public/${PHOTO_BUCKET}/`)[1];
 
-// Prepara el recorte (con las fotos indicadas o con las del reloj), lo publica y lo enseña
+// Recorte pendiente de aprobar: uno por reloj, se sustituye al repetir
+const pendingPath = (watchId: string) => `cutouts/pending/${watchId}.png`;
+
+// Prepara el recorte (con las fotos indicadas o con las del reloj) y envía la vista previa.
+// No entra en el estuche hasta que el administrador pulsa «Agregar al estuche».
 async function cutoutJob(chatId: number, watchId: string, photos?: string[]) {
   const db = adminDb();
   const { data } = await db.from("watches").select(PUBLISHED_FIELDS).eq("id", watchId).single();
@@ -358,42 +354,58 @@ async function cutoutJob(chatId: number, watchId: string, photos?: string[]) {
 
   try {
     // Tarda alrededor de un minuto: se avisa para que no parezca que el robot se quedó parado
-    await sendMessage(chatId, `✂️ Agregando ${name} al estuche y generando la vista previa… Tarda alrededor de un minuto.`);
+    await sendMessage(chatId, `✂️ Preparando el recorte de ${name} para el estuche y generando la vista previa… Tarda alrededor de un minuto.`);
     await tg("sendChatAction", { chat_id: chatId, action: "upload_photo" });
     const result = await makeCutout(photos ?? w.images, w.case_size);
     if (!result.ok) {
-      return sendMessage(chatId, `✂️ <b>${name}</b>: no pude hacer el recorte para el estuche. ${h(result.reason)}\n\n${retry}\nMientras tanto sale en la colección, pero no en el estuche.`);
+      return sendMessage(chatId, `✂️ <b>${name}</b>: no pude hacer el recorte para el estuche. ${h(result.reason)}
+
+${retry}
+Mientras tanto sale en la colección, pero no en el estuche.`);
     }
 
-    // Nombre nuevo en cada versión, para que nadie vea un recorte anterior guardado en caché
-    const stamp = Date.now();
-    const path = `cutouts/${w.slug}-${stamp}.png`;
-    const previewPath = `cutouts/preview/${w.slug}-${stamp}.jpg`;
     const bucket = db.storage.from(PHOTO_BUCKET);
-    const up1 = await bucket.upload(path, result.png, { contentType: "image/png", upsert: true });
+    // La vista previa lleva un nombre nuevo cada vez, para que Telegram no muestre una anterior
+    const previewPath = `cutouts/preview/${w.slug}-${Date.now()}.jpg`;
+    const up1 = await bucket.upload(pendingPath(w.id), result.png, { contentType: "image/png", upsert: true });
     const up2 = await bucket.upload(previewPath, await cutoutPreview(result.png), { contentType: "image/jpeg", upsert: true });
     if (up1.error || up2.error) throw up1.error ?? up2.error;
 
-    const url = bucket.getPublicUrl(path).data.publicUrl;
-    const { data: before } = await db.from("watches").select("cutout").eq("id", w.id).single();
-    const { error } = await db.from("watches").update({ cutout: url, updated_at: new Date().toISOString() }).eq("id", w.id);
-    if (error) throw error;
-    // El recorte anterior ya no se usa
-    if (before?.cutout && storagePath(before.cutout)) await bucket.remove([storagePath(before.cutout)]);
-    await refreshSite();
-
-    await sendPhoto(chatId, bucket.getPublicUrl(previewPath).data.publicUrl, `✂️ <b>${name}</b> ya está en el estuche.\nSi el recorte no está bien, quítalo o repítelo. ${retry}`, {
+    await sendPhoto(chatId, bucket.getPublicUrl(previewPath).data.publicUrl, `✂️ Vista previa de <b>${name}</b> para el estuche.
+¿Lo agrego? Si el recorte no está bien, repítelo o descártalo. ${retry}`, {
       reply_markup: keyboard([
+        [{ text: "✅ Agregar al estuche", callback_data: `cutok:${w.id}` }],
         [
           { text: "🔁 Repetir", callback_data: `cutredo:${w.id}` },
-          { text: "🗑 Quitar del estuche", callback_data: `cutdel:${w.id}` },
+          { text: "✖️ Descartar", callback_data: `cutno:${w.id}` },
         ],
       ]),
     });
   } catch (e) {
     console.error("Error en el recorte:", e);
-    await sendMessage(chatId, `⚠️ <b>${name}</b>: falló el recorte para el estuche (${h((e as Error).message)}).\n${retry}`);
+    await sendMessage(chatId, `⚠️ <b>${name}</b>: falló el recorte para el estuche (${h((e as Error).message)}).
+${retry}`);
   }
+}
+
+// «Agregar al estuche»: el recorte pendiente pasa a ser el del reloj y la web se actualiza
+async function acceptCutout(watchId: string) {
+  const db = adminDb();
+  const bucket = db.storage.from(PHOTO_BUCKET);
+  const { data } = await db.from("watches").select("slug, brand, model, cutout").eq("id", watchId).single();
+  if (!data) return { ok: false as const, text: "Este reloj ya no existe." };
+
+  // Nombre nuevo en cada versión, para que nadie vea un recorte anterior guardado en caché
+  const path = `cutouts/${data.slug}-${Date.now()}.png`;
+  const { error: moveErr } = await bucket.move(pendingPath(watchId), path);
+  if (moveErr) return { ok: false as const, text: "Esta vista previa ya no está disponible. Pulsa Repetir o usa /estuche." };
+
+  const { error } = await db.from("watches").update({ cutout: bucket.getPublicUrl(path).data.publicUrl, updated_at: new Date().toISOString() }).eq("id", watchId);
+  if (error) throw error;
+  // El recorte anterior ya no se usa
+  if (data.cutout && storagePath(data.cutout)) await bucket.remove([storagePath(data.cutout)]);
+  revalidateTag(INVENTORY_TAG, { expire: 0 });
+  return { ok: true as const, text: `✅ <b>${h(data.brand)} ${h(data.model)}</b> ya está en el estuche.` };
 }
 
 // Foto enviada con «estuche referencia»: se guarda y se usa solo para el recorte
@@ -410,6 +422,7 @@ async function cutoutFromPhoto(chatId: number, ref: string, fileId: string, mess
 async function handleCutoutButton(cb: TgCallback, chatId: number, action: string, watchId: string) {
   const removeButtons = () =>
     tg("editMessageReplyMarkup", { chat_id: chatId, message_id: cb.message!.message_id, reply_markup: keyboard([]) }).catch(() => {});
+  const db = adminDb();
 
   if (action === "cutredo") {
     await tg("answerCallbackQuery", { callback_query_id: cb.id, text: "Repitiendo el recorte…" });
@@ -418,7 +431,21 @@ async function handleCutoutButton(cb: TgCallback, chatId: number, action: string
     return;
   }
 
-  const db = adminDb();
+  if (action === "cutok") {
+    await tg("answerCallbackQuery", { callback_query_id: cb.id, text: "Agregando al estuche…" });
+    await removeButtons();
+    const result = await acceptCutout(watchId);
+    return sendMessage(chatId, result.text, result.ok ? { reply_markup: keyboard([[{ text: "🗑 Quitar del estuche", callback_data: `cutdel:${watchId}` }]]) } : {});
+  }
+
+  if (action === "cutno") {
+    await db.storage.from(PHOTO_BUCKET).remove([pendingPath(watchId)]);
+    await tg("answerCallbackQuery", { callback_query_id: cb.id, text: "Recorte descartado" });
+    await removeButtons();
+    return sendMessage(chatId, "Recorte descartado: el estuche queda como estaba. Para intentarlo con otra foto, envíala con el texto <code>estuche</code> y la referencia.");
+  }
+
+  // cutdel: quitar del estuche el recorte ya aprobado
   const { data } = await db.from("watches").select("cutout, brand, model").eq("id", watchId).single();
   await db.from("watches").update({ cutout: null, updated_at: new Date().toISOString() }).eq("id", watchId);
   if (data?.cutout && storagePath(data.cutout)) await db.storage.from(PHOTO_BUCKET).remove([storagePath(data.cutout)]);
