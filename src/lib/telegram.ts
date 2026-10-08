@@ -68,3 +68,22 @@ export function isAdmin(userId: number | undefined) {
   const ids = (process.env.TELEGRAM_ADMIN_IDS ?? "").split(",").map((s) => s.trim()).filter(Boolean);
   return ids.includes(String(userId));
 }
+
+const adminIds = () => (process.env.TELEGRAM_ADMIN_IDS ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+
+// Aviso a todo el equipo (chat privado de cada administrador). Con fotos, se envían antes del texto.
+export async function notifyAdmins(text: string, extra: Record<string, unknown> = {}, photos: string[] = []) {
+  for (const id of adminIds()) {
+    const chatId = Number(id);
+    try {
+      if (photos.length > 1) {
+        await tg("sendMediaGroup", { chat_id: chatId, media: photos.slice(0, 10).map((media) => ({ type: "photo", media })) });
+      } else if (photos.length === 1) {
+        await sendPhoto(chatId, photos[0], "");
+      }
+      await sendMessage(chatId, text, extra);
+    } catch (e) {
+      console.error("No se pudo avisar al administrador", id, e);
+    }
+  }
+}

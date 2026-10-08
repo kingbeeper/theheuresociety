@@ -5,6 +5,7 @@ import { adminDb, PHOTO_BUCKET } from "./supabase";
 import { INVENTORY_TAG } from "./inventory";
 import { analyzeWatch, type WatchDraft } from "./watch-ai";
 import { cutoutConfigured, cutoutPreview, makeCutout } from "./watch-cutout";
+import { reactivateBot } from "./wa-bot";
 import { downloadFile, escapeHtml as h, keyboard, sendMessage, sendPhoto, tg } from "./telegram";
 import { toSlug } from "./watches";
 
@@ -231,6 +232,13 @@ export async function handleCallback(cb: TgCallback) {
   const chatId = cb.message?.chat.id;
   const [action, draftId] = (cb.data ?? "").split(":");
   if (!chatId || !draftId) return tg("answerCallbackQuery", { callback_query_id: cb.id });
+
+  // Aviso de WhatsApp: el equipo devuelve la conversación al bot
+  if (action === "wabot") {
+    await reactivateBot(draftId);
+    await tg("answerCallbackQuery", { callback_query_id: cb.id, text: "El bot vuelve a responder en ese chat" });
+    return tg("editMessageReplyMarkup", { chat_id: chatId, message_id: cb.message!.message_id, reply_markup: keyboard([]) }).catch(() => {});
+  }
 
   // Botones del recorte del estuche: llevan el id del reloj publicado, no de un borrador
   if (["cutok", "cutno", "cutredo", "cutdel"].includes(action)) return handleCutoutButton(cb, chatId, action, draftId);
