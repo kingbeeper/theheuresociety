@@ -62,6 +62,7 @@ Para cambiar el recorte de un reloj ya publicado, envía una foto de frente con 
 /documentos — documentos abiertos
 /consignaciones — consignaciones activas (devolver o pagar al dueño)
 /costo — relojes sin costo · <code>/costo THS-0004 9500</code> para ponerlo directo
+/gasto — sumar un gasto (servicio, pulido, envío…) · <code>/gasto THS-0004 350 pulido</code>
 /seguimientos — clientes a contactar hoy (reseñas, aniversarios, servicio…)
 /demanda — qué buscan los clientes frente a lo que hay en stock
 /memos — relojes en memo · /facturas — facturas por cobrar
@@ -583,6 +584,9 @@ async function handleCommand(chatId: number, text: string, user: string) {
       return listOpenDocs(chatId);
     case "/costo":
       return costCommand(chatId, arg, user);
+    case "/gasto":
+    case "/gastos":
+      return costCommand(chatId, arg, user, "extra");
     case "/seguimientos":
       return listFollowUps(chatId);
     case "/demanda":

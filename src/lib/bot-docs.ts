@@ -482,12 +482,7 @@ export async function onCallback(chatId: number, cbId: string, messageId: number
   if (action === "dcost") {
     await answer();
     await clearButtons();
-    if (arg === "skip") {
-      await clearPendingCost(chatId);
-      return sendMessage(chatId, "De acuerdo. Cuando quieras: <code>/costo</code> te muestra los relojes sin costo.");
-    }
-    const [itemId, amount] = arg.split("|");
-    return amount ? setCost(chatId, itemId, Number(amount), user) : askCost(chatId, itemId);
+    return onCostButton(chatId, arg, user);
   }
 
   if (action === "dtask") {
@@ -669,92 +664,145 @@ export async function demandSummary(chatId: number) {
   return sendMessage(chatId, `<b>Demanda frente a inventario</b>\n🟢 = conviene comprar\n\n${lines.join("\n")}\n\n${SITE_URL}/admin/demanda`);
 }
 
-// ───────────────────────────── Costo de un reloj ─────────────────────────────
-// /costo · /costo 126610LN · /costo THS-0004 9500 · y la pregunta que llega al publicar
+// ───────────────────────────── Costo y gastos de un reloj ─────────────────────────────
+// /costo THS-0004 9500 → costo de compra (se reemplaza)
+// /gasto THS-0004 350 pulido → gasto extra (se suma: servicio, pulido, envío…)
+// Sin datos, el robot pregunta; y al publicar un reloj pregunta su costo.
+type Pending = { mode: "cost" | "extra"; itemId?: string; amount?: number; concept?: string | null };
 const costKey = (chatId: number) => `tgcost:${chatId}`;
 
-export async function pendingCost(chatId: number) {
+async function getPending(chatId: number): Promise<Pending | null> {
   const { data } = await adminDb().from("integration_settings").select("value").eq("key", costKey(chatId)).maybeSingle();
-  return (data?.value as string | undefined) ?? null;
+  try {
+    return data ? (JSON.parse(data.value as string) as Pending) : null;
+  } catch {
+    return null;
+  }
 }
+const savePending = (chatId: number, p: Pending) =>
+  adminDb().from("integration_settings").upsert({ key: costKey(chatId), value: JSON.stringify(p), updated_at: new Date().toISOString() }, { onConflict: "key" });
 const clearPendingCost = (chatId: number) => adminDb().from("integration_settings").delete().eq("key", costKey(chatId));
 
-export async function askCost(chatId: number, itemId: string, intro = "") {
-  const { data: i } = await adminDb().from("inventory_items").select("sku, brand, model, reference, cost, asking_price").eq("id", itemId).single();
+const itemName = (i: { sku: string; brand: string; model: string | null }) => `${i.sku} ${i.brand} ${i.model ?? ""}`.trim();
+
+export async function askCost(chatId: number, itemId: string, mode: Pending["mode"] = "cost") {
+  const { data: i } = await adminDb().from("inventory_items").select("sku, brand, model, cost, extra_costs").eq("id", itemId).single();
   if (!i) return sendMessage(chatId, "Ese reloj ya no está en el inventario.");
-  await adminDb().from("integration_settings").upsert({ key: costKey(chatId), value: itemId, updated_at: new Date().toISOString() }, { onConflict: "key" });
-  return sendMessage(
-    chatId,
-    `${intro}💵 ¿Cuánto te costó <b>${h(i.brand)} ${h(i.model ?? "")}</b> (${h(i.sku)})?${i.cost != null ? `\nAhora: ${usd(Number(i.cost))}` : ""}\nEscribe el número, ej. <code>9500</code> o <code>9.5k</code>.`,
-    { reply_markup: keyboard([[{ text: "Más tarde", callback_data: "dcost:skip" }]]) }
-  );
+  await savePending(chatId, { mode, itemId });
+  const text =
+    mode === "cost"
+      ? `💵 ¿Cuánto te costó <b>${h(itemName(i))}</b>?${i.cost != null ? `\nAhora: ${usd(Number(i.cost))}` : ""}\nEscribe el número, ej. <code>9500</code> o <code>9.5k</code>.`
+      : `🧾 Gasto de <b>${h(itemName(i))}</b>: escribe el importe y el concepto.\n<i>Ej.: 350 pulido · 1200 servicio · 85 envío</i>${Number(i.extra_costs) ? `\nGastos hasta ahora: ${usd(Number(i.extra_costs))}` : ""}`;
+  return sendMessage(chatId, text, { reply_markup: keyboard([[{ text: "Más tarde", callback_data: "dcost:skip" }]]) });
+}
+
+// Margen previsto (o real, si ya se vendió) después del cambio
+async function marginLine(itemId: string) {
+  const { data: i } = await adminDb().from("inventory_items").select("cost, extra_costs, asking_price, sale_price, status").eq("id", itemId).single();
+  if (!i || i.cost == null) return "";
+  const total = Number(i.cost) + Number(i.extra_costs ?? 0);
+  const sold = i.status === "sold" && i.sale_price != null;
+  const price = sold ? Number(i.sale_price) : i.asking_price == null ? null : Number(i.asking_price);
+  if (!price) return `\nCosto total: ${usd(total)}`;
+  return `\nCosto total ${usd(total)} · ${sold ? "venta" : "precio previsto"} ${usd(price)} → margen ${usd(price - total)} (${Math.round(((price - total) / price) * 100)}%)`;
 }
 
 export async function setCost(chatId: number, itemId: string, cost: number, user: string) {
   await clearPendingCost(chatId);
   const db = adminDb();
-  const { data: i } = await db.from("inventory_items").select("sku, brand, model, cost, extra_costs, asking_price, acquisition").eq("id", itemId).single();
+  const { data: i } = await db.from("inventory_items").select("sku, brand, model, cost").eq("id", itemId).single();
   if (!i) return sendMessage(chatId, "Ese reloj ya no está en el inventario.");
   await db.from("inventory_items").update({ cost, updated_at: new Date().toISOString() }).eq("id", itemId);
   const { logItem } = await import("./stock");
   await logItem(itemId, "cost", `Costo: ${i.cost == null ? "—" : usd(Number(i.cost))} → ${usd(cost)} (Telegram)`, user);
-  const total = cost + Number(i.extra_costs ?? 0);
-  const ask = i.asking_price == null ? null : Number(i.asking_price);
-  const margin = ask ? `\nPrecio previsto ${usd(ask)} → margen ${usd(ask - total)} (${Math.round(((ask - total) / ask) * 100)}%)` : "";
-  return sendMessage(chatId, `✅ Costo de ${h(i.sku)} ${h(i.brand)} ${h(i.model ?? "")}: <b>${usd(cost)}</b>${margin}`);
+  return sendMessage(chatId, `✅ Costo de ${h(itemName(i))}: <b>${usd(cost)}</b>${await marginLine(itemId)}`);
 }
 
-// Respuesta a la pregunta del costo (devuelve false si no había ninguna pendiente)
+export async function addExtra(chatId: number, itemId: string, amount: number, concept: string | null, user: string) {
+  await clearPendingCost(chatId);
+  const db = adminDb();
+  const { data: i } = await db.from("inventory_items").select("sku, brand, model, extra_costs").eq("id", itemId).single();
+  if (!i) return sendMessage(chatId, "Ese reloj ya no está en el inventario.");
+  const total = Number(i.extra_costs ?? 0) + amount;
+  await db.from("inventory_items").update({ extra_costs: total, updated_at: new Date().toISOString() }).eq("id", itemId);
+  const { logItem } = await import("./stock");
+  await logItem(itemId, "cost", `Gasto: ${usd(amount)}${concept ? ` · ${concept}` : ""} (Telegram) · gastos ${usd(total)}`, user);
+  return sendMessage(chatId, `✅ Gasto añadido a ${h(itemName(i))}: <b>${usd(amount)}</b>${concept ? ` · ${h(concept)}` : ""}\nGastos acumulados: ${usd(total)}${await marginLine(itemId)}`);
+}
+
+// «9500», «$9,500», «9.5k» (y en gastos, seguido del concepto: «350 pulido»)
+const AMOUNT = /^\s*\$?\s*(\d[\d.,]*\s*k?)\b\s*(.*)$/i;
+
+// Respuesta a la pregunta pendiente (devuelve false si no había ninguna o no es un importe)
 export async function onCostText(chatId: number, text: string, user: string) {
-  const itemId = await pendingCost(chatId);
-  if (!itemId) return false;
-  // Solo un importe («9500», «$9,500», «9.5k»): otro texto (p. ej. la nota de un reloj nuevo) no es la respuesta
-  if (!/^\s*\$?\s*\d[\d.,]*\s*k?\s*$/i.test(text)) {
+  const p = await getPending(chatId);
+  if (!p?.itemId) return false;
+  const m = text.match(AMOUNT);
+  // Otro texto (p. ej. la nota de un reloj nuevo) no es la respuesta: se olvida la pregunta
+  if (!m || (p.mode === "cost" && m[2].trim())) {
     await clearPendingCost(chatId);
     return false;
   }
-  const cost = parsePrice(text);
-  if (!cost) {
-    await sendMessage(chatId, "No entendí el costo. Escribe un número (ej. <code>9500</code>) o toca «Más tarde».");
+  const amount = parsePrice(m[1]);
+  if (!amount) {
+    await sendMessage(chatId, "No entendí el importe. Escribe un número (ej. <code>9500</code>) o toca «Más tarde».");
     return true;
   }
-  await setCost(chatId, itemId, cost, user);
+  if (p.mode === "cost") await setCost(chatId, p.itemId, amount, user);
+  else await addExtra(chatId, p.itemId, amount, m[2].trim() || null, user);
   return true;
 }
 
-export async function costCommand(chatId: number, arg: string, user: string) {
-  const { data } = await adminDb()
-    .from("inventory_items")
-    .select("id, sku, brand, model, reference, cost")
-    .in("status", ["in_stock", "reserved", "sold"])
-    .order("sku");
+export async function costCommand(chatId: number, arg: string, user: string, mode: Pending["mode"] = "cost") {
+  const { data } = await adminDb().from("inventory_items").select("id, sku, brand, model, reference, cost, status").in("status", ["in_stock", "reserved", "sold"]).order("sku");
   const items = data ?? [];
-  // «/costo»: los que no tienen costo
+  const button = (i: { id: string; sku: string; brand: string; model: string | null }) => [{ text: itemName(i).slice(0, 60), callback_data: `dcost:${i.id}|${mode}` }];
+
+  // Sin datos: en costo, los que no lo tienen; en gastos, los disponibles
   if (!arg) {
-    const missing = items.filter((i) => i.cost == null);
-    if (!missing.length) return sendMessage(chatId, "✅ Todos los relojes tienen costo. Para cambiar uno: <code>/costo THS-0004 9500</code>");
-    return sendMessage(chatId, `<b>Relojes sin costo</b> (${missing.length})\nToca uno para ponérselo:`, {
-      reply_markup: keyboard(missing.slice(0, 20).map((i) => [{ text: `${i.sku} · ${i.brand} ${i.model ?? ""}`.replace(/\s+/g, " ").slice(0, 60), callback_data: `dcost:${i.id}` }])),
+    const list = mode === "cost" ? items.filter((i) => i.cost == null) : items.filter((i) => i.status !== "sold");
+    if (!list.length) return sendMessage(chatId, mode === "cost" ? "✅ Todos los relojes tienen costo. Para cambiar uno: <code>/costo THS-0004 9500</code>" : "No hay relojes disponibles.");
+    return sendMessage(chatId, mode === "cost" ? `<b>Relojes sin costo</b> (${list.length})\nToca uno para ponérselo:` : "🧾 ¿A qué reloj le sumas el gasto?\n<i>Directo: <code>/gasto THS-0004 350 pulido</code></i>", {
+      reply_markup: keyboard(list.slice(0, 25).map(button)),
     });
   }
-  // «/costo 126610LN 9500»: el último número (si hay más palabras) es el costo
+
+  // «126610LN 9500» o «THS-0004 350 pulido»: lo anterior al importe es el reloj; lo posterior, el concepto
   const parts = arg.trim().split(/\s+/);
-  const last = parts.length > 1 ? parsePrice(parts[parts.length - 1]) : undefined;
-  const query = last ? parts.slice(0, -1).join(" ") : arg;
+  const at = parts.findIndex((w, i) => i > 0 && /^\$?\d[\d.,]*k?$/i.test(w));
+  const query = at > 0 ? parts.slice(0, at).join(" ") : arg;
+  const amount = at > 0 ? parsePrice(parts[at]) ?? undefined : undefined;
+  const concept = at > 0 ? parts.slice(at + 1).join(" ") || null : null;
   const q = words(query);
   const found = items.filter((i) => {
     const hay = `${i.sku} ${i.brand} ${i.model ?? ""} ${i.reference ?? ""}`;
     const w = words(hay);
-    // «skydweller» encuentra «Sky-Dweller»: también se compara sin espacios ni guiones
     return q.every((x) => w.some((y) => y.includes(x))) || (i.reference && compact(query).includes(compact(i.reference as string))) || compact(hay).includes(compact(query));
   });
   if (!found.length) return sendMessage(chatId, `No encontré «${h(query)}» en el inventario.`);
   if (found.length > 1) {
-    return sendMessage(chatId, "¿Cuál de estos?", {
-      reply_markup: keyboard(found.slice(0, 8).map((i) => [{ text: `${i.sku} · ${i.brand} ${i.model ?? ""}`.replace(/\s+/g, " ").slice(0, 60), callback_data: `dcost:${i.id}${last ? `|${last}` : ""}` }])),
-    });
+    // El importe y el concepto esperan a que se elija el reloj
+    await savePending(chatId, { mode, amount, concept });
+    return sendMessage(chatId, "¿Cuál de estos?", { reply_markup: keyboard(found.slice(0, 8).map(button)) });
   }
-  return last ? setCost(chatId, found[0].id as string, last, user) : askCost(chatId, found[0].id as string);
+  const id = found[0].id as string;
+  if (!amount) return askCost(chatId, id, mode);
+  return mode === "cost" ? setCost(chatId, id, amount, user) : addExtra(chatId, id, amount, concept, user);
+}
+
+// Botón de un reloj (dcost:id|modo) o «Más tarde» (dcost:skip)
+export async function onCostButton(chatId: number, arg: string, user: string) {
+  if (arg === "skip") {
+    await clearPendingCost(chatId);
+    return sendMessage(chatId, "De acuerdo. Cuando quieras: <code>/costo</code> o <code>/gasto</code>.");
+  }
+  const [itemId, modeArg] = arg.split("|");
+  const mode = modeArg === "extra" ? "extra" : "cost";
+  const p = await getPending(chatId);
+  if (p?.amount && !p.itemId && p.mode === mode) {
+    return mode === "cost" ? setCost(chatId, itemId, p.amount, user) : addExtra(chatId, itemId, p.amount, p.concept ?? null, user);
+  }
+  return askCost(chatId, itemId, mode);
 }
 
 // /seguimientos: lo que toca hoy, con el mensaje de WhatsApp listo y botón de hecho
