@@ -335,6 +335,18 @@ async function publish(draft: Draft) {
   if (error) throw error;
 
   await updateDraft(draft.id, { status: "published", watch_id: row.id } as Partial<Draft>);
+
+  // Entra también en el inventario del CRM (el costo y el proveedor se completan allí)
+  const { data: stock } = await db
+    .from("inventory_items")
+    .insert({
+      acquisition: "purchase", brand: w.brand, model: w.model, reference: w.reference,
+      comes_with: [w.hasBox && "Box", w.hasPapers && "Papers"].filter(Boolean).join(", ") || null,
+      condition: "Pre-Owned", purchase_date: now.slice(0, 10), asking_price: w.price, watch_id: row.id,
+    })
+    .select("id")
+    .single();
+  if (stock) await adminDb().from("inventory_events").insert({ item_id: stock.id, type: "entry", body: "Entrada desde Telegram (publicado en la web). Falta el costo.", created_by: "bot" });
   revalidateTag(INVENTORY_TAG, { expire: 0 });
   return { slug, id: row.id as string };
 }
@@ -555,6 +567,18 @@ async function handleCommand(chatId: number, text: string) {
       const found = await findPublished(arg);
       if (typeof found === "string") return sendMessage(chatId, found);
       await adminDb().from("watches").update({ status, updated_at: new Date().toISOString() }).eq("id", found.id);
+      // El inventario sigue el mismo estado (en una venta, el precio y el comprador se completan en el CRM)
+      const { data: stockItem } = await adminDb().from("inventory_items").select("id, status").eq("watch_id", found.id).in("status", ["in_stock", "reserved", "sold"]).maybeSingle();
+      if (stockItem && stockItem.status !== "sold") {
+        const next = status === "sold" ? "sold" : status === "reserved" ? "reserved" : "in_stock";
+        await adminDb().from("inventory_items")
+          .update({ status: next, ...(next === "sold" && { sale_date: new Date().toISOString().slice(0, 10) }), updated_at: new Date().toISOString() })
+          .eq("id", stockItem.id);
+        await adminDb().from("inventory_events").insert({ item_id: stockItem.id, type: next === "sold" ? "sale" : "status", body: `${command} desde Telegram`, created_by: "bot" });
+        if (next === "sold") {
+          await sendMessage(chatId, `Completa el precio de venta y el comprador en el CRM:\n${SITE_URL}/admin/inventario/${stockItem.id}`);
+        }
+      }
       revalidateTag(INVENTORY_TAG, { expire: 0 });
       const label = { sold: "vendido", reserved: "reservado", available: "disponible" }[status];
       return sendMessage(chatId, `Hecho: ${h(found.brand)} ${h(found.model)} (${h(found.reference)}) ahora figura como <b>${label}</b>.`);
