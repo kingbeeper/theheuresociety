@@ -8,6 +8,7 @@ import { ago, Card, fmtDate, fmtDateTime, ghostButtonClass, money, SourceTag, St
 import { LeadForm } from "@/components/admin/LeadForm";
 import { addNote, completeFollowUp, completeTaskAction, setBot, setSocialBot, toggleAlert } from "../../../actions";
 import { customerTasks, taskMessage, TASK_LABEL, waLink } from "@/lib/tasks";
+import { customerValues } from "@/lib/customer-value";
 import { getDocSettings } from "@/lib/documents";
 import { todayInMiami } from "@/lib/booking";
 import { STATUS_LABEL, type DocKind, type DocStatus } from "@/lib/doc-labels";
@@ -39,7 +40,8 @@ export default async function LeadPage({ params }: PageProps<"/admin/leads/[id]"
     : { data: [] as { contact_id: string; direction: string; type: string; body: string | null; media_url: string | null; created_at: string }[] };
   const platformOf = (contactId: string) => (socialContacts ?? []).find((s) => s.id === contactId)?.platform === "facebook" ? "Messenger" : "Instagram";
 
-  const [tasks, docSettings] = await Promise.all([customerTasks(id).catch(() => []), getDocSettings()]);
+  const [tasks, docSettings, values] = await Promise.all([customerTasks(id).catch(() => []), getDocSettings(), customerValues([id])]);
+  const value = values.get(id);
   const { data: docs } = await db.from("documents").select("id, kind, number, status, total").eq("customer_id", id).order("created_at", { ascending: false });
   const [events, alerts, appts, sells, wa, msgs] = await Promise.all([
     db.from("customer_events").select("*").eq("customer_id", id).order("created_at", { ascending: false }).limit(200),
@@ -81,6 +83,7 @@ export default async function LeadPage({ params }: PageProps<"/admin/leads/[id]"
         <div>
           <h1 className="font-display text-3xl font-light sm:text-4xl">{c.name ?? "Sin nombre"}</h1>
           <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-stone">
+            {value?.vip && <span className="border border-brass/60 px-2 py-0.5 text-[0.6rem] tracking-[0.2em] uppercase text-brass">⭐ VIP</span>}
             <StageBadge stage={c.stage} />
             <SourceTag source={c.source} />
             <span>· cliente desde {ago(c.created_at, now)}</span>
@@ -108,6 +111,22 @@ export default async function LeadPage({ params }: PageProps<"/admin/leads/[id]"
               </form>
             </div>
           )}
+          {value && (
+            <div className="grid grid-cols-2 gap-px border border-line bg-line sm:grid-cols-4">
+              {[
+                ["Ha comprado", money(value.spent)],
+                ["Compras", String(value.purchases)],
+                ["Última compra", value.lastPurchase ? fmtDate(`${value.lastPurchase}T12:00:00`) : "—"],
+                ["Nos vendió / consignó", String(value.supplied)],
+              ].map(([l, v]) => (
+                <div key={l} className="bg-forest px-4 py-3">
+                  <p className="font-display text-2xl font-light">{v}</p>
+                  <p className="mt-1 text-[0.58rem] tracking-[0.16em] uppercase text-stone">{l}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
           {tasks.length > 0 && (
             <Card title="Postventa">
               <ul className="space-y-3 text-sm">

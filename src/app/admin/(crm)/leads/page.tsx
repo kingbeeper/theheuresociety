@@ -3,10 +3,11 @@ import { connection } from "next/server";
 import { adminDb } from "@/lib/supabase";
 import { requireAdmin } from "@/lib/admin-auth";
 import { followUpsDue, INTENT_LABEL, SOURCE_LABEL, STAGES, STAGE_LABEL, type Customer, type Stage } from "@/lib/crm";
-import { ago, buttonClass, fieldClass, labelClass, PageTitle, SourceTag, requestTime } from "@/components/admin/ui";
+import { ago, buttonClass, fieldClass, labelClass, money, PageTitle, SourceTag, requestTime } from "@/components/admin/ui";
 import { StageSelect } from "@/components/admin/StageSelect";
 import { createLead } from "../../actions";
 import { todayInMiami } from "@/lib/booking";
+import { customerValues } from "@/lib/customer-value";
 
 export const metadata = { title: "Leads" };
 
@@ -22,6 +23,7 @@ export default async function LeadsPage({ searchParams }: PageProps<"/admin/lead
   const botOff = one(sp.bot) === "off";
   const withAlerts = one(sp.alerts) === "1";
   const followOnly = one(sp.follow) === "1";
+  const vipOnly = one(sp.vip) === "1";
 
   const db = adminDb();
   let query = db.from("customers").select("*").order("last_activity_at", { ascending: false }).limit(300);
@@ -40,12 +42,21 @@ export default async function LeadsPage({ searchParams }: PageProps<"/admin/lead
     const { data } = await db.from("watch_alerts").select("customer_id").eq("active", true);
     query = query.in("id", [...new Set((data ?? []).map((r) => r.customer_id as string))]);
   }
+  if (vipOnly) {
+    const all = await customerValues();
+    query = query.in("id", [...all.entries()].filter(([, v]) => v.vip).map(([id]) => id));
+  }
   if (followOnly) {
     const due = await followUpsDue(requestTime(), todayInMiami(new Date(requestTime())));
     query = query.in("id", due.map((f) => f.id));
   }
   const [{ data: rows }, { data: counts }] = await Promise.all([query, db.from("customers").select("stage")]);
   const leads = (rows ?? []) as Customer[];
+  const values = await customerValues(leads.map((c) => c.id));
+  const spent = (id: string) => {
+    const v = values.get(id);
+    return v && v.purchases ? `${v.vip ? "⭐ " : ""}${money(v.spent)} · ${v.purchases} compra${v.purchases > 1 ? "s" : ""}` : null;
+  };
   const count = (s: string) => (counts ?? []).filter((c) => c.stage === s).length;
   const now = requestTime();
 
@@ -112,7 +123,8 @@ export default async function LeadsPage({ searchParams }: PageProps<"/admin/lead
           {Object.entries(SOURCE_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
         </select>
         <button className="border border-line px-4 text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">Filtrar</button>
-        {(q || source || botOff || withAlerts || followOnly) && (
+        <Link href="/admin/leads?vip=1" className={`self-center text-xs underline ${vipOnly ? "text-brass" : "text-stone hover:text-ivory"}`}>⭐ Mejores clientes</Link>
+        {(q || source || botOff || withAlerts || followOnly || vipOnly) && (
           <Link href="/admin/leads" className="self-center text-xs text-stone underline hover:text-ivory">Quitar filtros</Link>
         )}
       </form>
@@ -126,6 +138,7 @@ export default async function LeadsPage({ searchParams }: PageProps<"/admin/lead
                 <Link href={`/admin/leads/${c.id}`} className="min-w-0 hover:text-brass">
                   <p className="truncate">{c.name ?? "Sin nombre"}</p>
                   <p className="truncate text-xs text-stone">{c.phone ?? c.email ?? ""}</p>
+                  {spent(c.id) && <p className="text-xs text-brass">{spent(c.id)}</p>}
                 </Link>
                 <span className="shrink-0 text-xs text-stone">{ago(c.last_activity_at, now)}</span>
               </div>
@@ -157,6 +170,7 @@ export default async function LeadsPage({ searchParams }: PageProps<"/admin/lead
                   <td className="px-4 py-3">
                     <Link href={`/admin/leads/${c.id}`} className="hover:text-brass">{c.name ?? "Sin nombre"}</Link>
                     <p className="text-xs text-stone">{c.phone ?? c.email ?? ""}</p>
+                    {spent(c.id) && <p className="text-xs text-brass">{spent(c.id)}</p>}
                   </td>
                   <td className="max-w-[280px] px-4 py-3">
                     <p className="truncate">{c.interests ?? "—"}</p>

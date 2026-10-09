@@ -9,7 +9,7 @@ import { reactivateBot } from "./wa-bot";
 import { addEvent, matchAlerts } from "./crm";
 import { downloadFile, escapeHtml as h, keyboard, sendMessage, sendPhoto, tg } from "./telegram";
 import { toSlug } from "./watches";
-import { FLOW_COMMANDS, afterAnalysis, attachDraft, clearFlow, getFlow, listFollowUps, listOpenDocs, onCallback, onContact, onText, resendDoc, startFlow } from "./bot-docs";
+import { FLOW_COMMANDS, afterAnalysis, attachDraft, clearFlow, getFlow, demandSummary, listFollowUps, listOpenDocs, onCallback, onContact, onText, resendDoc, startFlow } from "./bot-docs";
 
 // ───────────────────────── Tipos de Telegram (solo lo que usamos) ─────────────────────────
 type TgPhoto = { file_id: string; width: number; height: number };
@@ -62,6 +62,7 @@ Para cambiar el recorte de un reloj ya publicado, envía una foto de frente con 
 /documentos — documentos abiertos
 /consignaciones — consignaciones activas (devolver o pagar al dueño)
 /seguimientos — clientes a contactar hoy (reseñas, aniversarios, servicio…)
+/demanda — qué buscan los clientes frente a lo que hay en stock
 /memos — relojes en memo · /facturas — facturas por cobrar
 /pdf <i>número</i> — volver a enviar uno
 Puedes escribir la referencia o enviar fotos: si el reloj es nuevo, preparo la ficha y lo doy de alta.
@@ -576,6 +577,8 @@ async function handleCommand(chatId: number, text: string, user: string) {
       return listOpenDocs(chatId);
     case "/seguimientos":
       return listFollowUps(chatId);
+    case "/demanda":
+      return demandSummary(chatId);
     case "/consignaciones":
       return listOpenDocs(chatId, "consignment");
     case "/memos":

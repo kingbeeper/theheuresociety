@@ -4,6 +4,7 @@ import { adminDb } from "@/lib/supabase";
 import { requireAdmin } from "@/lib/admin-auth";
 import { followUpsDue, SOURCE_LABEL, STAGES, STAGE_LABEL, type Customer } from "@/lib/crm";
 import { salesByChannel, type Item } from "@/lib/stock";
+import { topCustomers } from "@/lib/customer-value";
 import { todayInMiami } from "@/lib/booking";
 import { completeTaskAction } from "../actions";
 import { ago, Card, fmtDateTime, money, PageTitle, SourceTag, StageBadge, requestTime } from "@/components/admin/ui";
@@ -31,7 +32,7 @@ export default async function Dashboard() {
     followUpsDue(now, todayInMiami(new Date(now))),
     db.from("inventory_items").select("*").eq("status", "sold"),
   ]);
-  const channels = await salesByChannel((stock.data ?? []) as Item[], now - 365 * 86_400_000);
+  const [channels, best] = await Promise.all([salesByChannel((stock.data ?? []) as Item[], now - 365 * 86_400_000), topCustomers(6)]);
 
   const all = (customers.data ?? []) as Pick<Customer, "stage" | "source" | "created_at">[];
   const week = all.filter((c) => c.created_at >= weekAgo);
@@ -141,6 +142,23 @@ export default async function Dashboard() {
             </ul>
           ) : (
             <p className="text-sm text-stone">Todo al día.</p>
+          )}
+        </Card>
+
+        <Card title="Mejores clientes" href="/admin/leads?vip=1">
+          {best.length ? (
+            <ul className="space-y-2.5 text-sm">
+              {best.map((b, i) => (
+                <li key={b.id} className="flex items-baseline justify-between gap-3 border-b border-line/60 pb-2">
+                  <Link href={`/admin/leads/${b.id}`} className="min-w-0 truncate hover:text-brass">
+                    <span className="text-stone">{i + 1}.</span> {b.vip ? "⭐ " : ""}{b.name ?? "Sin nombre"}
+                  </Link>
+                  <span className="shrink-0 tabular-nums text-stone">{money(b.spent)} · {b.purchases}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-stone">Aparecerán al registrar ventas con comprador en el inventario.</p>
           )}
         </Card>
 

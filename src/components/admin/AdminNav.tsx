@@ -8,6 +8,7 @@ const ITEMS = [
   { href: "/admin/leads", label: "Leads" },
   { href: "/admin/citas", label: "Citas" },
   { href: "/admin/inventario", label: "Inventario" },
+  { href: "/admin/demanda", label: "Demanda" },
   { href: "/admin/documentos", label: "Documentos" },
   { href: "/admin/compras", label: "Compras y consignas" },
   { href: "/admin/redes", label: "Redes" },

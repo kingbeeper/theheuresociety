@@ -611,6 +611,18 @@ function later(chatId: number, task: () => Promise<unknown>) {
   });
 }
 
+// /demanda: qué modelos buscan los clientes frente al stock
+export async function demandSummary(chatId: number) {
+  const { demandBoard } = await import("./demand");
+  const rows = (await demandBoard()).filter((r) => r.people.length);
+  if (!rows.length) return sendMessage(chatId, "Todavía no hay búsquedas de clientes para comparar con el stock.");
+  const lines = rows.slice(0, 12).map((r) => {
+    const gap = r.people.length - r.stock.length;
+    return `${gap > 0 ? "🟢" : "⚪"} <b>${h(r.family)}</b>: ${r.people.length} cliente(s) · ${r.stock.length} en stock${gap > 0 ? ` → <b>comprar ${gap}</b>` : ""}`;
+  });
+  return sendMessage(chatId, `<b>Demanda frente a inventario</b>\n🟢 = conviene comprar\n\n${lines.join("\n")}\n\n${SITE_URL}/admin/demanda`);
+}
+
 // /seguimientos: lo que toca hoy, con el mensaje de WhatsApp listo y botón de hecho
 export async function listFollowUps(chatId: number) {
   const { followUpsDue } = await import("./crm");
