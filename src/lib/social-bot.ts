@@ -1,7 +1,7 @@
 import "server-only";
 import { adminDb, PHOTO_BUCKET } from "./supabase";
 import { getWatches } from "./inventory";
-import { isBookable, miamiToUtc, TIME_ZONE, upcomingSlots } from "./booking";
+import { isBookable, miamiToUtc, slotClash, TIME_ZONE, upcomingSlots } from "./booking";
 import { runAgent, type HistoryItem } from "./wa-agent";
 import { addEvent, addWatchAlert, upsertLead } from "./crm";
 import { escapeHtml as h, notifyAdmins } from "./telegram";
@@ -201,6 +201,7 @@ async function reply(platform: Platform, contactId: string, who: { name: string 
         await saveOut("text", caption, mid2);
       },
       requestAppointment: async (a) => {
+        if (await slotClash(miamiToUtc(a.date, a.time))) return "taken";
         const customer = await lead({
           name: a.name, email: a.email, source: platform, intent: "buy", stage: "appointment",
           event: { type: "appointment", body: `Solicita cita (${a.kind === "office" ? "oficina" : "videollamada"}) el ${a.date} a las ${a.time}`, meta: { pieces: a.pieces } },

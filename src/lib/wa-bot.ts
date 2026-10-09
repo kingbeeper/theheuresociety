@@ -1,7 +1,7 @@
 import "server-only";
 import { adminDb, PHOTO_BUCKET } from "./supabase";
 import { getWatches } from "./inventory";
-import { isBookable, miamiToUtc, upcomingSlots, TIME_ZONE } from "./booking";
+import { isBookable, miamiToUtc, slotClash, upcomingSlots, TIME_ZONE } from "./booking";
 import { downloadMedia, markReadTyping, sendImage, sendText } from "./whatsapp";
 import { runAgent, type HistoryItem } from "./wa-agent";
 import { escapeHtml as h, keyboard, notifyAdmins } from "./telegram";
@@ -198,6 +198,7 @@ async function requestAppointment(
   a: { kind: "office" | "video"; date: string; time: string; name: string; email?: string; pieces: string[]; note?: string }
 ): Promise<"ok" | "taken"> {
   const startsAt = miamiToUtc(a.date, a.time);
+  if (await slotClash(startsAt)) return "taken";
   const customer = await upsertLead({
     waId, name: a.name, email: a.email, source: "whatsapp", intent: "buy", stage: "appointment",
     event: { type: "appointment", body: `Solicita cita (${a.kind === "office" ? "oficina" : "videollamada"}) el ${a.date} a las ${a.time}`, meta: { pieces: a.pieces } },

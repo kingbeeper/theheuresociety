@@ -150,6 +150,7 @@ export default async function LeadPage({ params }: PageProps<"/admin/leads/[id]"
           </Card>
 
           <Card title="Citas">
+            <Link href={`/admin/citas?cliente=${c.id}#nueva`} className="mb-3 inline-block text-[0.62rem] tracking-[0.2em] uppercase text-brass hover:text-ivory">+ Nueva cita</Link>
             {appts.data?.length ? (
               <ul className="space-y-2 text-sm">
                 {appts.data.map((a) => (

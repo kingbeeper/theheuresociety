@@ -2,7 +2,7 @@ import { z } from "zod";
 import { adminDb, PHOTO_BUCKET } from "@/lib/supabase";
 import { addWatchAlert, upsertLead } from "@/lib/crm";
 import { escapeHtml as h, notifyAdmins } from "@/lib/telegram";
-import { isBookable, miamiToUtc, TIME_ZONE } from "@/lib/booking";
+import { isBookable, miamiToUtc, slotClash, takenSlotKeys } from "@/lib/booking";
 
 // Leads de los formularios de la web. Se guardan antes de abrir WhatsApp, así no se pierde
 // ninguno aunque el visitante no llegue a enviar el mensaje.
@@ -51,8 +51,7 @@ export async function GET() {
     .select("starts_at")
     .in("status", ["requested", "confirmed"])
     .gte("starts_at", new Date().toISOString());
-  const fmt = new Intl.DateTimeFormat("sv-SE", { timeZone: TIME_ZONE, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false });
-  const taken = (data ?? []).map((r) => fmt.format(new Date(r.starts_at as string)).replace(",", ""));
+  const taken = takenSlotKeys((data ?? []).map((r) => new Date(r.starts_at as string)));
   return Response.json({ taken }, { headers: { "Cache-Control": "no-store" } });
 }
 
@@ -75,6 +74,7 @@ export async function POST(request: Request) {
       event: { type: "appointment", body: `Solicita cita (${lead.kind === "office" ? "oficina" : "videollamada"}) el ${lead.date} a las ${lead.time}`, meta: { pieces: lead.pieces } },
     });
     if (isBookable(lead.date, lead.time)) {
+      if (await slotClash(miamiToUtc(lead.date, lead.time))) return Response.json({ ok: false, taken: true });
       const { error } = await db.from("appointments").insert({
         kind: lead.kind,
         starts_at: miamiToUtc(lead.date, lead.time).toISOString(),

@@ -1,5 +1,6 @@
 import "server-only";
 import { booking } from "./site";
+import { adminDb } from "./supabase";
 
 // Horarios de cita en la hora de Miami, para el chatbot (la web usa la misma configuración de site.ts)
 export const TIME_ZONE = "America/New_York";
@@ -28,9 +29,39 @@ export function miamiToUtc(dateKey: string, time: string) {
   return new Date(guess - (shown - guess));
 }
 
+// Una cita ocupa su duración: un hueco está tomado si empieza a menos de esa duración de otra cita
+// (así una cita puesta a mano a las 15:30 también bloquea los huecos de las 15:00 y las 16:00)
+const SLOT_MS = booking.durationMinutes * 60_000;
+export const clashes = (t: Date, taken: Date[]) => taken.some((x) => Math.abs(x.getTime() - t.getTime()) < SLOT_MS);
+
+// Cita activa que se solapa con este horario (o null). `except`: la propia cita al reprogramarla.
+export async function slotClash(start: Date, except?: string) {
+  let q = adminDb()
+    .from("appointments")
+    .select("id, name, starts_at")
+    .in("status", ["requested", "confirmed"])
+    .gt("starts_at", new Date(start.getTime() - SLOT_MS).toISOString())
+    .lt("starts_at", new Date(start.getTime() + SLOT_MS).toISOString());
+  if (except) q = q.neq("id", except);
+  const { data } = await q.limit(1);
+  return (data?.[0] as { id: string; name: string; starts_at: string } | undefined) ?? null;
+}
+
+// Huecos de la web («AAAA-MM-DD HH:MM», hora de Miami) que ya no se pueden reservar
+export function takenSlotKeys(taken: Date[]) {
+  const start = new Date(miamiToUtc(todayInMiami(), "12:00"));
+  const out: string[] = [];
+  for (let i = 0; i <= booking.daysAhead; i++) {
+    const p = parts(new Date(start.getTime() + i * 86_400_000));
+    const key = `${p.year}-${p.month}-${p.day}`;
+    const weekdayIndex = new Date(Date.UTC(Number(p.year), Number(p.month) - 1, Number(p.day))).getUTCDay();
+    for (const t of booking.slots[weekdayIndex] ?? []) if (clashes(miamiToUtc(key, t), taken)) out.push(`${key} ${t}`);
+  }
+  return out;
+}
+
 // Próximos días con horario (desde mañana), quitando los huecos ya ocupados
 export function upcomingSlots(taken: Date[], fromKey?: string, maxDays = 7) {
-  const takenSet = new Set(taken.map((t) => t.getTime()));
   const start = new Date(miamiToUtc(todayInMiami(), "12:00"));
   const out: { date: string; weekday: string; times: string[] }[] = [];
   for (let i = 1; i <= booking.daysAhead && out.length < maxDays; i++) {
@@ -39,7 +70,7 @@ export function upcomingSlots(taken: Date[], fromKey?: string, maxDays = 7) {
     const key = `${p.year}-${p.month}-${p.day}`;
     if (fromKey && key < fromKey) continue;
     const weekdayIndex = new Date(Date.UTC(Number(p.year), Number(p.month) - 1, Number(p.day))).getUTCDay();
-    const times = (booking.slots[weekdayIndex] ?? []).filter((t) => !takenSet.has(miamiToUtc(key, t).getTime()));
+    const times = (booking.slots[weekdayIndex] ?? []).filter((t) => !clashes(miamiToUtc(key, t), taken));
     if (times.length) out.push({ date: key, weekday: p.weekday, times });
   }
   return out;
