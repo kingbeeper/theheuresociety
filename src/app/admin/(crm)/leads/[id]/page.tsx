@@ -8,11 +8,12 @@ import { ago, Card, fmtDate, fmtDateTime, ghostButtonClass, money, SourceTag, St
 import { LeadForm } from "@/components/admin/LeadForm";
 import { addNote, completeFollowUp, setBot, setSocialBot, toggleAlert } from "../../../actions";
 import { todayInMiami } from "@/lib/booking";
+import { STATUS_LABEL, type DocKind, type DocStatus } from "@/lib/doc-labels";
 
 export const metadata = { title: "Cliente" };
 
 const EVENT_ICON: Record<string, string> = {
-  lead: "✦", note: "✎", stage: "→", appointment: "📅", sell_request: "⌚", alert: "🔔", match: "✨", handoff: "👤", follow_up: "⏰", price_drop: "📉", purchase: "💰", return: "↩",
+  lead: "✦", note: "✎", stage: "→", appointment: "📅", sell_request: "⌚", alert: "🔔", match: "✨", handoff: "👤", document: "📄", follow_up: "⏰", price_drop: "📉", purchase: "💰", return: "↩",
 };
 const SELL_LABEL: Record<string, string> = { new: "Nueva", offered: "Ofertada", accepted: "Aceptada", received: "Recibido", paid: "Pagada", rejected: "Rechazada" };
 
@@ -36,6 +37,7 @@ export default async function LeadPage({ params }: PageProps<"/admin/leads/[id]"
     : { data: [] as { contact_id: string; direction: string; type: string; body: string | null; media_url: string | null; created_at: string }[] };
   const platformOf = (contactId: string) => (socialContacts ?? []).find((s) => s.id === contactId)?.platform === "facebook" ? "Messenger" : "Instagram";
 
+  const { data: docs } = await db.from("documents").select("id, kind, number, status, total").eq("customer_id", id).order("created_at", { ascending: false });
   const [events, alerts, appts, sells, wa, msgs] = await Promise.all([
     db.from("customer_events").select("*").eq("customer_id", id).order("created_at", { ascending: false }).limit(200),
     db.from("watch_alerts").select("*").eq("customer_id", id).order("created_at", { ascending: false }),
@@ -163,6 +165,24 @@ export default async function LeadPage({ params }: PageProps<"/admin/leads/[id]"
             ) : (
               <p className="text-sm text-stone">Sin citas.</p>
             )}
+          </Card>
+
+          <Card title="Cotizaciones, memos y facturas">
+            {docs?.length ? (
+              <ul className="mb-3 space-y-2 text-sm">
+                {docs.map((d) => (
+                  <li key={d.id as string} className="flex justify-between gap-3 border-b border-line/60 pb-2">
+                    <Link href={`/admin/documentos/${d.id}`} className="hover:text-brass">{d.number as string}</Link>
+                    <span className="text-stone">{STATUS_LABEL[d.kind as DocKind][d.status as DocStatus]} · {money(d.total as number)}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            <div className="flex flex-wrap gap-3 text-[0.62rem] tracking-[0.2em] uppercase">
+              <Link href={`/admin/documentos/nuevo?tipo=quote&cliente=${c.id}`} className="text-brass hover:text-ivory">+ Cotización</Link>
+              <Link href={`/admin/documentos/nuevo?tipo=memo&cliente=${c.id}`} className="text-brass hover:text-ivory">+ Memo</Link>
+              <Link href={`/admin/documentos/nuevo?tipo=invoice&cliente=${c.id}`} className="text-brass hover:text-ivory">+ Factura</Link>
+            </div>
           </Card>
 
           <Card title="Relojes que ofrece (vender / consignar)">

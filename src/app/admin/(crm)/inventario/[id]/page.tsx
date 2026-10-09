@@ -7,6 +7,7 @@ import { daysInStock, margin, totalCost, type Item } from "@/lib/stock";
 import { ACQUISITION, ITEM_STATUS, isOwnerStock } from "@/lib/stock-labels";
 import { Card, fmtDate, fmtDateTime, ghostButtonClass, money, PageTitle, requestTime } from "@/components/admin/ui";
 import { ItemForm, ReturnForm, SaleForm } from "@/components/admin/ItemForms";
+import { STATUS_LABEL, type DocKind, type DocStatus } from "@/lib/doc-labels";
 import { deleteItem, markOwnerPaid, reopenItem, setReserved } from "../../../inventory-actions";
 
 export const metadata = { title: "Reloj del inventario" };
@@ -30,6 +31,8 @@ export default async function ItemPage({ params }: PageProps<"/admin/inventario/
     db.from("customers").select("id, name, phone, email").order("last_activity_at", { ascending: false }).limit(500),
     item.watch_id ? db.from("watches").select("slug, status").eq("id", item.watch_id).maybeSingle() : Promise.resolve({ data: null }),
   ]);
+  // Cotizaciones, memos y facturas en las que aparece (vacío si falta la migración)
+  const { data: docs } = await db.from("documents").select("id, kind, number, status, client_name, total").contains("items", [{ item_id: id }]).order("created_at", { ascending: false });
   const watchOptions = (watches.data ?? []).map((w) => ({ id: w.id as string, label: `${w.brand} ${w.model} · ${w.reference}${w.status === "sold" ? " (vendido)" : ""}` }));
   const customerOptions = (customers.data ?? []).map((c) => ({ id: c.id as string, label: [c.name, c.phone, c.email].filter(Boolean).join(" · ") || "Sin nombre" }));
 
@@ -76,6 +79,26 @@ export default async function ItemPage({ params }: PageProps<"/admin/inventario/
 
       <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
         <div className="space-y-6">
+          <Card title="Cotizaciones, memos y facturas">
+            {docs?.length ? (
+              <ul className="mb-4 space-y-2 text-sm">
+                {docs.map((d) => (
+                  <li key={d.id as string} className="flex justify-between gap-3 border-b border-line/60 pb-2">
+                    <Link href={`/admin/documentos/${d.id}`} className="hover:text-brass">{d.number as string} · {(d.client_name as string) ?? "—"}</Link>
+                    <span className="text-stone">{STATUS_LABEL[d.kind as DocKind][d.status as DocStatus]} · {money(d.total as number)}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            {available && (
+              <div className="flex flex-wrap gap-2">
+                <Link href={`/admin/documentos/nuevo?tipo=quote&reloj=${item.id}`} className={ghostButtonClass}>+ Cotización</Link>
+                <Link href={`/admin/documentos/nuevo?tipo=memo&reloj=${item.id}`} className={ghostButtonClass}>+ Memo</Link>
+                <Link href={`/admin/documentos/nuevo?tipo=invoice&reloj=${item.id}`} className={ghostButtonClass}>+ Factura</Link>
+              </div>
+            )}
+          </Card>
+
           {available && <Card title="Registrar venta"><SaleForm item={item} customers={customerOptions} today={today} /></Card>}
 
           {item.status === "sold" && (

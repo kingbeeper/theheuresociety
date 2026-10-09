@@ -34,6 +34,7 @@ export async function buildDigest(now = Date.now()) {
     db.from("social_daily").select("data").eq("platform", "instagram").eq("day", yesterday).maybeSingle(),
     db.from("social_daily").select("data").eq("platform", "instagram").lte("day", twoDaysAgo).order("day", { ascending: false }).limit(5),
   ]);
+  const { data: openDocs } = await db.from("documents").select("kind, number, client_name, total, due_date").eq("status", "sent");
 
   const lines: string[] = [`☀️ <b>Buenos días · resumen de The Heure Society</b>`];
 
@@ -78,6 +79,19 @@ export async function buildDigest(now = Date.now()) {
     if (s.memoDue.length) lines.push(`• ⏳ ${s.memoDue.length} memo(s) por devolver esta semana`);
     if (s.aged.length) lines.push(`• 🕰 ${s.aged.length} reloj(es) con +90 días: revisa el precio`);
     if (s.missingCost.length) lines.push(`• ✎ ${s.missingCost.length} reloj(es) sin costo`);
+  }
+
+  // Documentos: facturas por cobrar, memos fuera y cotizaciones que caducan
+  const docs = openDocs ?? [];
+  const unpaid = docs.filter((d) => d.kind === "invoice");
+  const overdue = unpaid.filter((d) => d.due_date && d.due_date < today);
+  const memosLate = docs.filter((d) => d.kind === "memo" && d.due_date && d.due_date < today);
+  const quotesEnding = docs.filter((d) => d.kind === "quote" && d.due_date && d.due_date >= today && d.due_date <= new Date(now + 2 * DAY).toISOString().slice(0, 10));
+  if (unpaid.length || memosLate.length || quotesEnding.length) {
+    lines.push("", "📄 <b>Documentos</b>");
+    if (unpaid.length) lines.push(`• ${usd(unpaid.reduce((a, d) => a + Number(d.total), 0))} por cobrar (${unpaid.length} factura/s${overdue.length ? `, ${overdue.length} vencida/s` : ""})`);
+    for (const m of memosLate) lines.push(`• ⏳ Memo ${h(m.number)} vencido · ${h(m.client_name ?? "")}`);
+    for (const q of quotesEnding) lines.push(`• Cotización ${h(q.number)} caduca pronto · ${h(q.client_name ?? "")} · ${usd(Number(q.total))}`);
   }
 
   // Instagram ayer
