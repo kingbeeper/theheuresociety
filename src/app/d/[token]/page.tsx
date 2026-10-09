@@ -8,17 +8,18 @@ import { PRINT, SIGNABLE, docTotals, maskedId, usd, type Doc } from "@/lib/doc-l
 import { PrintButton } from "./PrintButton";
 import { SignaturePad } from "./SignaturePad";
 import { downloadPrivate } from "@/lib/private-files";
+import { stripeConfigured } from "@/lib/stripe";
 
 // Lo que ve el cliente: solo los datos del documento (nunca costos, proveedores ni notas internas)
-export default function Page({ params }: PageProps<"/d/[token]">) {
+export default function Page({ params, searchParams }: PageProps<"/d/[token]">) {
   return (
     <Suspense fallback={<main className="min-h-screen" />}>
-      <SharedDocument params={params} />
+      <SharedDocument params={params} searchParams={searchParams} />
     </Suspense>
   );
 }
 
-async function SharedDocument({ params }: { params: Promise<{ token: string }> }) {
+async function SharedDocument({ params, searchParams }: { params: Promise<{ token: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   await connection();
   const { token } = await params;
   if (!/^[\w-]{20,40}$/.test(token)) notFound();
@@ -43,6 +44,18 @@ async function SharedDocument({ params }: { params: Promise<{ token: string }> }
 
   return (
     <main className="mx-auto max-w-[860px] px-4 py-8 print:max-w-none print:p-0">
+      {(await searchParams).pagado && d.status !== "paid" && (
+        <p className="mb-4 border border-emerald-700/30 bg-emerald-50 p-3 text-sm text-emerald-900 print:hidden">
+          {d.lang === "es" ? "Pago recibido. En unos minutos la factura aparecerá como pagada." : "Payment received. The invoice will show as paid in a few minutes."}
+        </p>
+      )}
+      {d.kind === "invoice" && d.status === "sent" && stripeConfigured() && (
+        <div className="mb-4 flex justify-end print:hidden">
+          <a href={`/api/pay?t=${d.token}`} className="bg-[#8a7a52] px-6 py-3 text-[0.7rem] tracking-[0.22em] uppercase text-white hover:bg-[#6f6241]">
+            {d.lang === "es" ? "Pagar con tarjeta" : "Pay by card"}
+          </a>
+        </div>
+      )}
       <div className="mb-4 flex justify-end print:hidden">
         <div className="flex flex-wrap justify-end gap-2">
           {d.kind === "invoice" && d.items.some((l) => l.item_id) && (

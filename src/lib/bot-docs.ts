@@ -472,6 +472,7 @@ export async function deliver(chatId: number, d: Doc) {
   if (phone) rows.push([{ text: "📲 Enviar al cliente por WhatsApp", url: `https://wa.me/${phone}?text=${encodeURIComponent(msg)}` }]);
   if (d.status === "sent") {
     if (d.kind === "invoice") rows.push([{ text: "💰 Marcar pagada", callback_data: `dpaid:${d.id}` }]);
+    if (d.kind === "invoice" && process.env.STRIPE_SECRET_KEY) rows.push([{ text: "💳 Enlace de pago con tarjeta", url: `${SITE_URL}/api/pay?t=${d.token}` }]);
     if (d.kind === "memo") rows.push([{ text: "↩️ Devuelto", callback_data: `dret:${d.id}` }, { text: "🧾 Se lo queda: facturar", callback_data: `dinv:${d.id}` }]);
     if (d.kind === "consignment") rows.push([{ text: "💵 Vendido: pagado al dueño", callback_data: `down:${d.id}` }, { text: "↩️ Devuelto al dueño", callback_data: `dret:${d.id}` }]);
     if (d.kind === "quote") rows.push([{ text: "🧾 Convertir en factura", callback_data: `dinv:${d.id}` }]);

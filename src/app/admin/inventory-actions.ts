@@ -226,6 +226,19 @@ export async function returnFromServiceAction(serviceId: string, f: FormData) {
   refresh();
 }
 
+// ── Depósito con tarjeta (Stripe) ──
+export async function createDepositAction(itemId: string, _: unknown, f: FormData) {
+  const user = await requireAdmin("inventario");
+  const amount = money(f, "amount");
+  if (!amount || amount < 1) return { error: "Indica el importe del depósito." };
+  try {
+    const { depositLink } = await import("@/lib/payments");
+    return { url: await depositLink(itemId, amount, text(f, "customer_id"), user) };
+  } catch (e) {
+    return { error: (e as Error).message };
+  }
+}
+
 // ── Ubicación y conteo ──
 export async function setLocation(itemId: string, f: FormData) {
   const user = await requireAdmin("inventario");

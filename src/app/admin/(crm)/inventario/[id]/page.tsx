@@ -13,6 +13,8 @@ import { deleteItem, markCountedAction, markOwnerPaid, reopenItem, returnFromSer
 import { itemServices, providers } from "@/lib/services";
 import { LOCATIONS, type Location } from "@/lib/locations";
 import { team } from "@/lib/team";
+import { stripeConfigured } from "@/lib/stripe";
+import { DepositForm } from "@/components/admin/DepositForm";
 import { awayItems, openCount } from "@/lib/stock-count";
 
 export const metadata = { title: "Reloj del inventario" };
@@ -99,6 +101,12 @@ export default async function ItemPage({ params }: PageProps<"/admin/inventario/
 
       <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
         <div className="space-y-6">
+          {item.status === "in_stock" && stripeConfigured() && (
+            <Card title="💳 Depósito con tarjeta para reservar">
+              <DepositForm itemId={item.id} customers={customerOptions} />
+            </Card>
+          )}
+
           {available && (
             <Card title="Ubicación">
               {away.get(item.id) ? (
