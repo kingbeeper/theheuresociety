@@ -602,7 +602,7 @@ export async function promoAuto() {
 export async function promoJob(chatId: number, watchId: string) {
   const { startPromoVideo, pollPromoVideo } = await import("./promo-video");
   try {
-    await sendMessage(chatId, "🎬 Preparando el video promocional de 15 s para redes… Tarda unos minutos; te lo envío aquí cuando esté.");
+    await sendMessage(chatId, "🎬 Preparando el video promocional para redes… Tarda unos minutos; te lo envío aquí cuando esté.");
     const id = await startPromoVideo(watchId, chatId);
     await pollPromoVideo(id, 90_000);
   } catch (e) {
