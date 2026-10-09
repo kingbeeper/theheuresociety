@@ -58,7 +58,7 @@ async function SharedDocument({ params }: { params: Promise<{ token: string }> }
             </div>
           </div>
           <div className="text-right">
-            <h1 className="font-display text-4xl font-light tracking-[0.06em]">{t[d.kind]}</h1>
+            <h1 className={`font-display font-light tracking-[0.06em] ${consign ? "text-[1.7rem] leading-tight" : "text-4xl"}`}>{t[d.kind]}</h1>
             <dl className="mt-3 grid grid-cols-[auto_auto] justify-end gap-x-4 gap-y-1 text-xs">
               <dt className="text-[#5d625e]">{t.number}</dt><dd>{d.number}</dd>
               <dt className="text-[#5d625e]">{t.date}</dt><dd>{date(d.issue_date)}</dd>
