@@ -12,6 +12,7 @@ import { STATUS_LABEL, type DocKind, type DocStatus } from "@/lib/doc-labels";
 import { deleteItem, markCountedAction, markOwnerPaid, reopenItem, returnFromServiceAction, sendToServiceAction, setLocation, setReserved } from "../../../inventory-actions";
 import { itemServices, providers } from "@/lib/services";
 import { LOCATIONS, type Location } from "@/lib/locations";
+import { team } from "@/lib/team";
 import { awayItems, openCount } from "@/lib/stock-count";
 
 export const metadata = { title: "Reloj del inventario" };
@@ -60,6 +61,7 @@ export default async function ItemPage({ params }: PageProps<"/admin/inventario/
             {web.data?.slug && <a href={`/es/watches/${web.data.slug}`} target="_blank" rel="noreferrer" className={ghostButtonClass}>Ver en la web</a>}
             <a href={`/api/certificate/${item.id}`} target="_blank" rel="noreferrer" className={ghostButtonClass}>Certificado</a>
             <a href={`/admin/etiquetas?ids=${item.id}`} target="_blank" rel="noreferrer" className={ghostButtonClass}>Etiqueta QR</a>
+            <Link href={`/admin/tareas?reloj=${item.id}`} className={ghostButtonClass}>+ Tarea</Link>
             {available && (
               <form action={setReserved.bind(null, item.id, item.status !== "reserved")}>
                 <button className={ghostButtonClass}>{item.status === "reserved" ? "Quitar reserva" : "Reservar"}</button>
@@ -179,7 +181,7 @@ export default async function ItemPage({ params }: PageProps<"/admin/inventario/
             )}
           </Card>
 
-          {available && <Card title="Registrar venta"><SaleForm item={item} customers={customerOptions} today={today} /></Card>}
+          {available && <Card title="Registrar venta"><SaleForm item={item} customers={customerOptions} today={today} sellers={(await team()).map((m) => ({ email: m.email, label: m.name ?? m.email }))} me={user.email} /></Card>}
 
           {item.status === "sold" && (
             <Card title="Venta">

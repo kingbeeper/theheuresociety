@@ -96,6 +96,14 @@ export async function buildDigest(now = Date.now()) {
     for (const q of quotesEnding) lines.push(`• Cotización ${h(q.number)} caduca pronto · ${h(q.client_name ?? "")} · ${usd(Number(q.total))}`);
   }
 
+  // Tareas del equipo para hoy o vencidas
+  const { openTasks } = await import("./staff-tasks");
+  const dueTasks = (await openTasks()).filter((t) => t.due_date && t.due_date <= today);
+  if (dueTasks.length) {
+    lines.push("", `📝 <b>Tareas para hoy o vencidas: ${dueTasks.length}</b>`);
+    for (const t of dueTasks.slice(0, 6)) lines.push(`• ${h(t.title)} · ${h(t.assignee)}${t.due_date! < today ? " · ⚠️ vencida" : ""}`);
+  }
+
   // Relojero: más de 3 semanas fuera o pasada la fecha prevista
   const { openServices } = await import("./services");
   const late = (await openServices()).filter((s) => (s.expected_at ? s.expected_at < today : s.sent_at < new Date(now - 21 * DAY).toISOString().slice(0, 10)));

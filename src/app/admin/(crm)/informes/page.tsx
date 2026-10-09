@@ -2,6 +2,7 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 import { monthlyReport } from "@/lib/report";
+import { monthlyCommissions } from "@/lib/team";
 import { todayInMiami } from "@/lib/booking";
 import { buttonClass, Card, fieldClass, fmtDate, money, PageTitle, requestTime } from "@/components/admin/ui";
 
@@ -13,7 +14,7 @@ export default async function ReportsPage({ searchParams }: PageProps<"/admin/in
   const sp = await searchParams;
   const current = todayInMiami(new Date(requestTime())).slice(0, 7);
   const month = typeof sp.mes === "string" && /^\d{4}-\d{2}$/.test(sp.mes) ? sp.mes : current;
-  const r = await monthlyReport(month);
+  const [r, commissions] = await Promise.all([monthlyReport(month), monthlyCommissions(month)]);
   const t = r.totals;
   const label = new Intl.DateTimeFormat("es-ES", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${month}-15T12:00:00Z`));
   const day = (iso: string) => fmtDate(`${iso}T12:00:00`);
@@ -89,6 +90,22 @@ export default async function ReportsPage({ searchParams }: PageProps<"/admin/in
             Sale de las facturas pagadas en el mes. Las ventas registradas directamente en el inventario (sin factura) no llevan el detalle del impuesto:
             para que cuenten aquí, regístralas con una factura.
           </p>
+        </Card>
+
+        <Card title="Comisiones de vendedores">
+          {commissions.length ? (
+            <ul className="space-y-3 text-sm">
+              {commissions.map((c) => (
+                <li key={c.member.email} className="border-b border-line/60 pb-2">
+                  <p className="flex justify-between gap-3">
+                    <span>{c.member.name ?? c.member.email} <span className="text-xs text-stone">· {c.member.rate}% {c.member.base === "sale" ? "de la venta" : "de la ganancia"}</span></span>
+                    <span className="tabular-nums">{money(c.total)}</span>
+                  </p>
+                  <p className="text-xs text-stone">{c.sales.map((s) => `${s.sku} (${money(s.commission)})`).join(" · ")}</p>
+                </li>
+              ))}
+            </ul>
+          ) : <p className="text-sm text-stone">Sin ventas con vendedor este mes. El vendedor se elige al registrar la venta (y en las facturas, quien la creó).</p>}
         </Card>
 
         <Card title="Pagos a dueños y relojero">

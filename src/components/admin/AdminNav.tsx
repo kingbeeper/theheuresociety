@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  AtSign, CalendarDays, ChartColumn, FileText, HandCoins, LayoutDashboard, Mail, TrendingUp, UserCog, Users, Watch, type LucideIcon,
+  AtSign, CalendarDays, ListTodo, ChartColumn, FileText, HandCoins, LayoutDashboard, Mail, TrendingUp, UserCog, Users, Watch, type LucideIcon,
 } from "lucide-react";
 import type { Section } from "@/lib/crm-perms";
 
 // Menú del CRM: cada usuario ve solo las secciones para las que tiene permiso
 const ITEMS: { href: string; label: string; icon: LucideIcon; section?: Section }[] = [
   { href: "/admin", label: "Panel", icon: LayoutDashboard },
+  { href: "/admin/tareas", label: "Tareas", icon: ListTodo },
   { href: "/admin/leads", label: "Leads", icon: Users, section: "leads" },
   { href: "/admin/citas", label: "Citas", icon: CalendarDays, section: "citas" },
   { href: "/admin/inventario", label: "Inventario", icon: Watch, section: "inventario" },

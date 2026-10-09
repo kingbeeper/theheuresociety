@@ -63,9 +63,12 @@ export async function onMenuText(chatId: number, text: string, user: string) {
         ]),
       });
       return true;
-    case MENU.clients:
+    case MENU.clients: {
+      const { sendTaskList } = await import("./staff-tasks");
+      await sendTaskList(chatId, user).catch(() => false);
       await listFollowUps(chatId);
       return true;
+    }
     case MENU.help:
       await showMenu(chatId);
       return true;

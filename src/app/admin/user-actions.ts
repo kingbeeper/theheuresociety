@@ -11,6 +11,16 @@ import { ALL_SECTIONS, PRESETS, type Section } from "@/lib/crm-perms";
 const SITE = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://theheuresociety.vercel.app").replace(/\/$/, "");
 const text = (f: FormData, k: string) => String(f.get(k) ?? "").trim() || null;
 
+function extras(f: FormData) {
+  const rate = Number(String(f.get("commission_rate") ?? "0").replace(",", "."));
+  const tg = String(f.get("telegram_id") ?? "").replace(/\D/g, "");
+  return {
+    commission_rate: Number.isFinite(rate) ? Math.min(100, Math.max(0, rate)) : 0,
+    commission_base: f.get("commission_base") === "sale" ? "sale" : "profit",
+    telegram_id: tg || null,
+  };
+}
+
 function permissionsFrom(f: FormData) {
   const preset = PRESETS[String(f.get("preset") ?? "custom")] ?? PRESETS.custom;
   if (preset.role === "admin") return { role: "admin", permissions: ALL_SECTIONS };
@@ -40,7 +50,7 @@ export async function addUser(_: unknown, f: FormData) {
   if (role === "staff" && !permissions.length) return { error: "Elige al menos un permiso." };
   const { error } = await adminDb()
     .from("crm_users")
-    .upsert({ email, name: text(f, "name"), role, permissions, active: true, invited_by: me.email, updated_at: new Date().toISOString() }, { onConflict: "email" });
+    .upsert({ email, name: text(f, "name"), role, permissions, ...extras(f), active: true, invited_by: me.email, updated_at: new Date().toISOString() }, { onConflict: "email" });
   if (error) return { error: error.message };
   try {
     const link = await accessLink(email);
@@ -54,7 +64,7 @@ export async function addUser(_: unknown, f: FormData) {
 export async function updateUser(email: string, _: unknown, f: FormData) {
   await requireUser("usuarios");
   const { role, permissions } = permissionsFrom(f);
-  const { error } = await adminDb().from("crm_users").update({ name: text(f, "name"), role, permissions, updated_at: new Date().toISOString() }).eq("email", email);
+  const { error } = await adminDb().from("crm_users").update({ name: text(f, "name"), role, permissions, ...extras(f), updated_at: new Date().toISOString() }).eq("email", email);
   if (error) return { error: error.message };
   refresh();
   return { ok: true };

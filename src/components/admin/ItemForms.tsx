@@ -89,7 +89,7 @@ export function ItemForm({ item, watches, showCosts = true }: { item?: Item; wat
 type CustomerOption = { id: string; label: string };
 
 // Venta: un solo pago. El comprador puede ser un cliente del CRM o uno nuevo.
-export function SaleForm({ item, customers, today }: { item: Item; customers: CustomerOption[]; today: string }) {
+export function SaleForm({ item, customers, today, sellers = [], me }: { item: Item; customers: CustomerOption[]; today: string; sellers?: { email: string; label: string }[]; me?: string }) {
   const [state, action, pending] = useActionState(sellItem.bind(null, item.id), null);
   const [buyer, setBuyer] = useState("");
   return (
@@ -104,6 +104,14 @@ export function SaleForm({ item, customers, today }: { item: Item; customers: Cu
           </select>
         </label>
       </div>
+      {sellers.length > 1 && (
+        <label>
+          <span className={label}>Vendido por (comisión)</span>
+          <select name="sold_by" defaultValue={me} className={field}>
+            {sellers.map((s) => <option key={s.email} value={s.email}>{s.label}</option>)}
+          </select>
+        </label>
+      )}
       <label>
         <span className={label}>Comprador</span>
         <select name="buyer_customer_id" value={buyer} onChange={(e) => setBuyer(e.target.value)} className={field}>

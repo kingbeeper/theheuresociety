@@ -93,6 +93,7 @@ export default async function LeadPage({ params }: PageProps<"/admin/leads/[id]"
           {waNumber && <a href={`https://wa.me/${waNumber}`} target="_blank" rel="noreferrer" className={ghostButtonClass}>WhatsApp</a>}
           {c.ig_username && <a href={`https://ig.me/m/${c.ig_username}`} target="_blank" rel="noreferrer" className={ghostButtonClass}>Instagram @{c.ig_username}</a>}
           {c.phone && <a href={`tel:${c.phone}`} className={ghostButtonClass}>Llamar</a>}
+          <Link href={`/admin/tareas?cliente=${c.id}`} className={ghostButtonClass}>+ Tarea</Link>
           {c.email && <a href={`mailto:${c.email}`} className={ghostButtonClass}>Correo</a>}
         </div>
       </div>

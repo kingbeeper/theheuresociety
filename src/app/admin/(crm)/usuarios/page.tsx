@@ -36,7 +36,7 @@ export default async function UsersPage() {
               </p>
               {u.active ? (
                 <>
-                  <EditUserForm email={u.email} name={u.name} role={u.role} permissions={u.permissions as Section[]} />
+                  <EditUserForm email={u.email} name={u.name} role={u.role} permissions={u.permissions as Section[]} rate={Number(u.commission_rate ?? 0)} base={u.commission_base} telegram={u.telegram_id} />
                   <div className="mt-4 flex flex-wrap items-start gap-4 border-t border-line pt-4">
                     <NewLinkButton email={u.email} />
                     {u.email !== me.email && (

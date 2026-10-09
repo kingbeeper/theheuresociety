@@ -495,6 +495,13 @@ export async function onCallback(chatId: number, cbId: string, messageId: number
   const clearButtons = () => tg("editMessageReplyMarkup", { chat_id: chatId, message_id: messageId, reply_markup: keyboard([]) }).catch(() => {});
 
   // Botones de un documento ya creado (no dependen del asistente)
+  if (action === "dstk") {
+    const { completeStaffTask } = await import("./staff-tasks");
+    const t = await completeStaffTask(arg, user);
+    await answer(t ? "¡Hecha!" : "Ya estaba hecha");
+    return clearButtons();
+  }
+
   if (action === "dappr") {
     await answer("Cancelado");
     await clearButtons();

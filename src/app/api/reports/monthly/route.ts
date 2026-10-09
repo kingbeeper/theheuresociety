@@ -1,6 +1,7 @@
 import ExcelJS from "exceljs";
 import { adminEmail } from "@/lib/admin-auth";
 import { monthlyReport } from "@/lib/report";
+import { monthlyCommissions } from "@/lib/team";
 
 // Informe mensual en Excel (una hoja por apartado) para el contador
 export async function GET(request: Request) {
@@ -41,6 +42,13 @@ export async function GET(request: Request) {
   sheet("Pagos a dueños", [["Fecha", "date", 12], ["SKU", "sku", 11], ["Reloj", "watch", 36], ["Dueño", "owner", 28], ["Importe", "amount", 14, true]], r.owners);
   sheet("Impuesto de ventas", [["Fecha de pago", "date", 14], ["Factura", "number", 16], ["Cliente", "client", 28], ["Base", "taxable", 14, true], ["%", "rate", 6], ["Impuesto", "tax", 14, true], ["Total", "total", 14, true]], r.taxes);
   sheet("Relojero", [["Fecha", "date", 12], ["SKU", "sku", 11], ["Reloj", "watch", 34], ["Relojero", "provider", 24], ["Trabajo", "work", 24], ["Costo", "cost", 14, true]], r.repairs);
+
+  const commissions = await monthlyCommissions(month);
+  sheet(
+    "Comisiones",
+    [["Vendedor", "seller", 28], ["Reloj", "watch", 36], ["SKU", "sku", 11], ["Fecha", "date", 12], ["Venta", "price", 14, true], ["Comisión", "commission", 14, true]],
+    commissions.flatMap((c) => c.sales.map((s) => ({ seller: c.member.name ?? c.member.email, ...s })))
+  );
 
   const buffer = await wb.xlsx.writeBuffer();
   return new Response(buffer, {

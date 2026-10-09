@@ -106,7 +106,7 @@ export async function sellStock(d: Doc, user: string) {
     const saleDate = d.paid_at ?? new Date().toISOString().slice(0, 10);
     await adminDb()
       .from("inventory_items")
-      .update({ status: "sold", sale_date: saleDate, sale_price: price, buyer_customer_id: d.customer_id, buyer_name: d.client_name, payment_method: d.payment_method, updated_at: new Date().toISOString() })
+      .update({ status: "sold", sale_date: saleDate, sale_price: price, buyer_customer_id: d.customer_id, buyer_name: d.client_name, payment_method: d.payment_method, sold_by: d.created_by && /@/.test(d.created_by) ? d.created_by : null, updated_at: new Date().toISOString() })
       .eq("id", item.id);
     await logItem(item.id, "sale", `Vendido a ${d.client_name ?? "cliente"} por $${price.toLocaleString("en-US")} · ${docLabel(d)}`, user, { document: d.id });
     await recordPurchase(d.customer_id, { ...item, sale_price: price, sale_date: saleDate }, user);

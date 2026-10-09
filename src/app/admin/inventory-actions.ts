@@ -138,7 +138,7 @@ export async function sellItem(id: string, _: unknown, f: FormData) {
 
   const { error } = await adminDb()
     .from("inventory_items")
-    .update({ status: "sold", sale_date: saleDate, sale_price: price, buyer_customer_id: buyerId, buyer_name: name, payment_method: text(f, "payment_method"), updated_at: new Date().toISOString() })
+    .update({ status: "sold", sale_date: saleDate, sale_price: price, buyer_customer_id: buyerId, buyer_name: name, payment_method: text(f, "payment_method"), sold_by: text(f, "sold_by") ?? user, updated_at: new Date().toISOString() })
     .eq("id", id);
   if (error) return { error: error.message };
   const sold = { ...item, sale_price: price, sale_date: saleDate };

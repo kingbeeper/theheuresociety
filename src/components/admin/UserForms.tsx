@@ -9,6 +9,24 @@ const field =
 const label = "mb-1.5 block text-[0.62rem] tracking-[0.22em] uppercase text-stone";
 const button = "bg-ivory px-5 py-2.5 text-[0.68rem] tracking-[0.22em] uppercase text-ink hover:bg-brass disabled:opacity-60";
 
+// Comisión y Telegram
+function Extras({ rate = 0, base = "profit", telegram = "" }: { rate?: number; base?: string; telegram?: string | null }) {
+  return (
+    <div className="grid gap-4 sm:grid-cols-3">
+      <label><span className={label}>Comisión (%)</span><input name="commission_rate" inputMode="decimal" defaultValue={rate || ""} placeholder="0" className={field} /></label>
+      <label>
+        <span className={label}>Sobre</span>
+        <select name="commission_base" defaultValue={base} className={field}>
+          <option value="profit">la ganancia</option>
+          <option value="sale">el precio de venta</option>
+        </select>
+      </label>
+      <label><span className={label}>ID de Telegram</span><input name="telegram_id" inputMode="numeric" defaultValue={telegram ?? ""} placeholder="Opcional" className={field} /></label>
+      <p className="text-xs text-stone sm:col-span-3">El ID de Telegram se lo dice el robot al escribirle. Sirve para saber quién vende desde Telegram y para avisarle de sus tareas (añádelo también a TELEGRAM_ADMIN_IDS si debe usar el robot).</p>
+    </div>
+  );
+}
+
 // Plantilla + casillas de permisos
 function Permissions({ initialPreset, initial }: { initialPreset: string; initial: Section[] }) {
   const [preset, setPreset] = useState(initialPreset);
@@ -81,6 +99,7 @@ export function AddUserForm() {
         <label><span className={label}>Correo *</span><input name="email" type="email" required className={field} /></label>
       </div>
       <Permissions initialPreset="seller" initial={PRESETS.seller.permissions} />
+      <Extras />
       <div className="flex items-center gap-4">
         <button disabled={pending} className={button}>{pending ? "Guardando…" : "Dar acceso"}</button>
         {state && "error" in state && <p className="text-sm text-red-200/90">{state.error}</p>}
@@ -90,15 +109,16 @@ export function AddUserForm() {
   );
 }
 
-export function EditUserForm({ email, name, role, permissions }: { email: string; name: string | null; role: string; permissions: Section[] }) {
+export function EditUserForm({ email, name, role, permissions, rate, base, telegram }: { email: string; name: string | null; role: string; permissions: Section[]; rate?: number; base?: string; telegram?: string | null }) {
   const [state, action, pending] = useActionState(updateUser.bind(null, email), null);
   const preset = role === "admin" ? "admin" : Object.entries(PRESETS).find(([, p]) => p.role === "staff" && p.permissions.length === permissions.length && p.permissions.every((x) => permissions.includes(x)))?.[0] ?? "custom";
   return (
     <form action={action} className="grid gap-4">
       <label><span className={label}>Nombre</span><input name="name" defaultValue={name ?? ""} className={field} /></label>
       <Permissions initialPreset={preset} initial={permissions} />
+      <Extras rate={rate} base={base} telegram={telegram} />
       <div className="flex items-center gap-4">
-        <button disabled={pending} className={button}>{pending ? "Guardando…" : "Guardar permisos"}</button>
+        <button disabled={pending} className={button}>{pending ? "Guardando…" : "Guardar"}</button>
         {state && "error" in state && <p className="text-sm text-red-200/90">{state.error}</p>}
         {state && "ok" in state && !pending && <p className="text-sm text-emerald-200/90">Guardado</p>}
       </div>

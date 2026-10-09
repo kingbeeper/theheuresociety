@@ -86,7 +86,11 @@ export async function draftWatch(draftId: string) {
   return (data?.data as WatchDraft | null) ?? null;
 }
 
-const userLabel = (from?: { id: number; first_name?: string }) => `Telegram · ${from?.first_name ?? from?.id ?? "admin"}`;
+// Quién usa el robot: su correo del CRM si tiene el ID de Telegram enlazado (Usuarios); si no, su nombre
+async function userLabel(from?: { id: number; first_name?: string }) {
+  const { emailForTelegram } = await import("./team");
+  return (await emailForTelegram(from?.id).catch(() => null)) ?? `Telegram · ${from?.first_name ?? from?.id ?? "admin"}`;
+}
 
 // ───────────────────────────── Mensajes ─────────────────────────────
 export async function handleMessage(msg: TgMessage) {
@@ -95,8 +99,8 @@ export async function handleMessage(msg: TgMessage) {
   if (msg.photo?.length) return handlePhoto(msg);
 
   const text = (msg.text ?? "").trim();
-  if (text.startsWith("/")) return handleCommand(chatId, text, userLabel(msg.from));
-  if (text && (await onMenuText(chatId, text, userLabel(msg.from)))) return;
+  if (text.startsWith("/")) return handleCommand(chatId, text, await userLabel(msg.from));
+  if (text && (await onMenuText(chatId, text, await userLabel(msg.from)))) return;
   // Nota de la tasación (después de las fotos)
   if (text && (await appraisePending(chatId))) return runAppraisal(chatId, text);
 
@@ -106,7 +110,7 @@ export async function handleMessage(msg: TgMessage) {
   if (!text) return;
   if (flow) return onText(chatId, text, flow);
   // Respuesta a «¿cuánto te costó?»
-  if (await onCostText(chatId, text, userLabel(msg.from))) return;
+  if (await onCostText(chatId, text, await userLabel(msg.from))) return;
 
   const draft = await openDraft(chatId);
 
@@ -275,12 +279,12 @@ export async function handleCallback(cb: TgCallback) {
 
   // Submenús del teclado
   if (isMenuAction(action)) {
-    return onMenuCallback(chatId, cb.id, cb.message!.message_id, action, (cb.data ?? "").slice(action.length + 1), userLabel(cb.from));
+    return onMenuCallback(chatId, cb.id, cb.message!.message_id, action, (cb.data ?? "").slice(action.length + 1), await userLabel(cb.from));
   }
 
   // Asistente de documentos y botones de un documento ya creado
   if (/^d[a-z]+$/.test(action) && action !== "del") {
-    return onCallback(chatId, cb.id, cb.message!.message_id, action, (cb.data ?? "").slice(action.length + 1), userLabel(cb.from));
+    return onCallback(chatId, cb.id, cb.message!.message_id, action, (cb.data ?? "").slice(action.length + 1), await userLabel(cb.from));
   }
 
   // Botones del recorte del estuche: llevan el id del reloj publicado, no de un borrador
