@@ -75,7 +75,7 @@ export default async function InventarioPage({ searchParams }: PageProps<"/admin
       <div className="grid grid-cols-2 gap-px border border-line bg-line lg:grid-cols-6">
         {kpis.map((k) => (
           <div key={k.label} className="bg-forest px-5 py-5">
-            <p className="font-display text-3xl font-light">{k.value}</p>
+            <p className="break-words font-display text-2xl font-light sm:text-3xl">{k.value}</p>
             <p className="mt-1 text-[0.6rem] tracking-[0.16em] uppercase text-stone">{k.label}</p>
             {k.sub && <p className="mt-1 text-xs text-stone/80">{k.sub}</p>}
           </div>
@@ -123,8 +123,37 @@ export default async function InventarioPage({ searchParams }: PageProps<"/admin
           </form>
         </div>
 
+        {list.length > 0 && (
+          <ul className="divide-y divide-line/60 md:hidden">
+            {list.map((i) => {
+              const m = margin(i);
+              const d = daysInStock(i, now);
+              return (
+                <li key={i.id}>
+                  <Link href={`/admin/inventario/${i.id}`} className="block py-3 hover:bg-forest/60">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span className="min-w-0 truncate">{i.brand} {i.model ?? ""}</span>
+                      <span className="shrink-0 tabular-nums">{money(i.status === "sold" ? i.sale_price : i.asking_price)}</span>
+                    </div>
+                    <p className="truncate text-xs text-stone">{[i.sku, i.reference && `Ref. ${i.reference}`, ACQUISITION[i.acquisition]].filter(Boolean).join(" · ")}</p>
+                    <p className="mt-1 flex justify-between gap-3 text-xs">
+                      <span className={STATUS_STYLE[i.status]}>
+                        {ITEM_STATUS[i.status]}
+                        {i.status === "sold" && isOwnerStock(i.acquisition) && !i.owner_paid_at && <span className="text-amber-200"> · dueño sin pagar</span>}
+                      </span>
+                      <span className={`tabular-nums text-stone ${(d ?? 0) > 90 && i.status !== "sold" ? "text-amber-200" : ""}`}>
+                        {m ? `Margen ${money(m.amount)}` : `Costo ${money(i.cost)}`}{d != null ? ` · ${d} d` : ""}
+                      </span>
+                    </p>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+
         {list.length ? (
-          <div className="overflow-x-auto">
+          <div className="hidden overflow-x-auto md:block">
             <table className="w-full min-w-[900px] text-sm">
               <thead className="text-left text-[0.6rem] tracking-[0.16em] uppercase text-stone">
                 <tr>

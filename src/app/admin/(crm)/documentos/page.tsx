@@ -4,7 +4,7 @@ import { adminDb } from "@/lib/supabase";
 import { requireAdmin } from "@/lib/admin-auth";
 import { KIND_LABEL, KIND_PLURAL, STATUS_LABEL, STATUS_STYLE, usd, type Doc, type DocKind } from "@/lib/doc-labels";
 import { todayInMiami } from "@/lib/booking";
-import { buttonClass, fmtDate, ghostButtonClass, PageTitle, requestTime } from "@/components/admin/ui";
+import { buttonClass, fmtDate, ghostButtonClass, money, PageTitle, requestTime } from "@/components/admin/ui";
 
 export const metadata = { title: "Documentos" };
 
@@ -24,10 +24,10 @@ export default async function DocumentsPage({ searchParams }: PageProps<"/admin/
   const quotesOpen = docs.filter((d) => d.kind === "quote" && (d.status === "sent" || d.status === "accepted"));
   const sum = (ds: Doc[]) => ds.reduce((a, d) => a + Number(d.total), 0);
   const kpis = [
-    { label: "Por cobrar", value: usd(sum(unpaid)), sub: `${unpaid.length} factura(s)`, href: "?tipo=invoice" },
-    { label: "Vencidas", value: usd(sum(overdue)), sub: `${overdue.length} factura(s)`, href: "?tipo=invoice" },
-    { label: "Relojes en memo", value: String(memosOut.length), sub: usd(sum(memosOut)), href: "?tipo=memo" },
-    { label: "Cotizaciones abiertas", value: String(quotesOpen.length), sub: usd(sum(quotesOpen)), href: "?tipo=quote" },
+    { label: "Por cobrar", value: money(sum(unpaid)), sub: `${unpaid.length} factura(s)`, href: "?tipo=invoice" },
+    { label: "Vencidas", value: money(sum(overdue)), sub: `${overdue.length} factura(s)`, href: "?tipo=invoice" },
+    { label: "Relojes en memo", value: String(memosOut.length), sub: money(sum(memosOut)), href: "?tipo=memo" },
+    { label: "Cotizaciones abiertas", value: String(quotesOpen.length), sub: money(sum(quotesOpen)), href: "?tipo=quote" },
   ];
 
   return (
@@ -50,7 +50,7 @@ export default async function DocumentsPage({ searchParams }: PageProps<"/admin/
       <div className="grid grid-cols-2 gap-px border border-line bg-line lg:grid-cols-4">
         {kpis.map((k) => (
           <Link key={k.label} href={`/admin/documentos${k.href}`} className="bg-forest px-5 py-5 hover:bg-moss">
-            <p className="font-display text-3xl font-light">{k.value}</p>
+            <p className="break-words font-display text-2xl font-light sm:text-3xl">{k.value}</p>
             <p className="mt-1 text-[0.6rem] tracking-[0.16em] uppercase text-stone">{k.label}</p>
             <p className="mt-1 text-xs text-stone/80">{k.sub}</p>
           </Link>
@@ -69,8 +69,30 @@ export default async function DocumentsPage({ searchParams }: PageProps<"/admin/
         ))}
       </div>
 
+      {list.length > 0 && (
+        <ul className="mt-4 divide-y divide-line/60 border border-line md:hidden">
+          {list.map((d) => {
+            const late = d.status === "sent" && d.kind !== "quote" && d.due_date && d.due_date < today;
+            return (
+              <li key={d.id}>
+                <Link href={`/admin/documentos/${d.id}`} className="block px-4 py-3 hover:bg-forest/60">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <span className="text-sm">{d.number}</span>
+                    <span className="tabular-nums">{usd(d.total)}</span>
+                  </div>
+                  <p className="mt-0.5 truncate text-sm text-stone">{d.client_name ?? "—"} · {d.items.map((l) => l.title).join(", ")}</p>
+                  <p className={`mt-1 text-[0.62rem] tracking-[0.14em] uppercase ${late ? "text-red-200" : STATUS_STYLE[d.status]}`}>
+                    {late ? (d.kind === "memo" ? "Memo vencido" : d.kind === "consignment" ? "Plazo cumplido" : "Vencida") : STATUS_LABEL[d.kind][d.status]} · {fmtDate(`${d.issue_date}T12:00:00`)}
+                  </p>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
       {list.length ? (
-        <div className="mt-4 overflow-x-auto border border-line">
+        <div className="mt-4 hidden overflow-x-auto border border-line md:block">
           <table className="w-full min-w-[720px] text-sm">
             <thead className="bg-forest text-left text-[0.62rem] tracking-[0.2em] uppercase text-stone">
               <tr>

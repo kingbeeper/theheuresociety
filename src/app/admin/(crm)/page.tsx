@@ -56,7 +56,7 @@ export default async function Dashboard() {
       <div className="grid grid-cols-2 gap-px border border-line bg-line lg:grid-cols-6">
         {kpis.map((k) => (
           <Link key={k.label} href={k.href} className="bg-forest px-5 py-6 transition-colors hover:bg-moss">
-            <p className="font-display text-4xl font-light">{k.value}</p>
+            <p className="font-display text-3xl font-light sm:text-4xl">{k.value}</p>
             <p className="mt-2 text-[0.62rem] leading-snug tracking-[0.18em] uppercase text-stone">{k.label}</p>
           </Link>
         ))}

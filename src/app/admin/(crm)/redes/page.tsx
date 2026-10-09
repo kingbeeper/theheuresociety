@@ -101,7 +101,7 @@ export default async function RedesPage({ searchParams }: PageProps<"/admin/rede
               <div key={name} className="bg-forest p-5">
                 <p className="text-[0.66rem] tracking-[0.24em] uppercase text-brass">{name}</p>
                 <div className="mt-3 flex items-baseline gap-3">
-                  <p className="font-display text-4xl font-light">{fmt(d.followers)}</p>
+                  <p className="font-display text-3xl font-light sm:text-4xl">{fmt(d.followers)}</p>
                   <p className="text-xs text-stone">
                     seguidores{d.delta != null ? <span className={d.delta >= 0 ? "text-emerald-200" : "text-red-200"}> · {d.delta >= 0 ? "+" : ""}{fmt(d.delta)} en 30 días</span> : null}
                   </p>

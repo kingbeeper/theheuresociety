@@ -76,7 +76,7 @@ export default async function LeadPage({ params }: PageProps<"/admin/leads/[id]"
       <Link href="/admin/leads" className="text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">← Leads</Link>
       <div className="mt-4 mb-8 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="font-display text-4xl font-light">{c.name ?? "Sin nombre"}</h1>
+          <h1 className="font-display text-3xl font-light sm:text-4xl">{c.name ?? "Sin nombre"}</h1>
           <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-stone">
             <StageBadge stage={c.stage} />
             <SourceTag source={c.source} />

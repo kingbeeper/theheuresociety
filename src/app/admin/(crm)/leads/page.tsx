@@ -117,8 +117,30 @@ export default async function LeadsPage({ searchParams }: PageProps<"/admin/lead
         )}
       </form>
 
+      {/* Móvil: tarjetas (la tabla solo cabe en pantallas anchas) */}
+      {leads.length > 0 && (
+        <ul className="divide-y divide-line/60 border border-line md:hidden">
+          {leads.map((c) => (
+            <li key={c.id} className="px-4 py-3">
+              <div className="flex items-start justify-between gap-3">
+                <Link href={`/admin/leads/${c.id}`} className="min-w-0 hover:text-brass">
+                  <p className="truncate">{c.name ?? "Sin nombre"}</p>
+                  <p className="truncate text-xs text-stone">{c.phone ?? c.email ?? ""}</p>
+                </Link>
+                <span className="shrink-0 text-xs text-stone">{ago(c.last_activity_at, now)}</span>
+              </div>
+              {c.interests && <p className="mt-1 truncate text-sm text-stone">{c.interests}</p>}
+              <div className="mt-2 flex items-center justify-between gap-3">
+                <SourceTag source={c.source} />
+                <StageSelect id={c.id} stage={c.stage} />
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+
       {leads.length ? (
-        <div className="overflow-x-auto border border-line">
+        <div className="hidden overflow-x-auto border border-line md:block">
           <table className="w-full min-w-[760px] text-sm">
             <thead className="bg-forest text-left text-[0.62rem] tracking-[0.2em] uppercase text-stone">
               <tr>

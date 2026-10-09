@@ -30,7 +30,7 @@ export function PageTitle({ eyebrow, title, action }: { eyebrow?: string; title:
     <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
       <div>
         {eyebrow && <p className="eyebrow">{eyebrow}</p>}
-        <h1 className="mt-2 font-display text-4xl font-light">{title}</h1>
+        <h1 className="mt-2 font-display text-3xl font-light sm:text-4xl">{title}</h1>
       </div>
       {action}
     </div>
