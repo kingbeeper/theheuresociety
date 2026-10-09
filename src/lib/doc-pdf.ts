@@ -228,7 +228,7 @@ export async function renderDocPdf(d: Doc, s: Required<DocSettings>) {
     y -= 50;
     sign(M, y, who[0], true);
     sign(M + half + 30, y, who[1]);
-    y -= 34;
+    y -= sigImage ? 50 : 34; // con firma, deja sitio a la línea «firmado electrónicamente por…»
     if (sigImage) text(signedOn, M + 4, y + 4, { size: 8.5 });
     sign(M, y, t.date);
     sign(M + half + 30, y, t.date);
