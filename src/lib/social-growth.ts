@@ -210,7 +210,9 @@ export async function generateContentPlan(user: string, count = 5) {
     return {
       format: i.format, title: i.title, why: i.why, watch_id: i.watch_id && validIds.has(i.watch_id) ? i.watch_id : null,
       caption_es: i.caption_es, caption_en: i.caption_en, hashtags: i.hashtags.slice(0, 20), visual_brief: i.visual_brief,
-      scheduled_for: miamiToUtc(day, time).toISOString(), created_by: user,
+      // Nunca en el pasado: si esa hora ya pasó (o falta menos de 1 h), al día siguiente
+      scheduled_for: new Date(miamiToUtc(day, time).getTime() + (miamiToUtc(day, time).getTime() < Date.now() + 3_600_000 ? DAY : 0)).toISOString(),
+      created_by: user,
     };
   });
   if (!rows.length) return [];
