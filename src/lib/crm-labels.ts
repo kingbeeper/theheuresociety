@@ -19,6 +19,7 @@ export const SOURCE_LABEL: Record<string, string> = {
   web_consign: "Web · consignar",
   web_alert: "Web · aviso",
   instagram: "Instagram",
+  facebook: "Facebook",
   referral: "Recomendación",
   walk_in: "En persona",
   other: "Otro",

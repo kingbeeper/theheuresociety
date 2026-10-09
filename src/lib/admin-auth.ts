@@ -33,3 +33,10 @@ export async function requireAdmin() {
   if (!isAllowed(email)) redirect("/admin/login");
   return email!;
 }
+
+// Para rutas de API: el correo del usuario del CRM, o null si no hay sesión válida
+export async function adminEmail() {
+  const { data } = await (await authClient()).auth.getUser();
+  const email = data.user?.email ?? null;
+  return isAllowed(email) ? email : null;
+}

@@ -147,3 +147,33 @@ const SELL_STATUS: Record<string, string> = {
   paid: "pagada",
   rejected: "rechazada",
 };
+
+// ───────────────────────────── Redes (Instagram y Facebook) ─────────────────────────────
+export async function saveSocialSettings(form: FormData) {
+  await requireAdmin();
+  const { saveSettings } = await import("@/lib/meta");
+  await saveSettings({
+    bot_dm: form.get("bot_dm") === "on" ? "on" : "off",
+    comment_reply: form.get("comment_reply") === "on" ? "on" : "off",
+    comment_reply_text: text(form, "comment_reply_text"),
+  });
+  refresh();
+}
+
+export async function disconnectSocial() {
+  await requireAdmin();
+  const { saveSettings } = await import("@/lib/meta");
+  await saveSettings({ page_id: null, page_name: null, page_token: null, ig_id: null, ig_username: null, connected_at: null, connected_by: null });
+  refresh();
+}
+
+export async function setSocialBot(contactId: string, on: boolean) {
+  await requireAdmin();
+  if (on) {
+    const { reactivateSocialBot } = await import("@/lib/social-bot");
+    await reactivateSocialBot(contactId);
+  } else {
+    await adminDb().from("social_contacts").update({ mode: "human", human_until: new Date(Date.now() + 7 * 86_400_000).toISOString() }).eq("id", contactId);
+  }
+  refresh();
+}

@@ -8,6 +8,7 @@ const ITEMS = [
   { href: "/admin/leads", label: "Leads" },
   { href: "/admin/citas", label: "Citas" },
   { href: "/admin/compras", label: "Compras y consignas" },
+  { href: "/admin/redes", label: "Redes" },
 ];
 
 export function AdminNav() {

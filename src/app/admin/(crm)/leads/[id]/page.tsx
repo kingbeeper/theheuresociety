@@ -6,7 +6,7 @@ import { requireAdmin } from "@/lib/admin-auth";
 import type { Customer } from "@/lib/crm";
 import { ago, Card, fmtDateTime, ghostButtonClass, money, SourceTag, StageBadge, requestTime } from "@/components/admin/ui";
 import { LeadForm } from "@/components/admin/LeadForm";
-import { addNote, setBot, toggleAlert } from "../../../actions";
+import { addNote, setBot, setSocialBot, toggleAlert } from "../../../actions";
 
 export const metadata = { title: "Cliente" };
 
@@ -26,6 +26,14 @@ export default async function LeadPage({ params }: PageProps<"/admin/leads/[id]"
   const { data } = await db.from("customers").select("*").eq("id", id).maybeSingle();
   if (!data) notFound();
   const c = data as Customer;
+
+  // Conversaciones por Instagram o Messenger (si las tablas de redes aún no existen, quedan vacías)
+  const { data: socialContacts } = await db.from("social_contacts").select("id, platform, username, mode, human_until").eq("customer_id", id);
+  const socialIds = (socialContacts ?? []).map((s) => s.id as string);
+  const { data: socialMsgs } = socialIds.length
+    ? await db.from("social_messages").select("contact_id, direction, type, body, media_url, created_at").in("contact_id", socialIds).order("created_at", { ascending: false }).limit(150)
+    : { data: [] as { contact_id: string; direction: string; type: string; body: string | null; media_url: string | null; created_at: string }[] };
+  const platformOf = (contactId: string) => (socialContacts ?? []).find((s) => s.id === contactId)?.platform === "facebook" ? "Messenger" : "Instagram";
 
   const [events, alerts, appts, sells, wa, msgs] = await Promise.all([
     db.from("customer_events").select("*").eq("customer_id", id).order("created_at", { ascending: false }).limit(200),
@@ -49,6 +57,11 @@ export default async function LeadPage({ params }: PageProps<"/admin/leads/[id]"
       who: m.direction === "in" ? c.name ?? "Cliente" : m.direction === "bot" ? "Bot" : "Equipo",
       body: m.body ?? (m.type === "image" ? "[Foto]" : `[${m.type}]`), image: m.type === "image" ? m.media_url : null,
     })),
+    ...(socialMsgs ?? []).map((m) => ({
+      at: m.created_at as string, kind: "msg" as const, icon: m.direction === "in" ? "📸" : m.direction === "bot" ? "🤖" : "🧑‍💼",
+      who: `${m.direction === "in" ? c.name ?? "Cliente" : m.direction === "bot" ? "Bot" : "Equipo"} · ${platformOf(m.contact_id as string)}`,
+      body: (m.body as string | null) ?? (m.type === "image" ? "[Foto]" : `[${m.type}]`), image: m.type === "image" ? (m.media_url as string | null) : null,
+    })),
   ].sort((a, b) => b.at.localeCompare(a.at));
 
   const now = requestTime();
@@ -69,6 +82,7 @@ export default async function LeadPage({ params }: PageProps<"/admin/leads/[id]"
         </div>
         <div className="flex flex-wrap gap-2">
           {waNumber && <a href={`https://wa.me/${waNumber}`} target="_blank" rel="noreferrer" className={ghostButtonClass}>WhatsApp</a>}
+          {c.ig_username && <a href={`https://ig.me/m/${c.ig_username}`} target="_blank" rel="noreferrer" className={ghostButtonClass}>Instagram @{c.ig_username}</a>}
           {c.phone && <a href={`tel:${c.phone}`} className={ghostButtonClass}>Llamar</a>}
           {c.email && <a href={`mailto:${c.email}`} className={ghostButtonClass}>Correo</a>}
         </div>
@@ -90,6 +104,20 @@ export default async function LeadPage({ params }: PageProps<"/admin/leads/[id]"
               </div>
             </Card>
           )}
+
+          {(socialContacts ?? []).map((sc) => {
+            const paused = sc.mode === "human" && sc.human_until && new Date(sc.human_until as string) > new Date(now);
+            return (
+              <Card key={sc.id as string} title={`Bot de ${sc.platform === "facebook" ? "Messenger" : "Instagram"}`}>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <p className="text-sm text-stone">{paused ? "Pausado: una persona atiende este chat." : "Activo: el bot responde en este chat."}</p>
+                  <form action={setSocialBot.bind(null, sc.id as string, Boolean(paused))}>
+                    <button className={ghostButtonClass}>{paused ? "Reactivar el bot" : "Pausar el bot"}</button>
+                  </form>
+                </div>
+              </Card>
+            );
+          })}
 
           <Card title="Búsquedas («avísenme»)">
             {alerts.data?.length ? (
