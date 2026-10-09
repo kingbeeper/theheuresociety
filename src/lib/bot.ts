@@ -547,7 +547,13 @@ async function handleCutoutButton(cb: TgCallback, chatId: number, action: string
     await tg("answerCallbackQuery", { callback_query_id: cb.id, text: "Agregando al estuche…" });
     await removeButtons();
     const result = await acceptCutout(watchId);
-    return sendMessage(chatId, result.text, result.ok ? { reply_markup: keyboard([[{ text: "🗑 Quitar del estuche", callback_data: `cutdel:${watchId}` }]]) } : {});
+    await sendMessage(chatId, result.text, result.ok ? { reply_markup: keyboard([[{ text: "🗑 Quitar del estuche", callback_data: `cutdel:${watchId}` }]]) } : {});
+    // Reloj nuevo en el estuche → video promocional para redes (si está activado)
+    if (result.ok) {
+      const { promoConfigured } = await import("./promo-video");
+      if (promoConfigured() && (await promoAuto())) after(() => promoJob(chatId, watchId));
+    }
+    return;
   }
 
   if (action === "cutno") {
@@ -585,6 +591,23 @@ export async function setWatchStatus(chatId: number, w: { id: string; brand: str
   revalidateTag(INVENTORY_TAG, { expire: 0 });
   const label = { sold: "vendido", reserved: "reservado", available: "disponible" }[status];
   return sendMessage(chatId, `Hecho: ${h(w.brand)} ${h(w.model)} (${h(w.reference)}) ahora figura como <b>${label}</b>.`);
+}
+
+// ───────────────────────────── Video promocional ─────────────────────────────
+export async function promoAuto() {
+  const { data } = await adminDb().from("integration_settings").select("value").eq("key", "promo_auto").maybeSingle();
+  return data?.value !== "off";
+}
+
+export async function promoJob(chatId: number, watchId: string) {
+  const { startPromoVideo, pollPromoVideo } = await import("./promo-video");
+  try {
+    await sendMessage(chatId, "🎬 Preparando el video promocional de 15 s para redes… Tarda unos minutos; te lo envío aquí cuando esté.");
+    const id = await startPromoVideo(watchId, chatId);
+    await pollPromoVideo(id, 90_000);
+  } catch (e) {
+    await sendMessage(chatId, `⚠️ No se pudo empezar el video: ${h((e as Error).message.slice(0, 200))}`);
+  }
 }
 
 // ───────────────────────────── Órdenes ─────────────────────────────

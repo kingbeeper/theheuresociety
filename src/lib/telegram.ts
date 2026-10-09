@@ -65,6 +65,19 @@ export async function sendDocumentFile(chatId: number, bytes: Uint8Array, filena
   if (!json.ok) throw new Error(`Telegram sendDocument: ${json.description}`);
 }
 
+export async function sendVideoFile(chatId: number, bytes: Uint8Array, filename: string, caption: string, extra: Record<string, unknown> = {}) {
+  const form = new FormData();
+  form.append("chat_id", String(chatId));
+  form.append("video", new Blob([Buffer.from(bytes)], { type: "video/mp4" }), filename);
+  form.append("caption", caption.slice(0, 1024));
+  form.append("parse_mode", "HTML");
+  form.append("supports_streaming", "true");
+  for (const [k, v] of Object.entries(extra)) form.append(k, typeof v === "string" ? v : JSON.stringify(v));
+  const res = await fetch(api("sendVideo"), { method: "POST", body: form });
+  const json = (await res.json()) as { ok: boolean; description?: string };
+  if (!json.ok) throw new Error(`Telegram sendVideo: ${json.description}`);
+}
+
 // Descarga una foto recibida (Telegram envía varios tamaños; se usa el mayor)
 export async function downloadFile(fileId: string): Promise<ArrayBuffer> {
   const file = await tg<{ file_path: string }>("getFile", { file_id: fileId });

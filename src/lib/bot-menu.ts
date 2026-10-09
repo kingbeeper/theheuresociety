@@ -60,6 +60,7 @@ export async function onMenuText(chatId: number, text: string, user: string) {
           ]),
           [{ text: "🔎 Tasar un reloj (fotos)", callback_data: "mappr:1" }],
           [{ text: "🏷 Relojes para rebajar", callback_data: "mdrop:1" }],
+          [{ text: "🎬 Video promocional", callback_data: "mst:video" }],
           [{ text: "📊 Qué buscan los clientes", callback_data: "mdem:1" }],
         ]),
       });
@@ -78,7 +79,7 @@ export async function onMenuText(chatId: number, text: string, user: string) {
   return false;
 }
 
-const MENU_ACTIONS = new Set(["mnew", "mopen", "mcost", "mlist", "mst", "mset", "mcase", "mdem", "mappr", "mdrop"]);
+const MENU_ACTIONS = new Set(["mnew", "mopen", "mcost", "mlist", "mst", "mset", "mcase", "mdem", "mappr", "mdrop", "mvid"]);
 export const isMenuAction = (action: string) => MENU_ACTIONS.has(action);
 
 type Watch = { id: string; brand: string; model: string; reference: string; status: string };
@@ -133,13 +134,13 @@ export async function onMenuCallback(chatId: number, cbId: string, messageId: nu
 
     // Elegir el reloj: para cambiar su estado o repetir su recorte
     case "mst": {
-      const from = { sold: ["available", "reserved"], reserved: ["available"], available: ["reserved", "sold"], case: ["available", "reserved"] }[arg] ?? ["available"];
+      const from = { sold: ["available", "reserved"], reserved: ["available"], available: ["reserved", "sold"], case: ["available", "reserved"], video: ["available", "reserved"] }[arg] ?? ["available"];
       const { data } = await adminDb().from("watches").select("id, brand, model, reference, status").in("status", from).order("published_at", { ascending: false }).limit(24);
       const watches = (data ?? []) as Watch[];
       if (!watches.length) return sendMessage(chatId, "No hay relojes para esa opción.");
-      const title = { sold: "¿Cuál se vendió?", reserved: "¿Cuál reservamos?", available: "¿Cuál vuelve a estar disponible?", case: "¿De cuál repito el recorte del estuche?" }[arg] ?? "¿Cuál?";
+      const title = { sold: "¿Cuál se vendió?", reserved: "¿Cuál reservamos?", available: "¿Cuál vuelve a estar disponible?", case: "¿De cuál repito el recorte del estuche?", video: "🎬 ¿De qué reloj hago el video promocional?" }[arg] ?? "¿Cuál?";
       return sendMessage(chatId, title, {
-        reply_markup: keyboard(watches.map((w) => [{ text: `${w.status === "reserved" ? "🟡 " : w.status === "sold" ? "⚫ " : ""}${w.brand} ${w.model} · ${w.reference}`.slice(0, 60), callback_data: arg === "case" ? `mcase:${w.id}` : `mset:${w.id}|${arg}` }])),
+        reply_markup: keyboard(watches.map((w) => [{ text: `${w.status === "reserved" ? "🟡 " : w.status === "sold" ? "⚫ " : ""}${w.brand} ${w.model} · ${w.reference}`.slice(0, 60), callback_data: arg === "case" ? `mcase:${w.id}` : arg === "video" ? `mvid:${w.id}` : `mset:${w.id}|${arg}` }])),
       });
     }
 
@@ -149,6 +150,15 @@ export async function onMenuCallback(chatId: number, cbId: string, messageId: nu
       const { data: w } = await adminDb().from("watches").select("id, brand, model, reference").eq("id", id).maybeSingle();
       if (!w || !["sold", "reserved", "available"].includes(status)) return sendMessage(chatId, "Ese reloj ya no está publicado.");
       return setWatchStatus(chatId, w as Watch, status as "sold" | "reserved" | "available");
+    }
+
+    case "mvid": {
+      await clearButtons();
+      const { promoConfigured } = await import("./promo-video");
+      if (!promoConfigured()) return sendMessage(chatId, "El video promocional aún no está activado: falta la clave de la API de Higgsfield (HF_API_KEY_ID y HF_API_KEY_SECRET).");
+      const { promoJob } = await import("./bot");
+      after(() => promoJob(chatId, arg));
+      return;
     }
 
     case "mcase":

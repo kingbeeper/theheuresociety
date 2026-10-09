@@ -8,7 +8,8 @@ const nextConfig: NextConfig = {
     "/d/\\[token\\]/pdf": ["src/lib/pdf-assets/**/*"],
     "/d/\\[token\\]/certificate": ["src/lib/pdf-assets/**/*"],
     "/api/certificate/\\[id\\]": ["src/lib/pdf-assets/**/*"],
-    "/api/telegram": ["src/lib/pdf-assets/**/*"],
+    "/api/telegram": ["src/lib/pdf-assets/**/*", "node_modules/ffmpeg-static/ffmpeg"],
+    "/api/promo-video/poll": ["src/lib/pdf-assets/**/*", "node_modules/ffmpeg-static/ffmpeg"],
   },
   partialPrefetching: true,
   // Fotos subidas por el robot de Telegram (Supabase Storage)
