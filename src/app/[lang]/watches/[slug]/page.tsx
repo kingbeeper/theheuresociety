@@ -9,6 +9,7 @@ import { getWatch, getWatches } from "@/lib/inventory";
 import { getDictionary } from "../../dictionaries";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
+import { AlertForm } from "@/components/AlertForm";
 import { Gallery } from "@/components/Gallery";
 import { WatchCard } from "@/components/WatchCard";
 
@@ -190,6 +191,8 @@ async function WatchDetail({ params }: { params: PageProps<"/[lang]/watches/[slu
           </div>
         </section>
       </main>
+      {/* Si ya no está disponible: captar al interesado para avisarle cuando llegue otro igual */}
+      {watch.status !== "available" && <AlertForm lang={lang} dict={dict} initialQuery={`${watch.brand} ${watch.model} ${watch.reference}`} />}
 
       <Footer lang={lang} dict={dict} />
     </>

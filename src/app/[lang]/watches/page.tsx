@@ -6,6 +6,7 @@ import { getBrands, getWatches } from "@/lib/inventory";
 import { getDictionary } from "../dictionaries";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
+import { AlertForm } from "@/components/AlertForm";
 import { Catalog } from "@/components/Catalog";
 import { GoldMonogram } from "@/components/GoldMonogram";
 import { CollectionTitle } from "@/components/CollectionTitle";
@@ -49,6 +50,7 @@ export default async function WatchesPage({ params }: PageProps<"/[lang]/watches
           <Catalog watches={await getWatches()} brands={await getBrands()} lang={lang} dict={dict} />
         </div>
       </main>
+      <AlertForm lang={lang} dict={dict} />
       <Footer lang={lang} dict={dict} />
     </>
   );

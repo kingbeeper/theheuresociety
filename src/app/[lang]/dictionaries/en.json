@@ -362,5 +362,22 @@
     "book": "Book a viewing",
     "directions": "Get directions",
     "mapTitle": "Map of The Heure Society office in Miami"
+  },
+  "alert": {
+    "eyebrow": "Private search",
+    "title": "Looking for a specific piece?",
+    "lead": "Tell us which watch you are after and we will let you know as soon as one joins our collection, before it is listed.",
+    "query": "Watch you are looking for",
+    "queryPh": "E.g. Rolex Daytona 126500LN white dial",
+    "budget": "Approximate budget (optional)",
+    "name": "Name",
+    "phone": "Phone / WhatsApp",
+    "email": "Email (optional)",
+    "submit": "Notify me",
+    "sending": "Sending…",
+    "done": "Thank you. We will be in touch as soon as we have a piece for you.",
+    "error": "We could not send your request. Please try again or message us on WhatsApp.",
+    "missing": "Please add the watch, your name and a phone or email.",
+    "privacy": "We will only use your details to contact you about it."
   }
 }

@@ -5,6 +5,7 @@ import { isBookable, miamiToUtc, upcomingSlots, TIME_ZONE } from "./booking";
 import { downloadMedia, markReadTyping, sendImage, sendText } from "./whatsapp";
 import { runAgent, type HistoryItem } from "./wa-agent";
 import { escapeHtml as h, keyboard, notifyAdmins } from "./telegram";
+import { addEvent, addWatchAlert, upsertLead } from "./crm";
 
 // Lógica del chatbot de WhatsApp: guarda cada mensaje, decide si el bot responde y ejecuta
 // lo que pide el agente (citas, relojes para vender, pasar con una persona).
@@ -73,6 +74,12 @@ async function handleInbound(m: WaMessage, profileName: string | null) {
     { wa_id: m.from, name: existing?.name ?? profileName, last_inbound_at: now, updated_at: now },
     { onConflict: "wa_id" }
   );
+  // Lead en el CRM (si ya existe, solo se actualiza su última actividad)
+  const customer = await upsertLead({ waId: m.from, name: existing?.name ?? profileName, source: "whatsapp" }).catch((e) => {
+    console.error("CRM:", e);
+    return null;
+  });
+  if (customer) await db.from("wa_contacts").update({ customer_id: customer.id }).eq("wa_id", m.from);
 
   // Texto y archivo (las fotos se guardan para el bot y para el especialista)
   let body: string | null = m.text?.body ?? m.image?.caption ?? m.document?.caption ?? m.video?.caption ?? null;
@@ -148,6 +155,13 @@ async function reply(waId: string, name: string | null) {
       requestAppointment: (a) => requestAppointment(waId, a),
       submitWatch: (s) => submitWatch(waId, s),
       handoff: (reason) => handoff(waId, name, reason),
+      saveInterest: async ({ query, budget, alert }) => {
+        const c = await upsertLead({
+          waId, source: "whatsapp", intent: "buy", stage: "qualified",
+          interests: budget ? `${query} (presupuesto: ${budget})` : query,
+        });
+        if (alert) await addWatchAlert(c.id, query);
+      },
     });
     if (text) {
       const ids = await sendText(waId, text);
@@ -171,6 +185,8 @@ async function setHuman(waId: string, hours = HUMAN_HOURS) {
 
 async function handoff(waId: string, name: string | null, reason: string) {
   await setHuman(waId, 24);
+  const c = await upsertLead({ waId, source: "whatsapp" }).catch(() => null);
+  if (c) await addEvent(c.id, "handoff", `Pide hablar con una persona: ${reason}`, {}, "bot");
   await notifyAdmins(
     `👤 <b>WhatsApp · pide una persona</b>\n${h(name ?? "Cliente")} · +${waId}\n\n${h(reason)}\n\nResponde desde la app WhatsApp Business: el bot no contestará en este chat durante 24 h.\n${waLink(waId)}`,
     { reply_markup: reactivateButton(waId) }
@@ -182,8 +198,13 @@ async function requestAppointment(
   a: { kind: "office" | "video"; date: string; time: string; name: string; email?: string; pieces: string[]; note?: string }
 ): Promise<"ok" | "taken"> {
   const startsAt = miamiToUtc(a.date, a.time);
+  const customer = await upsertLead({
+    waId, name: a.name, email: a.email, source: "whatsapp", intent: "buy", stage: "appointment",
+    event: { type: "appointment", body: `Solicita cita (${a.kind === "office" ? "oficina" : "videollamada"}) el ${a.date} a las ${a.time}`, meta: { pieces: a.pieces } },
+  });
   const { error } = await adminDb().from("appointments").insert({
     kind: a.kind, starts_at: startsAt.toISOString(), name: a.name, phone: `+${waId}`, email: a.email ?? null, pieces: a.pieces, note: a.note ?? null,
+    customer_id: customer.id,
   });
   if (error?.code === "23505") return "taken";
   if (error) throw error;
@@ -216,9 +237,13 @@ async function submitWatch(waId: string, s: { kind: "sell" | "trade" | "consign"
     .gte("created_at", new Date(Date.now() - 2 * 86_400_000).toISOString())
     .order("created_at", { ascending: true });
   const urls = (photos ?? []).map((p) => p.media_url as string).filter(Boolean).slice(-10);
+  const customer = await upsertLead({
+    waId, name: s.name, source: "whatsapp", intent: s.kind, stage: "qualified",
+    event: { type: "sell_request", body: `${{ sell: "Vende", trade: "Intercambia", consign: "Consigna" }[s.kind]}: ${[s.brand, s.model, s.reference].filter(Boolean).join(" ")}` },
+  });
   await db.from("sell_requests").insert({
     kind: s.kind, name: s.name, phone: `+${waId}`, brand: s.brand, model: s.model ?? null, reference: s.reference ?? null,
-    message: s.details ?? null, image_paths: urls,
+    message: s.details ?? null, image_paths: urls, customer_id: customer.id,
   });
   const label = { sell: "Venta", trade: "Intercambio", consign: "Consignación" }[s.kind];
   await notifyAdmins(

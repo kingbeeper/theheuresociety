@@ -6,6 +6,7 @@ import { INVENTORY_TAG } from "./inventory";
 import { analyzeWatch, type WatchDraft } from "./watch-ai";
 import { cutoutConfigured, cutoutPreview, makeCutout } from "./watch-cutout";
 import { reactivateBot } from "./wa-bot";
+import { addEvent, matchAlerts } from "./crm";
 import { downloadFile, escapeHtml as h, keyboard, sendMessage, sendPhoto, tg } from "./telegram";
 import { toSlug } from "./watches";
 
@@ -260,6 +261,8 @@ export async function handleCallback(cb: TgCallback) {
     await sendMessage(chatId, `✅ <b>Publicado.</b> Ya está en la colección:\n${SITE_URL}/es/watches/${slug}`);
     // El recorte tarda un poco: se prepara después de responder a Telegram
     after(() => cutoutJob(chatId, id));
+    // Compradores que esperaban una pieza así (búsquedas «avísenme» del CRM)
+    after(() => notifyAlertMatches(chatId, draft.data!, slug).catch((e) => console.error("Avisos:", e)));
     return;
   }
 
@@ -334,6 +337,36 @@ async function publish(draft: Draft) {
   await updateDraft(draft.id, { status: "published", watch_id: row.id } as Partial<Draft>);
   revalidateTag(INVENTORY_TAG, { expire: 0 });
   return { slug, id: row.id as string };
+}
+
+// ───────────────────────────── Avisos a compradores ─────────────────────────────
+async function notifyAlertMatches(chatId: number, w: WatchDraft, slug: string) {
+  const matches = await matchAlerts({ brand: w.brand, model: w.model, reference: w.reference });
+  if (!matches.length) return;
+  const lines = matches.map((a) => {
+    const c = a.customer;
+    const wa = c?.wa_id ?? c?.phone?.replace(/\D/g, "");
+    return [`• <b>${h(c?.name ?? "Cliente")}</b>${c?.phone ? ` · ${c.phone}` : ""}`, `  Busca: «${h(a.query)}»`, wa ? `  https://wa.me/${wa}` : ""]
+      .filter(Boolean)
+      .join("\n");
+  });
+  await sendMessage(
+    chatId,
+    [
+      `🔔 <b>${matches.length} cliente(s) esperaban una pieza así</b>`,
+      `${h(w.brand)} ${h(w.model)} (${h(w.reference)})`,
+      `${SITE_URL}/es/watches/${slug}`,
+      "",
+      lines.join("\n\n"),
+      "",
+      "Escríbeles antes de que se publique en redes.",
+    ].join("\n")
+  );
+  const now = new Date().toISOString();
+  for (const a of matches) {
+    await adminDb().from("watch_alerts").update({ last_notified_at: now }).eq("id", a.id);
+    if (a.customer) await addEvent(a.customer.id, "match", `Llegó una pieza que encaja: ${w.brand} ${w.model} ${w.reference}`, { slug });
+  }
 }
 
 // ───────────────────────────── Recorte para el estuche ─────────────────────────────

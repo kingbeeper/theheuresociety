@@ -362,5 +362,22 @@
     "book": "Agendar una visita",
     "directions": "Cómo llegar",
     "mapTitle": "Mapa de la oficina de The Heure Society en Miami"
+  },
+  "alert": {
+    "eyebrow": "Búsqueda privada",
+    "title": "¿Busca una pieza concreta?",
+    "lead": "Díganos qué reloj busca y le avisaremos en cuanto llegue uno a nuestra colección, antes de publicarlo.",
+    "query": "Reloj que busca",
+    "queryPh": "Ej.: Rolex Daytona 126500LN esfera blanca",
+    "budget": "Presupuesto aproximado (opcional)",
+    "name": "Nombre",
+    "phone": "Teléfono / WhatsApp",
+    "email": "Correo electrónico (opcional)",
+    "submit": "Avisarme",
+    "sending": "Enviando…",
+    "done": "Gracias. Le escribiremos en cuanto tengamos una pieza para usted.",
+    "error": "No pudimos enviar su solicitud. Inténtelo de nuevo o escríbanos por WhatsApp.",
+    "missing": "Indique el reloj, su nombre y un teléfono o correo.",
+    "privacy": "Usaremos sus datos solo para avisarle."
   }
 }

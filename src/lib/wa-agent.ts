@@ -23,6 +23,7 @@ export type AgentDeps = {
   requestAppointment: (a: { kind: "office" | "video"; date: string; time: string; name: string; email?: string; pieces: string[]; note?: string }) => Promise<"ok" | "taken">;
   submitWatch: (s: { kind: "sell" | "trade" | "consign"; name: string; brand: string; model?: string; reference?: string; details?: string }) => Promise<number>;
   handoff: (reason: string) => Promise<void>;
+  saveInterest: (i: { query: string; budget?: string; alert: boolean }) => Promise<void>;
   now: () => Date;
 };
 
@@ -46,6 +47,7 @@ Cómo trabajas:
 - Para cualquier dato de un reloj (si lo tenemos, estado, precio, especificaciones) usa siempre las herramientas. Nunca inventes piezas, referencias, precios ni disponibilidad. Si no lo tenemos, dilo y ofrece avisarle o buscarlo: en ese caso pásalo a una persona con el motivo.
 - Precios: di el precio solo si la herramienta lo da. Si es «Precio a consultar», ofrece que le contacte una persona del equipo. Nunca negocies, ni ofrezcas descuentos, ni prometas un precio de compra por el reloj del cliente.
 - Al hablar de un reloj concreto, ofrece la foto (herramienta enviar_foto) y el enlace a su ficha.
+- Cuando el cliente diga qué busca (o su presupuesto), guárdalo con registrar_interes. Si no tenemos lo que busca, ofrécele avisarle cuando llegue y, si acepta, regístralo con avisar=true.
 - Citas: ofrece los horarios con la herramienta y, cuando el cliente elija tipo (oficina o videollamada), día y hora, pide su nombre (y opcionalmente correo) y solicita la cita. Explica que es una solicitud y que el equipo la confirmará por este chat.
 - Vender, intercambiar o consignar: pide marca y modelo o referencia, estado, si tiene caja y papeles, año aproximado, y fotos (esfera, caja, brazalete y papeles si los tiene). Cuando tengas lo esencial y al menos una foto, regístralo con la herramienta. No valores el reloj: un especialista responde con una oferta.
 - Pasa con una persona (herramienta pasar_a_persona) cuando el cliente lo pida, quiera comprar o reservar un reloj, pregunte por formas de pago, negocie, tenga una queja, o cuando no sepas algo. Tras usarla, dile que alguien del equipo le escribirá en breve y no sigas la conversación por tu cuenta.
@@ -178,6 +180,19 @@ export async function runAgent(history: HistoryItem[], deps: AgentDeps) {
       run: async (s) => {
         const photos = await deps.submitWatch({ kind: s.tipo, name: s.nombre, brand: s.marca, model: s.modelo, reference: s.referencia, details: s.detalles });
         return `Registrado con ${photos} foto(s) y especialista avisado. Dile al cliente que le responderemos con una oferta en breve.`;
+      },
+    }),
+    betaZodTool({
+      name: "registrar_interes",
+      description: "Guarda en la ficha del cliente qué reloj busca y su presupuesto. Úsala siempre que el cliente diga qué busca. Con avisar=true, el equipo le avisará cuando llegue una pieza así (úsalo si no la tenemos y el cliente acepta que le avisemos).",
+      inputSchema: z.object({
+        busca: z.string().describe("Marca, modelo, referencia o descripción de lo que busca"),
+        presupuesto: z.string().optional(),
+        avisar: z.boolean().describe("true si quiere que le avisemos cuando llegue"),
+      }),
+      run: async ({ busca, presupuesto, avisar }) => {
+        await deps.saveInterest({ query: busca, budget: presupuesto, alert: avisar });
+        return avisar ? "Guardado. Le avisaremos cuando llegue una pieza así." : "Guardado en su ficha.";
       },
     }),
     betaZodTool({

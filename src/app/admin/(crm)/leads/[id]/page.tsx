@@ -1,0 +1,180 @@
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { connection } from "next/server";
+import { adminDb } from "@/lib/supabase";
+import { requireAdmin } from "@/lib/admin-auth";
+import type { Customer } from "@/lib/crm";
+import { ago, Card, fmtDateTime, ghostButtonClass, money, SourceTag, StageBadge, requestTime } from "@/components/admin/ui";
+import { LeadForm } from "@/components/admin/LeadForm";
+import { addNote, setBot, toggleAlert } from "../../../actions";
+
+export const metadata = { title: "Cliente" };
+
+const EVENT_ICON: Record<string, string> = {
+  lead: "✦", note: "✎", stage: "→", appointment: "📅", sell_request: "⌚", alert: "🔔", match: "✨", handoff: "👤",
+};
+const SELL_LABEL: Record<string, string> = { new: "Nueva", offered: "Ofertada", accepted: "Aceptada", received: "Recibido", paid: "Pagada", rejected: "Rechazada" };
+
+type Item = { at: string; kind: "event" | "msg"; icon: string; who: string; body: string; image?: string | null };
+
+export default async function LeadPage({ params }: PageProps<"/admin/leads/[id]">) {
+  await connection();
+  // La plantilla y la página se generan en paralelo: cada página comprueba la sesión antes de leer datos
+  await requireAdmin();
+  const { id } = await params;
+  const db = adminDb();
+  const { data } = await db.from("customers").select("*").eq("id", id).maybeSingle();
+  if (!data) notFound();
+  const c = data as Customer;
+
+  const [events, alerts, appts, sells, wa, msgs] = await Promise.all([
+    db.from("customer_events").select("*").eq("customer_id", id).order("created_at", { ascending: false }).limit(200),
+    db.from("watch_alerts").select("*").eq("customer_id", id).order("created_at", { ascending: false }),
+    db.from("appointments").select("*").eq("customer_id", id).order("starts_at", { ascending: false }),
+    db.from("sell_requests").select("*").eq("customer_id", id).order("created_at", { ascending: false }),
+    c.wa_id ? db.from("wa_contacts").select("mode, human_until").eq("wa_id", c.wa_id).maybeSingle() : Promise.resolve({ data: null }),
+    c.wa_id
+      ? db.from("wa_messages").select("direction, type, body, media_url, created_at").eq("wa_id", c.wa_id).order("created_at", { ascending: false }).limit(150)
+      : Promise.resolve({ data: [] as { direction: string; type: string; body: string | null; media_url: string | null; created_at: string }[] }),
+  ]);
+
+  // Historial: eventos del CRM y conversación de WhatsApp, del más reciente al más antiguo
+  const timeline: Item[] = [
+    ...(events.data ?? []).map((e) => ({
+      at: e.created_at as string, kind: "event" as const, icon: EVENT_ICON[e.type as string] ?? "•",
+      who: (e.created_by as string) ?? "", body: e.body as string,
+    })),
+    ...(msgs.data ?? []).map((m) => ({
+      at: m.created_at, kind: "msg" as const, icon: m.direction === "in" ? "💬" : m.direction === "bot" ? "🤖" : "🧑‍💼",
+      who: m.direction === "in" ? c.name ?? "Cliente" : m.direction === "bot" ? "Bot" : "Equipo",
+      body: m.body ?? (m.type === "image" ? "[Foto]" : `[${m.type}]`), image: m.type === "image" ? m.media_url : null,
+    })),
+  ].sort((a, b) => b.at.localeCompare(a.at));
+
+  const now = requestTime();
+  const waNumber = c.wa_id ?? c.phone?.replace(/\D/g, "");
+  const botPaused = wa.data?.mode === "human" && wa.data.human_until && new Date(wa.data.human_until) > new Date(now);
+
+  return (
+    <>
+      <Link href="/admin/leads" className="text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">← Leads</Link>
+      <div className="mt-4 mb-8 flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="font-display text-4xl font-light">{c.name ?? "Sin nombre"}</h1>
+          <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-stone">
+            <StageBadge stage={c.stage} />
+            <SourceTag source={c.source} />
+            <span>· cliente desde {ago(c.created_at, now)}</span>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {waNumber && <a href={`https://wa.me/${waNumber}`} target="_blank" rel="noreferrer" className={ghostButtonClass}>WhatsApp</a>}
+          {c.phone && <a href={`tel:${c.phone}`} className={ghostButtonClass}>Llamar</a>}
+          {c.email && <a href={`mailto:${c.email}`} className={ghostButtonClass}>Correo</a>}
+        </div>
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
+        <div className="space-y-6">
+          <Card title="Datos del cliente"><LeadForm c={c} /></Card>
+
+          {c.wa_id && wa.data && (
+            <Card title="Bot de WhatsApp">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="text-sm text-stone">
+                  {botPaused ? "Pausado: una persona atiende este chat." : "Activo: el bot responde en este chat."}
+                </p>
+                <form action={setBot.bind(null, c.wa_id, Boolean(botPaused))}>
+                  <button className={ghostButtonClass}>{botPaused ? "Reactivar el bot" : "Pausar el bot"}</button>
+                </form>
+              </div>
+            </Card>
+          )}
+
+          <Card title="Búsquedas («avísenme»)">
+            {alerts.data?.length ? (
+              <ul className="space-y-2 text-sm">
+                {alerts.data.map((a) => (
+                  <li key={a.id as string} className="flex items-center justify-between gap-3 border-b border-line/60 pb-2">
+                    <span className={a.active ? "" : "text-stone line-through"}>{a.query as string}</span>
+                    <form action={toggleAlert.bind(null, a.id as string, !a.active)}>
+                      <button className="text-xs text-stone underline hover:text-ivory">{a.active ? "Desactivar" : "Activar"}</button>
+                    </form>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-stone">Sin búsquedas guardadas.</p>
+            )}
+          </Card>
+
+          <Card title="Citas">
+            {appts.data?.length ? (
+              <ul className="space-y-2 text-sm">
+                {appts.data.map((a) => (
+                  <li key={a.id as string} className="flex justify-between gap-3 border-b border-line/60 pb-2">
+                    <span>{fmtDateTime(a.starts_at as string)} · {a.kind === "office" ? "Oficina" : "Video"}</span>
+                    <span className="text-stone">{{ requested: "Pendiente", confirmed: "Confirmada", cancelled: "Cancelada" }[a.status as string]}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-stone">Sin citas.</p>
+            )}
+          </Card>
+
+          <Card title="Relojes que ofrece (vender / consignar)">
+            {sells.data?.length ? (
+              <ul className="space-y-4 text-sm">
+                {sells.data.map((s) => (
+                  <li key={s.id as string} className="border-b border-line/60 pb-3">
+                    <div className="flex justify-between gap-3">
+                      <Link href="/admin/compras" className="hover:text-brass">{[s.brand, s.model, s.reference].filter(Boolean).join(" ")}</Link>
+                      <span className="text-stone">{SELL_LABEL[s.status as string] ?? s.status} · {money(s.offer_amount as number | null)}</span>
+                    </div>
+                    {(s.image_paths as string[])?.length > 0 && (
+                      <div className="mt-2 flex gap-2 overflow-x-auto">
+                        {(s.image_paths as string[]).map((u) => (
+                          <a key={u} href={u} target="_blank" rel="noreferrer">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={u} alt="" className="h-16 w-16 object-cover" />
+                          </a>
+                        ))}
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-stone">Ninguno.</p>
+            )}
+          </Card>
+        </div>
+
+        <Card title="Historial">
+          <form action={addNote.bind(null, c.id)} className="mb-5 flex gap-2">
+            <input name="note" placeholder="Añadir una nota (llamada, visita, acuerdo…)" className="w-full border border-line bg-ink/60 px-3 py-2.5 text-sm outline-none focus:border-brass/70" />
+            <button className="border border-line px-4 text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">Añadir</button>
+          </form>
+          <ol className="space-y-3">
+            {timeline.map((t, i) => (
+              <li key={i} className={`border-l-2 pl-3 ${t.kind === "msg" ? "border-line" : "border-brass/50"}`}>
+                <p className="text-[0.66rem] tracking-[0.12em] text-stone">
+                  {t.icon} {t.who && `${t.who} · `}{fmtDateTime(t.at)}
+                </p>
+                <p className="mt-0.5 whitespace-pre-wrap text-sm leading-relaxed">{t.body}</p>
+                {t.image && (
+                  <a href={t.image} target="_blank" rel="noreferrer">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={t.image} alt="" className="mt-2 h-24 w-24 object-cover" />
+                  </a>
+                )}
+              </li>
+            ))}
+            {!timeline.length && <p className="text-sm text-stone">Sin actividad todavía.</p>}
+          </ol>
+        </Card>
+      </div>
+    </>
+  );
+}

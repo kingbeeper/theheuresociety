@@ -127,7 +127,7 @@ export default async function ConsignPage({ params }: PageProps<"/[lang]/consign
               </div>
             </div>
             <div className="min-w-0">
-              <SellForm dict={dict} variant="consign" />
+              <SellForm dict={dict} lang={lang} variant="consign" />
             </div>
           </div>
         </section>

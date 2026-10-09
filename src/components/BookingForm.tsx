@@ -1,12 +1,13 @@
 "use client";
 
 import Image from "next/image";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import type { Locale } from "@/lib/i18n";
 import type { Dictionary } from "@/app/[lang]/dictionaries";
 import { booking } from "@/lib/site";
 import { whatsappLink } from "@/lib/watches";
+import { sendLead } from "@/lib/lead-client";
 
 type Piece = { slug: string; brand: string; model: string; reference: string; image?: string };
 type Kind = "office" | "video";
@@ -30,6 +31,14 @@ export function BookingForm({ lang, dict, pieces }: { lang: Locale; dict: Dictio
   const [time, setTime] = useState<string | null>(null);
   const [form, setForm] = useState({ name: "", phone: "", email: "", note: "" });
   const [sentLink, setSentLink] = useState<string | null>(null);
+  // Horarios ya solicitados por otros clientes (se tachan para no dar dos citas a la vez)
+  const [taken, setTaken] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    fetch("/api/leads")
+      .then((r) => r.json())
+      .then((j: { taken?: string[] }) => setTaken(new Set(j.taken ?? [])))
+      .catch(() => {});
+  }, []);
 
   const locale = lang === "es" ? "es" : "en";
 
@@ -76,6 +85,11 @@ export function BookingForm({ lang, dict, pieces }: { lang: Locale; dict: Dictio
     if (form.email.trim()) lines.push(`${t.email}: ${form.email.trim()}`);
     if (form.note.trim()) lines.push(`${t.msgNote}: ${form.note.trim()}`);
     const link = whatsappLink(lines.join("\n"));
+    // El lead se guarda en segundo plano; WhatsApp se abre al momento (si no, el navegador lo bloquea)
+    void sendLead({
+      type: "booking", lang, kind, date: day!, time: time!, pieces: selected,
+      name: form.name.trim(), phone: form.phone.trim(), email: form.email.trim(), note: form.note.trim(),
+    });
     window.open(link, "_blank", "noopener");
     setSentLink(link);
   }
@@ -207,8 +221,9 @@ export function BookingForm({ lang, dict, pieces }: { lang: Locale; dict: Dictio
                   <button
                     key={s}
                     type="button"
+                    disabled={taken.has(`${dayInfo.key} ${s}`)}
                     onClick={() => setTime(s)}
-                    className={`min-w-20 border px-4 py-2.5 text-sm transition-colors ${
+                    className={`min-w-20 border px-4 py-2.5 text-sm transition-colors disabled:cursor-not-allowed disabled:border-line/50 disabled:text-stone/40 disabled:line-through ${
                       time === s ? "border-brass bg-brass text-ink" : "border-line hover:border-ivory/40"
                     }`}
                   >

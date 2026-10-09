@@ -3,13 +3,15 @@
 import { useEffect, useRef, useState } from "react";
 import type { Dictionary } from "@/app/[lang]/dictionaries";
 import { whatsappLink } from "@/lib/watches";
+import { sendLead } from "@/lib/lead-client";
+import type { Locale } from "@/lib/i18n";
 
 const BRANDS = ["Rolex", "Audemars Piguet", "Patek Philippe", "Richard Mille", "Cartier", "Omega", "Vacheron Constantin"];
 const MAX_PHOTOS = 6;
 type Condition = "new" | "excellent" | "good" | "fair";
 
 // variant "consign": misma recogida de datos, pero como solicitud de consignación
-export function SellForm({ dict, variant = "sell" }: { dict: Dictionary; variant?: "sell" | "consign" }) {
+export function SellForm({ dict, lang, variant = "sell" }: { dict: Dictionary; lang: Locale; variant?: "sell" | "consign" }) {
   const t = dict.sell;
   const consign = variant === "consign";
   const priceLabel = consign ? dict.consign.priceLabel : t.price;
@@ -81,6 +83,30 @@ export function SellForm({ dict, variant = "sell" }: { dict: Dictionary; variant
     const text = message();
     const link = whatsappLink(text);
     const files = photos.map((p) => p.file);
+
+    // El lead (con sus fotos) se guarda en segundo plano, aunque el visitante no llegue a enviar el WhatsApp
+    const included = [set.box && t.box, set.papers && t.papers, set.service && t.service].filter(Boolean).join(", ");
+    const details = [
+      watch.year.trim() && `${t.year}: ${watch.year.trim()}`,
+      condition && `${t.condition}: ${t.conditions[condition]}`,
+      included && `${t.set}: ${included}`,
+      watch.price.trim() && `${priceLabel.split(" (")[0]}: ${watch.price.trim()}`,
+      contact.note.trim(),
+    ].filter(Boolean).join("\n");
+    void sendLead(
+      {
+        type: consign ? "consign" : intent,
+        lang,
+        brand: brandName,
+        model: watch.model.trim(),
+        reference: watch.reference.trim(),
+        details,
+        name: contact.name.trim(),
+        phone: contact.phone.trim(),
+        email: contact.email.trim(),
+      },
+      files
+    );
 
     // En el móvil, el menú de compartir envía el texto y las fotos juntos (WhatsApp incluido)
     if (files.length && typeof navigator.canShare === "function" && navigator.canShare({ files })) {

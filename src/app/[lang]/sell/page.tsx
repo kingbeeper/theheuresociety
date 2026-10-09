@@ -71,7 +71,7 @@ export default async function SellPage({ params }: PageProps<"/[lang]/sell">) {
             </div>
           </div>
           <div className="min-w-0">
-            <SellForm dict={dict} />
+            <SellForm dict={dict} lang={lang} />
           </div>
         </section>
       </main>
