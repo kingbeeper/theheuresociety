@@ -127,5 +127,8 @@ export async function buildDigest(now = Date.now()) {
 export async function sendDigest() {
   const text = await buildDigest();
   await notifyAdmins(text);
+  // Relojes estancados: propuesta de rebaja con botón para aplicarla
+  const { notifyDrops } = await import("./pricing");
+  await notifyDrops().catch((e) => console.error("Rebajas sugeridas:", e));
   return text;
 }

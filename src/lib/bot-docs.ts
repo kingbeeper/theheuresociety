@@ -495,6 +495,18 @@ export async function onCallback(chatId: number, cbId: string, messageId: number
   const clearButtons = () => tg("editMessageReplyMarkup", { chat_id: chatId, message_id: messageId, reply_markup: keyboard([]) }).catch(() => {});
 
   // Botones de un documento ya creado (no dependen del asistente)
+  if (action === "dprc") {
+    await clearButtons();
+    if (arg === "no") return answer("De acuerdo");
+    const [itemId, price] = arg.split("|");
+    await answer("Aplicando…");
+    const { applyPrice } = await import("./pricing");
+    const r = await applyPrice(itemId, Number(price), user);
+    if (!r) return sendMessage(chatId, "Ese reloj ya no está en el inventario.");
+    return sendMessage(chatId, `✅ ${h(r.sku)}: ${usd(r.from)} → <b>${usd(r.to)}</b>, también en la web.${r.notified ? `
+📣 Aviso enviado con ${r.notified} cliente(s) interesado(s).` : ""}`);
+  }
+
   if (action === "dstk") {
     const { completeStaffTask } = await import("./staff-tasks");
     const t = await completeStaffTask(arg, user);

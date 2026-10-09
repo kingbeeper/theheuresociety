@@ -59,6 +59,7 @@ export async function onMenuText(chatId: number, text: string, user: string) {
             { text: "✂️ Repetir recorte", callback_data: "mst:case" },
           ]),
           [{ text: "🔎 Tasar un reloj (fotos)", callback_data: "mappr:1" }],
+          [{ text: "🏷 Relojes para rebajar", callback_data: "mdrop:1" }],
           [{ text: "📊 Qué buscan los clientes", callback_data: "mdem:1" }],
         ]),
       });
@@ -77,7 +78,7 @@ export async function onMenuText(chatId: number, text: string, user: string) {
   return false;
 }
 
-const MENU_ACTIONS = new Set(["mnew", "mopen", "mcost", "mlist", "mst", "mset", "mcase", "mdem", "mappr"]);
+const MENU_ACTIONS = new Set(["mnew", "mopen", "mcost", "mlist", "mst", "mset", "mcase", "mdem", "mappr", "mdrop"]);
 export const isMenuAction = (action: string) => MENU_ACTIONS.has(action);
 
 type Watch = { id: string; brand: string; model: string; reference: string; status: string };
@@ -113,6 +114,11 @@ export async function onMenuCallback(chatId: number, cbId: string, messageId: nu
 
     case "mdem":
       return demandSummary(chatId);
+
+    case "mdrop": {
+      const { sendDrops } = await import("./pricing");
+      return sendDrops(chatId);
+    }
 
     case "mappr":
       await clearButtons();
