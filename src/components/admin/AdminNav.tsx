@@ -12,6 +12,7 @@ const ITEMS = [
   { href: "/admin/documentos", label: "Documentos" },
   { href: "/admin/informes", label: "Informes" },
   { href: "/admin/compras", label: "Compras y consignas" },
+  { href: "/admin/correos", label: "Correos" },
   { href: "/admin/redes", label: "Redes" },
 ];
 
