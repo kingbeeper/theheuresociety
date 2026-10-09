@@ -252,7 +252,7 @@ export async function notifyPriceDrop(
 // Días sin actividad tras los que un lead pide seguimiento, según su etapa
 export const STALE_AFTER: Partial<Record<Stage, number>> = { new: 2, contacted: 5, qualified: 5, appointment: 3, negotiating: 3 };
 
-export type FollowUp = { id: string; name: string | null; stage: Stage; reason: string; due: string; scheduled: boolean };
+export type FollowUp = { id: string; name: string | null; stage: Stage; reason: string; due: string; scheduled: boolean; taskId?: string; wa?: string | null };
 
 export async function followUpsDue(now: number, today: string) {
   const db = adminDb();
@@ -268,6 +268,21 @@ export async function followUpsDue(now: number, today: string) {
     const days = Math.floor((now - new Date(c.last_activity_at).getTime()) / 86_400_000);
     const limit = STALE_AFTER[c.stage as Stage]!;
     if (days >= limit) out.push({ id: c.id, name: c.name, stage: c.stage, reason: `${days} días sin actividad en «${STAGE_LABEL[c.stage as Stage]}»`, due: c.last_activity_at, scheduled: false });
+  }
+  // Postventa (reseña, aniversario, servicio), con el mensaje de WhatsApp preparado
+  const { dueTasks, taskMessage, waLink, TASK_LABEL } = await import("./tasks");
+  const { getDocSettings } = await import("./documents");
+  const tasks = await dueTasks(today);
+  if (tasks.length) {
+    const reviewUrl = (await getDocSettings()).doc_review_url;
+    for (const t of tasks) {
+      const c = t.customer;
+      out.push({
+        id: t.customer_id, name: c?.name ?? null, stage: "won", scheduled: true, due: t.due_date, taskId: t.id,
+        reason: `${TASK_LABEL[t.kind] ?? "Seguimiento"}${t.note ? ` · ${t.note.split(" · ")[0]}` : ""}`,
+        wa: waLink(c?.wa_id ?? c?.phone ?? null, taskMessage(t, c?.name ?? null, c?.lang ?? null, reviewUrl)),
+      });
+    }
   }
   return out;
 }

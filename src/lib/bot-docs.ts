@@ -460,6 +460,13 @@ export async function onCallback(chatId: number, cbId: string, messageId: number
   const clearButtons = () => tg("editMessageReplyMarkup", { chat_id: chatId, message_id: messageId, reply_markup: keyboard([]) }).catch(() => {});
 
   // Botones de un documento ya creado (no dependen del asistente)
+  if (action === "dtask") {
+    const { completeTask } = await import("./tasks");
+    const done = await completeTask(arg, user);
+    await answer(done ? "Hecho" : "Ya estaba hecho");
+    return clearButtons();
+  }
+
   // Consignación sin contrato: confirmar y devolver al dueño desde el inventario
   if (action === "dirq" || action === "dirok") {
     const { data: item } = await adminDb().from("inventory_items").select("*").eq("id", arg).maybeSingle();
@@ -602,6 +609,22 @@ function later(chatId: number, task: () => Promise<unknown>) {
       await sendMessage(chatId, `⚠️ No se pudo terminar: ${h((e as Error).message)}`).catch(() => {});
     }
   });
+}
+
+// /seguimientos: lo que toca hoy, con el mensaje de WhatsApp listo y botón de hecho
+export async function listFollowUps(chatId: number) {
+  const { followUpsDue } = await import("./crm");
+  const items = await followUpsDue(Date.now(), todayInMiami());
+  if (!items.length) return sendMessage(chatId, "✅ Todo al día: no hay seguimientos para hoy.");
+  await sendMessage(chatId, `<b>Seguimientos para hoy</b> (${items.length})`);
+  for (const f of items.slice(0, 15)) {
+    const rows: InlineButton[][] = [];
+    if (f.wa) rows.push([{ text: "📲 WhatsApp", url: f.wa }]);
+    if (f.taskId) rows.push([{ text: "✓ Hecho", callback_data: `dtask:${f.taskId}` }]);
+    rows.push([{ text: "Ficha en el CRM", url: `${SITE_URL}/admin/leads/${f.id}` }]);
+    await sendMessage(chatId, `${f.taskId ? "⭐" : f.scheduled ? "⏰" : "💤"} <b>${h(f.name ?? "Sin nombre")}</b>\n${h(f.reason)}`, { reply_markup: keyboard(rows) });
+  }
+  if (items.length > 15) await sendMessage(chatId, `…y ${items.length - 15} más en el CRM: ${SITE_URL}/admin/leads?follow=1`);
 }
 
 // /pdf INV-2026-0003: vuelve a enviar un documento

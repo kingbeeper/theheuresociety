@@ -6,7 +6,9 @@ import { requireAdmin } from "@/lib/admin-auth";
 import type { Customer } from "@/lib/crm";
 import { ago, Card, fmtDate, fmtDateTime, ghostButtonClass, money, SourceTag, StageBadge, requestTime } from "@/components/admin/ui";
 import { LeadForm } from "@/components/admin/LeadForm";
-import { addNote, completeFollowUp, setBot, setSocialBot, toggleAlert } from "../../../actions";
+import { addNote, completeFollowUp, completeTaskAction, setBot, setSocialBot, toggleAlert } from "../../../actions";
+import { customerTasks, taskMessage, TASK_LABEL, waLink } from "@/lib/tasks";
+import { getDocSettings } from "@/lib/documents";
 import { todayInMiami } from "@/lib/booking";
 import { STATUS_LABEL, type DocKind, type DocStatus } from "@/lib/doc-labels";
 
@@ -37,6 +39,7 @@ export default async function LeadPage({ params }: PageProps<"/admin/leads/[id]"
     : { data: [] as { contact_id: string; direction: string; type: string; body: string | null; media_url: string | null; created_at: string }[] };
   const platformOf = (contactId: string) => (socialContacts ?? []).find((s) => s.id === contactId)?.platform === "facebook" ? "Messenger" : "Instagram";
 
+  const [tasks, docSettings] = await Promise.all([customerTasks(id).catch(() => []), getDocSettings()]);
   const { data: docs } = await db.from("documents").select("id, kind, number, status, total").eq("customer_id", id).order("created_at", { ascending: false });
   const [events, alerts, appts, sells, wa, msgs] = await Promise.all([
     db.from("customer_events").select("*").eq("customer_id", id).order("created_at", { ascending: false }).limit(200),
@@ -104,6 +107,28 @@ export default async function LeadPage({ params }: PageProps<"/admin/leads/[id]"
                 <button className="whitespace-nowrap border border-line px-4 text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">✓ Hecho</button>
               </form>
             </div>
+          )}
+          {tasks.length > 0 && (
+            <Card title="Postventa">
+              <ul className="space-y-3 text-sm">
+                {tasks.map((t) => {
+                  const due = t.due_date <= todayInMiami(new Date(now));
+                  const wa = waLink(c.wa_id ?? c.phone, taskMessage(t, c.name, c.lang, docSettings.doc_review_url));
+                  return (
+                    <li key={t.id} className="flex flex-wrap items-center justify-between gap-3 border-b border-line/60 pb-3">
+                      <div>
+                        <p className={due ? "text-amber-200" : ""}>{TASK_LABEL[t.kind] ?? "Seguimiento"}</p>
+                        <p className="text-xs text-stone">{t.note?.split(" · ")[0]} · {due ? "toca ya" : fmtDate(`${t.due_date}T12:00:00`)}</p>
+                      </div>
+                      <div className="flex gap-3 text-[0.62rem] tracking-[0.16em] uppercase">
+                        {wa && <a href={wa} target="_blank" rel="noreferrer" className="text-brass hover:text-ivory">WhatsApp</a>}
+                        <form action={completeTaskAction.bind(null, t.id)}><button className="text-stone hover:text-ivory">✓ Hecho</button></form>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </Card>
           )}
           <Card title="Datos del cliente"><LeadForm c={c} /></Card>
 

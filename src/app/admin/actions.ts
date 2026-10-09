@@ -114,6 +114,13 @@ export async function completeFollowUp(id: string, form: FormData) {
   refresh();
 }
 
+export async function completeTaskAction(id: string) {
+  const user = await requireAdmin();
+  const { completeTask } = await import("@/lib/tasks");
+  await completeTask(id, user);
+  refresh();
+}
+
 export async function toggleAlert(alertId: string, active: boolean) {
   await requireAdmin();
   await adminDb().from("watch_alerts").update({ active }).eq("id", alertId);

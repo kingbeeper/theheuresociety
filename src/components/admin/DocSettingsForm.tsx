@@ -25,6 +25,11 @@ export function DocSettingsForm({ s }: { s: Required<DocSettings> }) {
         <textarea name="doc_payment_info" rows={3} defaultValue={s.doc_payment_info} placeholder="Wire transfer: Bank…, Account name…, Routing…, Account…  ·  Zelle: …" className={field} />
         <span className="mt-1 block text-[0.7rem] text-stone/80">Escríbelas tú aquí: se guardan en tu base de datos y solo salen en los documentos que compartas.</span>
       </label>
+      <label>
+        <span className={label}>Enlace para dejar una reseña en Google</span>
+        <input name="doc_review_url" type="url" defaultValue={s.doc_review_url} placeholder="https://g.page/r/…/review" className={field} />
+        <span className="mt-1 block text-[0.7rem] text-stone/80">Va en el mensaje de agradecimiento que se envía a los 7 días de cada venta. Se obtiene en Google Business Profile → «Pedir reseñas».</span>
+      </label>
       <label><span className={label}>Términos de las cotizaciones</span><textarea name="doc_terms_quote" rows={3} defaultValue={s.doc_terms_quote} className={field} /></label>
       <label><span className={label}>Términos de los memos</span><textarea name="doc_terms_memo" rows={4} defaultValue={s.doc_terms_memo} className={field} /></label>
       <label><span className={label}>Términos de los contratos de consignación</span><textarea name="doc_terms_consignment" rows={4} defaultValue={s.doc_terms_consignment} className={field} /></label>

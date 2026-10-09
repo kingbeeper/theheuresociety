@@ -5,6 +5,7 @@ import { requireAdmin } from "@/lib/admin-auth";
 import { followUpsDue, SOURCE_LABEL, STAGES, STAGE_LABEL, type Customer } from "@/lib/crm";
 import { salesByChannel, type Item } from "@/lib/stock";
 import { todayInMiami } from "@/lib/booking";
+import { completeTaskAction } from "../actions";
 import { ago, Card, fmtDateTime, money, PageTitle, SourceTag, StageBadge, requestTime } from "@/components/admin/ui";
 
 export const metadata = { title: "Panel" };
@@ -125,9 +126,15 @@ export default async function Dashboard() {
           {follow.length ? (
             <ul className="space-y-3 text-sm">
               {follow.slice(0, 8).map((f) => (
-                <li key={f.id} className="border-b border-line/60 pb-3">
-                  <Link href={`/admin/leads/${f.id}`} className="hover:text-brass">{f.scheduled ? "⏰" : "💤"} {f.name ?? "Sin nombre"}</Link>
+                <li key={f.taskId ?? f.id} className="border-b border-line/60 pb-3">
+                  <Link href={`/admin/leads/${f.id}`} className="hover:text-brass">{f.taskId ? "⭐" : f.scheduled ? "⏰" : "💤"} {f.name ?? "Sin nombre"}</Link>
                   <p className="text-xs text-stone">{f.reason}</p>
+                  {f.taskId && (
+                    <div className="mt-1.5 flex gap-3 text-[0.62rem] tracking-[0.16em] uppercase">
+                      {f.wa && <a href={f.wa} target="_blank" rel="noreferrer" className="text-brass hover:text-ivory">WhatsApp</a>}
+                      <form action={completeTaskAction.bind(null, f.taskId)}><button className="text-stone hover:text-ivory">✓ Hecho</button></form>
+                    </div>
+                  )}
                 </li>
               ))}
               {follow.length > 8 && <li className="text-xs text-stone">…y {follow.length - 8} más</li>}

@@ -110,7 +110,7 @@ export const PRINT = {
 // Ajustes del negocio que salen en los documentos (se editan en Documentos → Ajustes)
 export const DOC_SETTING_KEYS = [
   "doc_company", "doc_address", "doc_phone", "doc_email", "doc_tax_id", "doc_payment_info", "doc_tax_rate",
-  "doc_terms_quote", "doc_terms_memo", "doc_terms_invoice", "doc_terms_consignment",
+  "doc_terms_quote", "doc_terms_memo", "doc_terms_invoice", "doc_terms_consignment", "doc_review_url",
 ] as const;
 export type DocSettings = Partial<Record<(typeof DOC_SETTING_KEYS)[number], string>>;
 
@@ -122,6 +122,7 @@ export const DOC_DEFAULTS: Required<DocSettings> = {
   doc_email: "",
   doc_tax_id: "",
   doc_payment_info: "",
+  doc_review_url: "",
   doc_tax_rate: "7",
   doc_terms_quote:
     "Prices are in US dollars and subject to availability until payment is received. This quotation is valid until the date shown. All timepieces are authenticated and sold as described.",

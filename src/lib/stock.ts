@@ -4,6 +4,7 @@ import { adminDb } from "./supabase";
 import { INVENTORY_TAG } from "./inventory";
 import { addEvent } from "./crm";
 import { isOwnerStock } from "./stock-labels";
+import { scheduleAfterSale } from "./tasks";
 
 // Inventario privado (stock, ventas, devoluciones). Distinto de `watches`, que es la ficha pública
 // de la web: un reloj del inventario puede estar enlazado a su ficha (watch_id).
@@ -81,6 +82,8 @@ export async function recordPurchase(customerId: string | null, item: Item, user
   if (!customerId) return;
   await adminDb().from("customers").update({ stage: "won", last_activity_at: new Date().toISOString() }).eq("id", customerId);
   await addEvent(customerId, "purchase", `Compró ${item.brand} ${item.model ?? ""} ${item.reference ?? ""}`.replace(/\s+/g, " ").trim() + (item.sale_price ? ` por $${Number(item.sale_price).toLocaleString("en-US")}` : ""), { item: item.id, sku: item.sku }, user);
+  // Postventa: reseña a los 7 días, aniversario al año y recordatorio de servicio
+  await scheduleAfterSale(customerId, item).catch((e) => console.error("Tareas de postventa:", e));
 }
 
 // Resumen para el panel de inventario
