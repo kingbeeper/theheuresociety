@@ -9,8 +9,10 @@ import { ACQUISITION, ITEM_STATUS, isOwnerStock } from "@/lib/stock-labels";
 import { Card, fieldClass, fmtDate, fmtDateTime, ghostButtonClass, money, PageTitle, requestTime } from "@/components/admin/ui";
 import { ItemForm, ReturnForm, SaleForm } from "@/components/admin/ItemForms";
 import { STATUS_LABEL, type DocKind, type DocStatus } from "@/lib/doc-labels";
-import { deleteItem, markOwnerPaid, reopenItem, returnFromServiceAction, sendToServiceAction, setReserved } from "../../../inventory-actions";
+import { deleteItem, markCountedAction, markOwnerPaid, reopenItem, returnFromServiceAction, sendToServiceAction, setLocation, setReserved } from "../../../inventory-actions";
 import { itemServices, providers } from "@/lib/services";
+import { LOCATIONS, type Location } from "@/lib/locations";
+import { awayItems, openCount } from "@/lib/stock-count";
 
 export const metadata = { title: "Reloj del inventario" };
 
@@ -34,7 +36,8 @@ export default async function ItemPage({ params }: PageProps<"/admin/inventario/
     db.from("customers").select("id, name, phone, email").order("last_activity_at", { ascending: false }).limit(500),
     item.watch_id ? db.from("watches").select("slug, status").eq("id", item.watch_id).maybeSingle() : Promise.resolve({ data: null }),
   ]);
-  const [services, knownProviders] = await Promise.all([itemServices(id), providers()]);
+  const [services, knownProviders, count, away] = await Promise.all([itemServices(id), providers(), openCount(), awayItems()]);
+  const counting = count && count.expected.includes(id) ? count : null;
   const openService = services.find((s) => !s.returned_at);
   // Cotizaciones, memos y facturas en las que aparece (vacío si falta la migración)
   const { data: docs } = await db.from("documents").select("id, kind, number, status, client_name, total").contains("items", [{ item_id: id }]).order("created_at", { ascending: false });
@@ -56,6 +59,7 @@ export default async function ItemPage({ params }: PageProps<"/admin/inventario/
           <div className="flex flex-wrap gap-2">
             {web.data?.slug && <a href={`/es/watches/${web.data.slug}`} target="_blank" rel="noreferrer" className={ghostButtonClass}>Ver en la web</a>}
             <a href={`/api/certificate/${item.id}`} target="_blank" rel="noreferrer" className={ghostButtonClass}>Certificado</a>
+            <a href={`/admin/etiquetas?ids=${item.id}`} target="_blank" rel="noreferrer" className={ghostButtonClass}>Etiqueta QR</a>
             {available && (
               <form action={setReserved.bind(null, item.id, item.status !== "reserved")}>
                 <button className={ghostButtonClass}>{item.status === "reserved" ? "Quitar reserva" : "Reservar"}</button>
@@ -82,8 +86,36 @@ export default async function ItemPage({ params }: PageProps<"/admin/inventario/
         ))}
       </div>
 
+      {counting && (
+        <form action={markCountedAction.bind(null, counting.id, item.id, !counting.found.includes(item.id))} className="mt-6 flex flex-wrap items-center justify-between gap-3 border border-brass/50 bg-brass/5 p-4 text-sm">
+          <span>📋 Conteo de inventario en curso</span>
+          <button className={counting.found.includes(item.id) ? "text-[0.66rem] tracking-[0.18em] uppercase text-emerald-200" : "bg-ivory px-5 py-2.5 text-[0.68rem] tracking-[0.22em] uppercase text-ink hover:bg-brass"}>
+            {counting.found.includes(item.id) ? "✓ Contado (deshacer)" : "✓ Contado"}
+          </button>
+        </form>
+      )}
+
       <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
         <div className="space-y-6">
+          {available && (
+            <Card title="Ubicación">
+              {away.get(item.id) ? (
+                <p className="text-sm">📍 {away.get(item.id)}</p>
+              ) : (
+                <form action={setLocation.bind(null, item.id)} className="grid gap-3 sm:grid-cols-[200px_1fr_auto] sm:items-end">
+                  <select name="location" defaultValue={item.location ?? ""} className={fieldClass}>
+                    <option value="">— Sin indicar —</option>
+                    {Object.entries(LOCATIONS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+                  </select>
+                  <input name="location_note" defaultValue={item.location_note ?? ""} placeholder="Detalle (cajón 2, con Juan…)" className={fieldClass} />
+                  <button className={ghostButtonClass}>Guardar</button>
+                </form>
+              )}
+              {item.last_counted_at && <p className="mt-2 text-xs text-stone">Último conteo: {fmtDateTime(item.last_counted_at)}</p>}
+              {!away.get(item.id) && item.location && <p className="mt-2 text-xs text-stone">📍 {LOCATIONS[item.location as Location]}{item.location_note ? ` · ${item.location_note}` : ""}</p>}
+            </Card>
+          )}
+
           {(available || services.length > 0) && (
             <Card title={openService ? "🔧 En el relojero" : "Relojero"}>
               {openService ? (

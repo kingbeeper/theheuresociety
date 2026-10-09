@@ -8,6 +8,7 @@ import { ACQUISITION, ITEM_STATUS, isOwnerStock } from "@/lib/stock-labels";
 import { buttonClass, Card, fieldClass, fmtDate, ghostButtonClass, money, PageTitle, requestTime } from "@/components/admin/ui";
 import { ImportInventory } from "@/components/admin/ImportInventory";
 import { openServices } from "@/lib/services";
+import { LOCATIONS, type Location } from "@/lib/locations";
 
 export const metadata = { title: "Inventario" };
 
@@ -75,6 +76,8 @@ export default async function InventarioPage({ searchParams }: PageProps<"/admin
             {showCosts && <ImportInventory />}
             {/* Descarga de archivo: enlace normal, no navegación de Next */}
             {showCosts && <a href="/api/inventory/export" download className={ghostButtonClass}>Exportar a Excel</a>}
+            <Link href="/admin/inventario/conteo" className={ghostButtonClass}>Conteo</Link>
+            <a href="/admin/etiquetas" target="_blank" rel="noreferrer" className={ghostButtonClass}>Etiquetas QR</a>
             <Link href="/admin/inventario/nuevo" className={buttonClass}>+ Añadir reloj</Link>
           </div>
         }
@@ -143,7 +146,7 @@ export default async function InventarioPage({ searchParams }: PageProps<"/admin
                       <span className="min-w-0 truncate">{inService.has(i.id) ? "🔧 " : ""}{i.brand} {i.model ?? ""}</span>
                       <span className="shrink-0 tabular-nums">{money(i.status === "sold" ? i.sale_price : i.asking_price)}</span>
                     </div>
-                    <p className="truncate text-xs text-stone">{[i.sku, i.reference && `Ref. ${i.reference}`, ACQUISITION[i.acquisition]].filter(Boolean).join(" · ")}</p>
+                    <p className="truncate text-xs text-stone">{[i.sku, i.reference && `Ref. ${i.reference}`, ACQUISITION[i.acquisition], i.location && `📍 ${LOCATIONS[i.location as Location]}`].filter(Boolean).join(" · ")}</p>
                     <p className="mt-1 flex justify-between gap-3 text-xs">
                       <span className={STATUS_STYLE[i.status]}>
                         {ITEM_STATUS[i.status]}
@@ -187,7 +190,7 @@ export default async function InventarioPage({ searchParams }: PageProps<"/admin
                       </td>
                       <td className="py-2.5 pr-3">
                         <Link href={`/admin/inventario/${i.id}`} className="hover:text-brass">{inService.has(i.id) ? "🔧 " : ""}{i.brand} {i.model ?? ""}</Link>
-                        <p className="text-xs text-stone">{[i.reference && `Ref. ${i.reference}`, i.serial && `S/N ${i.serial}`].filter(Boolean).join(" · ")}</p>
+                        <p className="text-xs text-stone">{[i.reference && `Ref. ${i.reference}`, i.serial && `S/N ${i.serial}`, i.location && `📍 ${LOCATIONS[i.location as Location]}`].filter(Boolean).join(" · ")}</p>
                       </td>
                       <td className="py-2.5 text-xs">
                         {ACQUISITION[i.acquisition]}

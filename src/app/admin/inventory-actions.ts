@@ -226,6 +226,45 @@ export async function returnFromServiceAction(serviceId: string, f: FormData) {
   refresh();
 }
 
+// ── Ubicación y conteo ──
+export async function setLocation(itemId: string, f: FormData) {
+  const user = await requireAdmin("inventario");
+  const { LOCATIONS } = await import("@/lib/locations");
+  const loc = text(f, "location");
+  const location = loc && loc in LOCATIONS ? loc : null;
+  const note = text(f, "location_note");
+  await adminDb().from("inventory_items").update({ location, location_note: note, updated_at: new Date().toISOString() }).eq("id", itemId);
+  await logItem(itemId, "status", `Ubicación: ${location ? LOCATIONS[location as keyof typeof LOCATIONS] : "—"}${note ? ` · ${note}` : ""}`, user);
+  refresh();
+}
+
+export async function startCountAction() {
+  const user = await requireAdmin("inventario");
+  const { startCount } = await import("@/lib/stock-count");
+  await startCount(user);
+  redirect("/admin/inventario/conteo");
+}
+
+export async function markCountedAction(countId: string, itemId: string, found: boolean) {
+  await requireAdmin("inventario");
+  const { markCounted } = await import("@/lib/stock-count");
+  await markCounted(countId, itemId, found);
+  refresh();
+}
+
+export async function finishCountAction(countId: string) {
+  const user = await requireAdmin("inventario");
+  const { finishCount } = await import("@/lib/stock-count");
+  const { count, missing } = await finishCount(countId);
+  const { notifyAdmins } = await import("@/lib/telegram");
+  await notifyAdmins(
+    missing.length
+      ? `⚠️ <b>Conteo de inventario</b>: faltan ${missing.length} de ${count.expected.length} relojes (por ${user}). Revísalo en el CRM.`
+      : `✅ <b>Conteo de inventario</b>: están los ${count.expected.length} relojes (por ${user}).`
+  ).catch(() => {});
+  redirect(`/admin/inventario/conteo?terminado=1&faltan=${missing.join(",")}`);
+}
+
 export async function deleteItem(id: string) {
   await requireAdmin("inventario");
   await adminDb().from("inventory_items").delete().eq("id", id);

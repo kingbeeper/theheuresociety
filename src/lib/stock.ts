@@ -43,6 +43,10 @@ export type Item = {
   return_date: string | null;
   return_reason: string | null;
   notes: string | null;
+  location?: string | null;
+  location_note?: string | null;
+  last_counted_at?: string | null;
+  sold_by?: string | null;
   created_at: string;
 };
 
