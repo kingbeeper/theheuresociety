@@ -5,14 +5,15 @@ import { adminDb } from "@/lib/supabase";
 import { requireAdmin } from "@/lib/admin-auth";
 import { daysInStock, margin, totalCost, type Item } from "@/lib/stock";
 import { ACQUISITION, ITEM_STATUS, isOwnerStock } from "@/lib/stock-labels";
-import { Card, fmtDate, fmtDateTime, ghostButtonClass, money, PageTitle, requestTime } from "@/components/admin/ui";
+import { Card, fieldClass, fmtDate, fmtDateTime, ghostButtonClass, money, PageTitle, requestTime } from "@/components/admin/ui";
 import { ItemForm, ReturnForm, SaleForm } from "@/components/admin/ItemForms";
 import { STATUS_LABEL, type DocKind, type DocStatus } from "@/lib/doc-labels";
-import { deleteItem, markOwnerPaid, reopenItem, setReserved } from "../../../inventory-actions";
+import { deleteItem, markOwnerPaid, reopenItem, returnFromServiceAction, sendToServiceAction, setReserved } from "../../../inventory-actions";
+import { itemServices, providers } from "@/lib/services";
 
 export const metadata = { title: "Reloj del inventario" };
 
-const EVENT_ICON: Record<string, string> = { entry: "⇢", price: "$", cost: "$", status: "•", sale: "✓", return: "↩", owed: "⏳", owner_paid: "💵", import: "⇣" };
+const EVENT_ICON: Record<string, string> = { service: "🔧", entry: "⇢", price: "$", cost: "$", status: "•", sale: "✓", return: "↩", owed: "⏳", owner_paid: "💵", import: "⇣" };
 
 export default async function ItemPage({ params }: PageProps<"/admin/inventario/[id]">) {
   await connection();
@@ -31,6 +32,8 @@ export default async function ItemPage({ params }: PageProps<"/admin/inventario/
     db.from("customers").select("id, name, phone, email").order("last_activity_at", { ascending: false }).limit(500),
     item.watch_id ? db.from("watches").select("slug, status").eq("id", item.watch_id).maybeSingle() : Promise.resolve({ data: null }),
   ]);
+  const [services, knownProviders] = await Promise.all([itemServices(id), providers()]);
+  const openService = services.find((s) => !s.returned_at);
   // Cotizaciones, memos y facturas en las que aparece (vacío si falta la migración)
   const { data: docs } = await db.from("documents").select("id, kind, number, status, client_name, total").contains("items", [{ item_id: id }]).order("created_at", { ascending: false });
   const watchOptions = (watches.data ?? []).map((w) => ({ id: w.id as string, label: `${w.brand} ${w.model} · ${w.reference}${w.status === "sold" ? " (vendido)" : ""}` }));
@@ -79,6 +82,43 @@ export default async function ItemPage({ params }: PageProps<"/admin/inventario/
 
       <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
         <div className="space-y-6">
+          {(available || services.length > 0) && (
+            <Card title={openService ? "🔧 En el relojero" : "Relojero"}>
+              {openService ? (
+                <>
+                  <p className="text-sm">
+                    {openService.provider}{openService.work ? ` · ${openService.work}` : ""} · desde {fmtDate(`${openService.sent_at}T12:00:00`)}
+                    {openService.expected_at && <span className="text-stone"> · vuelve ~{fmtDate(`${openService.expected_at}T12:00:00`)}</span>}
+                  </p>
+                  <form action={returnFromServiceAction.bind(null, openService.id)} className="mt-4 grid gap-3 sm:grid-cols-[160px_1fr_auto] sm:items-end">
+                    <label><span className="mb-1.5 block text-[0.62rem] tracking-[0.22em] uppercase text-stone">Costo (USD)</span><input name="cost" inputMode="decimal" className={fieldClass} /></label>
+                    <label><span className="mb-1.5 block text-[0.62rem] tracking-[0.22em] uppercase text-stone">Notas</span><input name="notes" placeholder="Qué se hizo" className={fieldClass} /></label>
+                    <button className={ghostButtonClass}>Ya volvió</button>
+                  </form>
+                  <p className="mt-2 text-xs text-stone">El costo se suma a los gastos del reloj (y a su margen).</p>
+                </>
+              ) : available ? (
+                <form action={sendToServiceAction.bind(null, item.id)} className="grid gap-3 sm:grid-cols-3 sm:items-end">
+                  <label>
+                    <span className="mb-1.5 block text-[0.62rem] tracking-[0.22em] uppercase text-stone">Relojero *</span>
+                    <input name="provider" list="providers" required className={fieldClass} />
+                    <datalist id="providers">{knownProviders.map((p) => <option key={p} value={p} />)}</datalist>
+                  </label>
+                  <label><span className="mb-1.5 block text-[0.62rem] tracking-[0.22em] uppercase text-stone">Trabajo</span><input name="work" placeholder="Servicio, pulido…" className={fieldClass} /></label>
+                  <label><span className="mb-1.5 block text-[0.62rem] tracking-[0.22em] uppercase text-stone">Vuelve aprox.</span><input name="expected_at" type="date" className={fieldClass} /></label>
+                  <button className={`${ghostButtonClass} sm:col-span-3 sm:justify-self-start`}>🔧 Enviar al relojero</button>
+                </form>
+              ) : null}
+              {services.filter((s) => s.returned_at).length > 0 && (
+                <ul className="mt-4 space-y-1 border-t border-line pt-3 text-xs text-stone">
+                  {services.filter((s) => s.returned_at).map((s) => (
+                    <li key={s.id}>{fmtDate(`${s.sent_at}T12:00:00`)} → {fmtDate(`${s.returned_at}T12:00:00`)} · {s.provider}{s.work ? ` · ${s.work}` : ""}{s.cost ? ` · ${money(s.cost)}` : ""}</li>
+                  ))}
+                </ul>
+              )}
+            </Card>
+          )}
+
           <Card title="Cotizaciones, memos y facturas">
             {docs?.length ? (
               <ul className="mb-4 space-y-2 text-sm">

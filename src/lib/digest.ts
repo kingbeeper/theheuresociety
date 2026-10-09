@@ -96,6 +96,14 @@ export async function buildDigest(now = Date.now()) {
     for (const q of quotesEnding) lines.push(`• Cotización ${h(q.number)} caduca pronto · ${h(q.client_name ?? "")} · ${usd(Number(q.total))}`);
   }
 
+  // Relojero: más de 3 semanas fuera o pasada la fecha prevista
+  const { openServices } = await import("./services");
+  const late = (await openServices()).filter((s) => (s.expected_at ? s.expected_at < today : s.sent_at < new Date(now - 21 * DAY).toISOString().slice(0, 10)));
+  if (late.length) {
+    lines.push("", `🔧 <b>Relojero</b>: ${late.length} reloj(es) con retraso`);
+    for (const s of late.slice(0, 5)) lines.push(`• ${h(s.item?.sku ?? "")} ${h(s.item?.brand ?? "")} ${h(s.item?.model ?? "")} · ${h(s.provider)} desde ${s.sent_at}`);
+  }
+
   // Instagram ayer
   const y = igY.data?.data as Record<string, number> | undefined;
   if (y) {

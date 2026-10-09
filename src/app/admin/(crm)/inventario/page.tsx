@@ -6,6 +6,7 @@ import { daysInStock, margin, summarize, type Item } from "@/lib/stock";
 import { ACQUISITION, ITEM_STATUS, isOwnerStock } from "@/lib/stock-labels";
 import { buttonClass, Card, fieldClass, fmtDate, ghostButtonClass, money, PageTitle, requestTime } from "@/components/admin/ui";
 import { ImportInventory } from "@/components/admin/ImportInventory";
+import { openServices } from "@/lib/services";
 
 export const metadata = { title: "Inventario" };
 
@@ -26,6 +27,7 @@ export default async function InventarioPage({ searchParams }: PageProps<"/admin
 
   const { data } = await adminDb().from("inventory_items").select("*").order("purchase_date", { ascending: false, nullsFirst: false }).order("created_at", { ascending: false });
   const items = (data ?? []) as Item[];
+  const inService = new Set((await openServices()).map((s) => s.item_id));
   const s = summarize(items, now);
 
   const list = items
@@ -34,6 +36,7 @@ export default async function InventarioPage({ searchParams }: PageProps<"/admin
       : tab === "available" ? i.status === "in_stock" || i.status === "reserved"
       : tab === "aged" ? (i.status === "in_stock" || i.status === "reserved") && (daysInStock(i, now) ?? 0) > 90
       : tab === "owed" ? s.owed.some((o) => o.id === i.id)
+      : tab === "service" ? inService.has(i.id)
       : i.status === tab
     )
     .filter((i) => !q || [i.sku, i.brand, i.model, i.reference, i.serial, i.supplier_name, i.supplier_company, i.buyer_name].some((v) => v?.toLowerCase().includes(q)));
@@ -45,6 +48,7 @@ export default async function InventarioPage({ searchParams }: PageProps<"/admin
     ["returned", "Devueltos", count((i) => i.status === "returned")],
     ["aged", "+90 días", s.aged.length],
     ["owed", "A pagar a dueños", s.owed.length],
+    ["service", "En relojero", inService.size],
     ["all", "Todos", items.length],
   ];
 
@@ -132,7 +136,7 @@ export default async function InventarioPage({ searchParams }: PageProps<"/admin
                 <li key={i.id}>
                   <Link href={`/admin/inventario/${i.id}`} className="block py-3 hover:bg-forest/60">
                     <div className="flex items-baseline justify-between gap-3">
-                      <span className="min-w-0 truncate">{i.brand} {i.model ?? ""}</span>
+                      <span className="min-w-0 truncate">{inService.has(i.id) ? "🔧 " : ""}{i.brand} {i.model ?? ""}</span>
                       <span className="shrink-0 tabular-nums">{money(i.status === "sold" ? i.sale_price : i.asking_price)}</span>
                     </div>
                     <p className="truncate text-xs text-stone">{[i.sku, i.reference && `Ref. ${i.reference}`, ACQUISITION[i.acquisition]].filter(Boolean).join(" · ")}</p>
@@ -178,7 +182,7 @@ export default async function InventarioPage({ searchParams }: PageProps<"/admin
                         <Link href={`/admin/inventario/${i.id}`} className="hover:text-brass">{i.sku}</Link>
                       </td>
                       <td className="py-2.5 pr-3">
-                        <Link href={`/admin/inventario/${i.id}`} className="hover:text-brass">{i.brand} {i.model ?? ""}</Link>
+                        <Link href={`/admin/inventario/${i.id}`} className="hover:text-brass">{inService.has(i.id) ? "🔧 " : ""}{i.brand} {i.model ?? ""}</Link>
                         <p className="text-xs text-stone">{[i.reference && `Ref. ${i.reference}`, i.serial && `S/N ${i.serial}`].filter(Boolean).join(" · ")}</p>
                       </td>
                       <td className="py-2.5 text-xs">

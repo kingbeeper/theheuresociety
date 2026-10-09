@@ -204,6 +204,23 @@ export async function reopenItem(id: string) {
   refresh();
 }
 
+// ── Relojero ──
+export async function sendToServiceAction(itemId: string, f: FormData) {
+  const user = await requireAdmin();
+  const provider = text(f, "provider");
+  if (!provider) return;
+  const { sendToService } = await import("@/lib/services");
+  await sendToService(itemId, { provider, work: text(f, "work"), expected_at: date(f, "expected_at") }, user);
+  refresh();
+}
+
+export async function returnFromServiceAction(serviceId: string, f: FormData) {
+  const user = await requireAdmin();
+  const { returnFromService } = await import("@/lib/services");
+  await returnFromService(serviceId, money(f, "cost"), text(f, "notes"), user);
+  refresh();
+}
+
 export async function deleteItem(id: string) {
   await requireAdmin();
   await adminDb().from("inventory_items").delete().eq("id", id);
