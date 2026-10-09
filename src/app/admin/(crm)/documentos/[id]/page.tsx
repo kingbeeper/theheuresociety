@@ -48,7 +48,8 @@ export default async function DocumentPage({ params }: PageProps<"/admin/documen
         title={`${d.number} · ${d.client_name ?? ""}`}
         action={
           <div className="flex flex-wrap gap-2">
-            <a href={`/d/${d.token}`} target="_blank" rel="noreferrer" className={ghostButtonClass}>Ver / PDF</a>
+            <a href={`/d/${d.token}`} target="_blank" rel="noreferrer" className={ghostButtonClass}>Ver</a>
+            {d.status !== "draft" && <a href={`/d/${d.token}/pdf`} target="_blank" rel="noreferrer" className={ghostButtonClass}>PDF</a>}
             {phone && <a href={`https://wa.me/${phone}?text=${encodeURIComponent(message)}`} target="_blank" rel="noreferrer" className={ghostButtonClass}>Enviar por WhatsApp</a>}
             {d.client_email && <a href={`mailto:${d.client_email}?subject=${encodeURIComponent(`${d.lang === "es" ? KIND_LABEL[d.kind] : t[d.kind]} ${d.number} · The Heure Society`)}&body=${encodeURIComponent(message)}`} className={ghostButtonClass}>Enviar por correo</a>}
           </div>

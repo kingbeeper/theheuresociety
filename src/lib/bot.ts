@@ -9,6 +9,7 @@ import { reactivateBot } from "./wa-bot";
 import { addEvent, matchAlerts } from "./crm";
 import { downloadFile, escapeHtml as h, keyboard, sendMessage, sendPhoto, tg } from "./telegram";
 import { toSlug } from "./watches";
+import { FLOW_COMMANDS, afterAnalysis, attachDraft, clearFlow, getFlow, listOpenDocs, onCallback, onContact, onText, resendDoc, startFlow } from "./bot-docs";
 
 // ───────────────────────── Tipos de Telegram (solo lo que usamos) ─────────────────────────
 type TgPhoto = { file_id: string; width: number; height: number };
@@ -17,13 +18,14 @@ export type TgMessage = {
   chat: { id: number };
   from?: { id: number; first_name?: string };
   text?: string;
+  contact?: { phone_number: string; first_name?: string; last_name?: string };
   caption?: string;
   photo?: TgPhoto[];
   media_group_id?: string;
 };
 export type TgCallback = {
   id: string;
-  from: { id: number };
+  from: { id: number; first_name?: string };
   data?: string;
   message?: { message_id: number; chat: { id: number } };
 };
@@ -51,6 +53,16 @@ const HELP = `<b>The Heure Society · Publicar relojes</b>
 <b>Estuche</b>
 Para cambiar el recorte de un reloj ya publicado, envía una foto de frente con el texto <code>estuche</code> y su referencia (ej. <code>estuche 126610LN</code>). Sale mejor sobre una mesa, sin mano.
 
+<b>Documentos</b> (te pregunto lo que falta y te doy el PDF)
+/factura — factura de venta
+/memo — memo (reloj prestado a un dealer o cliente)
+/consignacion — contrato con quien nos deja su reloj
+/cotizacion — cotización
+/compra — reloj comprado fuera de la oficina (alta y web)
+/documentos — documentos abiertos
+/pdf <i>número</i> — volver a enviar uno
+Puedes escribir la referencia o enviar fotos: si el reloj es nuevo, preparo la ficha y lo doy de alta.
+
 <b>Órdenes</b>
 /lista — últimos relojes publicados
 /vista — volver a ver la ficha del borrador actual
@@ -58,7 +70,7 @@ Para cambiar el recorte de un reloj ya publicado, envía una foto de frente con 
 /reservado <i>referencia</i> — marcar como reservado
 /disponible <i>referencia</i> — volver a disponible
 /estuche <i>referencia</i> — repetir el recorte con sus fotos
-/cancelar — descartar el borrador actual`;
+/cancelar — descartar el borrador o el documento en curso`;
 
 // ───────────────────────────── Borradores ─────────────────────────────
 async function openDraft(chatId: number): Promise<Draft | null> {
@@ -76,7 +88,7 @@ async function getOrCreateDraft(chatId: number): Promise<Draft> {
   return data as Draft;
 }
 
-async function updateDraft(id: string, fields: Partial<Draft>) {
+export async function updateDraft(id: string, fields: Partial<Draft>) {
   const { error } = await adminDb().from("bot_drafts").update({ ...fields, updated_at: new Date().toISOString() }).eq("id", id);
   if (error) throw error;
 }
@@ -86,6 +98,13 @@ async function draftPhotos(draftId: string) {
   return (data ?? []).map((p) => p.url as string);
 }
 
+export async function draftWatch(draftId: string) {
+  const { data } = await adminDb().from("bot_drafts").select("data").eq("id", draftId).maybeSingle();
+  return (data?.data as WatchDraft | null) ?? null;
+}
+
+const userLabel = (from?: { id: number; first_name?: string }) => `Telegram · ${from?.first_name ?? from?.id ?? "admin"}`;
+
 // ───────────────────────────── Mensajes ─────────────────────────────
 export async function handleMessage(msg: TgMessage) {
   const chatId = msg.chat.id;
@@ -93,9 +112,13 @@ export async function handleMessage(msg: TgMessage) {
   if (msg.photo?.length) return handlePhoto(msg);
 
   const text = (msg.text ?? "").trim();
-  if (!text) return;
+  if (text.startsWith("/")) return handleCommand(chatId, text, userLabel(msg.from));
 
-  if (text.startsWith("/")) return handleCommand(chatId, text);
+  // Asistente de documentos en curso: los textos y contactos son sus respuestas
+  const flow = await getFlow(chatId);
+  if (flow && msg.contact) return onContact(chatId, msg.contact, flow);
+  if (!text) return;
+  if (flow) return onText(chatId, text, flow);
 
   const draft = await openDraft(chatId);
 
@@ -138,6 +161,18 @@ async function handlePhoto(msg: TgMessage) {
   // Si ya había una ficha preparada, las fotos nuevas obligan a revisarla de nuevo
   if (draft.status === "ready") await updateDraft(draft.id, { status: "collecting" });
 
+  const flow = await getFlow(chatId);
+  if (flow && (flow.step === "watch" || flow.step === "photos")) {
+    const count = (await draftPhotos(draft.id)).length;
+    await attachDraft(chatId, draft.id, flow, count === 1 && !msg.caption?.trim());
+    if (msg.caption?.trim()) {
+      await updateDraft(draft.id, { caption: msg.caption.trim() });
+      if (msg.media_group_id) await new Promise((r) => setTimeout(r, 3500));
+      return analyze(chatId, draft.id);
+    }
+    return;
+  }
+
   if (msg.caption?.trim()) {
     await updateDraft(draft.id, { caption: msg.caption.trim() });
     // En un álbum las demás fotos llegan en paralelo: se espera un momento antes de analizar
@@ -154,7 +189,7 @@ async function handlePhoto(msg: TgMessage) {
   }
 }
 
-async function analyze(chatId: number, draftId: string) {
+export async function analyze(chatId: number, draftId: string) {
   const db = adminDb();
   const { data: d } = await db.from("bot_drafts").select("*").eq("id", draftId).single();
   const draft = d as Draft;
@@ -173,6 +208,8 @@ async function analyze(chatId: number, draftId: string) {
     await sendMessage(chatId, `⚠️ No pude preparar la ficha: ${h((e as Error).message)}\nPuedes volver a enviar la nota para reintentar.`);
     return;
   }
+  // Reloj de un documento (/factura, /consignacion…): la ficha sigue en el asistente
+  if (await afterAnalysis(chatId, draftId)) return;
   // Fuera del try: un fallo al mostrar la vista previa no descarta la ficha ya preparada
   await sendPreview(chatId, draftId);
 }
@@ -241,6 +278,11 @@ export async function handleCallback(cb: TgCallback) {
     return tg("editMessageReplyMarkup", { chat_id: chatId, message_id: cb.message!.message_id, reply_markup: keyboard([]) }).catch(() => {});
   }
 
+  // Asistente de documentos y botones de un documento ya creado
+  if (/^d[a-z]+$/.test(action) && action !== "del") {
+    return onCallback(chatId, cb.id, cb.message!.message_id, action, (cb.data ?? "").slice(action.length + 1), userLabel(cb.from));
+  }
+
   // Botones del recorte del estuche: llevan el id del reloj publicado, no de un borrador
   if (["cutok", "cutno", "cutredo", "cutdel"].includes(action)) return handleCutoutButton(cb, chatId, action, draftId);
 
@@ -282,7 +324,7 @@ export async function handleCallback(cb: TgCallback) {
   return tg("answerCallbackQuery", { callback_query_id: cb.id });
 }
 
-async function publish(draft: Draft) {
+export async function publish(draft: Draft) {
   const db = adminDb();
   const w = draft.data!;
   const images = await draftPhotos(draft.id);
@@ -352,7 +394,7 @@ async function publish(draft: Draft) {
 }
 
 // ───────────────────────────── Avisos a compradores ─────────────────────────────
-async function notifyAlertMatches(chatId: number, w: WatchDraft, slug: string) {
+export async function notifyAlertMatches(chatId: number, w: WatchDraft, slug: string) {
   const matches = await matchAlerts({ brand: w.brand, model: w.model, reference: w.reference });
   if (!matches.length) return;
   const lines = matches.map((a) => {
@@ -404,7 +446,7 @@ const pendingPath = (watchId: string) => `cutouts/pending/${watchId}.png`;
 
 // Prepara el recorte (con las fotos indicadas o con las del reloj) y envía la vista previa.
 // No entra en el estuche hasta que el administrador pulsa «Agregar al estuche».
-async function cutoutJob(chatId: number, watchId: string, photos?: string[]) {
+export async function cutoutJob(chatId: number, watchId: string, photos?: string[]) {
   const db = adminDb();
   const { data } = await db.from("watches").select(PUBLISHED_FIELDS).eq("id", watchId).single();
   const w = data as PublishedWatch;
@@ -519,12 +561,21 @@ async function handleCutoutButton(cb: TgCallback, chatId: number, action: string
 }
 
 // ───────────────────────────── Órdenes ─────────────────────────────
-async function handleCommand(chatId: number, text: string) {
+async function handleCommand(chatId: number, text: string, user: string) {
   const [cmd, ...rest] = text.split(/\s+/);
   const arg = rest.join(" ").trim();
   const command = cmd.toLowerCase().replace(/@.*$/, "");
 
+  if (FLOW_COMMANDS[command]) return startFlow(chatId, FLOW_COMMANDS[command], arg, user);
+
   switch (command) {
+    case "/documentos":
+      return listOpenDocs(chatId);
+
+    case "/pdf":
+      if (!arg) return sendMessage(chatId, "Indica el número. Ej.: <code>/pdf INV-2026-0003</code>");
+      return resendDoc(chatId, arg);
+
     case "/start":
     case "/ayuda":
     case "/help":
@@ -540,8 +591,10 @@ async function handleCommand(chatId: number, text: string) {
 
     case "/cancelar": {
       const draft = await openDraft(chatId);
+      const flow = await getFlow(chatId);
       if (draft) await updateDraft(draft.id, { status: "cancelled", awaiting: null });
-      return sendMessage(chatId, draft ? "Borrador descartado." : "No hay ningún borrador abierto.");
+      if (flow) await clearFlow(chatId);
+      return sendMessage(chatId, draft || flow ? "Cancelado." : "No hay nada en curso.");
     }
 
     case "/lista": {
@@ -598,7 +651,7 @@ async function handleCommand(chatId: number, text: string) {
 }
 
 // "14500", "14.500", "14,500", "14.5k", "$14,500" -> 14500 · "consultar" -> null · otra cosa -> undefined
-function parsePrice(text: string): number | null | undefined {
+export function parsePrice(text: string): number | null | undefined {
   const t = text.toLowerCase().trim();
   if (/consult|request|n\/a/.test(t)) return null;
   const k = /k\b/.test(t);

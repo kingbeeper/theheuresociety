@@ -5,7 +5,7 @@ import "server-only";
 const token = process.env.TELEGRAM_BOT_TOKEN;
 const api = (method: string) => `https://api.telegram.org/bot${token}/${method}`;
 
-export type InlineButton = { text: string; callback_data: string };
+export type InlineButton = { text: string; callback_data: string } | { text: string; url: string };
 
 export async function tg<T = unknown>(method: string, body: Record<string, unknown>): Promise<T> {
   if (!token) throw new Error("Falta TELEGRAM_BOT_TOKEN");
@@ -50,6 +50,19 @@ export async function sendPhoto(chatId: number, photo: string, caption: string, 
     if (!json.ok) throw new Error(`Telegram sendPhoto: ${json.description}`);
     return json.result;
   }
+}
+
+// Envía un archivo (PDF de un documento) para reenviarlo desde Telegram
+export async function sendDocumentFile(chatId: number, bytes: Uint8Array, filename: string, caption: string, extra: Record<string, unknown> = {}) {
+  const form = new FormData();
+  form.append("chat_id", String(chatId));
+  form.append("document", new Blob([Buffer.from(bytes)], { type: "application/pdf" }), filename);
+  form.append("caption", caption.slice(0, 1024));
+  form.append("parse_mode", "HTML");
+  for (const [k, v] of Object.entries(extra)) form.append(k, typeof v === "string" ? v : JSON.stringify(v));
+  const res = await fetch(api("sendDocument"), { method: "POST", body: form });
+  const json = (await res.json()) as { ok: boolean; description?: string };
+  if (!json.ok) throw new Error(`Telegram sendDocument: ${json.description}`);
 }
 
 // Descarga una foto recibida (Telegram envía varios tamaños; se usa el mayor)

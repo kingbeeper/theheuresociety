@@ -5,8 +5,7 @@ import { refresh } from "next/cache";
 import { requireAdmin } from "@/lib/admin-auth";
 import { adminDb } from "@/lib/supabase";
 import { upsertLead } from "@/lib/crm";
-import { escapeHtml as h, notifyAdmins } from "@/lib/telegram";
-import { advanceStage, docEvent, getDoc, getDocSettings, insertDoc, markOwnersPaid, releaseStock, reserveStock, returnConsigned, saveDocSettings, sellStock } from "@/lib/documents";
+import { closeReturned, consignorPaid, docEvent, getDoc, insertDoc, issueDoc, payInvoice, reserveStock, saveDocSettings, toInvoice, voidDoc } from "@/lib/documents";
 import { DOC_SETTING_KEYS, KIND_LABEL, docTotals, usd, type DocKind, type DocLine } from "@/lib/doc-labels";
 
 // Acciones de cotizaciones, memos y facturas. Todas comprueban la sesión.
@@ -98,22 +97,12 @@ export async function saveDocument(id: string | null, _: unknown, f: FormData) {
   return { ok: true };
 }
 
-// Marcar como enviado / entregado
+// Marcar como enviado / entregado / firmado
 export async function sendDocument(id: string) {
   const user = await requireAdmin();
   const d = await getDoc(id);
   if (!d || d.status !== "draft") return;
-  await adminDb().from("documents").update({ status: "sent", updated_at: new Date().toISOString() }).eq("id", id);
-  if (d.kind === "consignment") {
-    await docEvent(d, `contrato firmado (neto al dueño ${usd(d.total)})`, user);
-  } else if (d.kind === "quote") {
-    await docEvent(d, `enviada (${usd(d.total)})`, user);
-    await advanceStage(d.customer_id, "negotiating", user);
-  } else {
-    await reserveStock(d, user);
-    await docEvent(d, d.kind === "memo" ? `reloj entregado en memo (${usd(d.total)})` : `emitida por ${usd(d.total)}`, user);
-    await advanceStage(d.customer_id, "negotiating", user);
-  }
+  await issueDoc(d, user);
   refresh();
 }
 
@@ -129,15 +118,8 @@ export async function setQuoteResult(id: string, accepted: boolean) {
 export async function returnMemo(id: string) {
   const user = await requireAdmin();
   const d = await getDoc(id);
-  if (!d || (d.kind !== "memo" && d.kind !== "consignment")) return;
-  await adminDb().from("documents").update({ status: "returned", updated_at: new Date().toISOString() }).eq("id", id);
-  if (d.kind === "memo") {
-    await releaseStock(d, user, "devuelto del memo");
-    await docEvent(d, "reloj devuelto", user);
-  } else {
-    await returnConsigned(d, user);
-    await docEvent(d, "reloj devuelto a su dueño", user);
-  }
+  if (!d || (d.kind !== "memo" && d.kind !== "consignment") || d.status !== "sent") return;
+  await closeReturned(d, user);
   refresh();
 }
 
@@ -146,40 +128,15 @@ export async function markConsignorPaid(id: string) {
   const user = await requireAdmin();
   const d = await getDoc(id);
   if (!d || d.kind !== "consignment" || d.status !== "sent") return;
-  const paidAt = today();
-  await adminDb().from("documents").update({ status: "paid", paid_at: paidAt, updated_at: new Date().toISOString() }).eq("id", id);
-  await markOwnersPaid(d, user, paidAt);
-  await docEvent(d, `pagado al dueño (${usd(d.total)})`, user);
+  await consignorPaid(d, user);
   refresh();
 }
 
-// Cotización aceptada o memo que el cliente se queda → factura con los mismos datos
 export async function convertToInvoice(id: string) {
   const user = await requireAdmin();
   const d = await getDoc(id);
   if (!d || d.kind === "invoice" || d.kind === "consignment") return;
-  const settings = await getDocSettings();
-  const invoice = await insertDoc({
-    kind: "invoice",
-    customer_id: d.customer_id,
-    client_name: d.client_name, client_company: d.client_company, client_email: d.client_email, client_phone: d.client_phone, client_address: d.client_address,
-    lang: d.lang,
-    issue_date: today(),
-    due_date: today(),
-    items: d.items,
-    discount: d.discount,
-    tax_rate: d.tax_rate,
-    shipping: d.shipping,
-    show_serial: true,
-    notes: d.notes,
-    terms: settings.doc_terms_invoice,
-    payment_method: d.payment_method,
-    source_id: d.id,
-    created_by: user,
-  });
-  await adminDb().from("documents").update({ status: "converted", updated_at: new Date().toISOString() }).eq("id", id);
-  await docEvent(d, `convertida en la factura ${invoice.number}`, user);
-  await docEvent(invoice, `creada desde ${KIND_LABEL[d.kind].toLowerCase()} ${d.number}`, user);
+  const invoice = await toInvoice(d, user);
   redirect(`/admin/documentos/${invoice.id}`);
 }
 
@@ -187,14 +144,7 @@ export async function markPaid(id: string, _: unknown, f: FormData) {
   const user = await requireAdmin();
   const d = await getDoc(id);
   if (!d || d.kind !== "invoice" || d.status === "paid" || d.status === "void") return { error: "Esta factura no se puede marcar como pagada." };
-  const method = text(f, "payment_method");
-  const paidAt = date(f, "paid_at") ?? today();
-  await adminDb().from("documents").update({ status: "paid", paid_at: paidAt, payment_method: method, updated_at: new Date().toISOString() }).eq("id", id);
-  const paid = { ...d, status: "paid" as const, paid_at: paidAt, payment_method: method };
-  await sellStock(paid, user);
-  await docEvent(paid, `pagada (${usd(d.total)}${method ? ` · ${method}` : ""})`, user);
-  if (d.customer_id) await adminDb().from("customers").update({ stage: "won", last_activity_at: new Date().toISOString() }).eq("id", d.customer_id);
-  await notifyAdmins(`💰 <b>Factura pagada · ${h(d.number)}</b>\n${h(d.client_name ?? "Cliente")} · <b>${usd(d.total)}</b>${method ? ` · ${h(method)}` : ""}\n${h(d.items.map((l) => l.title).join(", "))}`).catch(() => {});
+  await payInvoice(d, text(f, "payment_method"), date(f, "paid_at") ?? today(), user);
   refresh();
   return { ok: true };
 }
@@ -203,9 +153,7 @@ export async function voidDocument(id: string) {
   const user = await requireAdmin();
   const d = await getDoc(id);
   if (!d || d.status === "paid") return;
-  await adminDb().from("documents").update({ status: "void", updated_at: new Date().toISOString() }).eq("id", id);
-  if (d.status === "sent" && (d.kind === "memo" || d.kind === "invoice")) await releaseStock(d, user, "documento anulado");
-  await docEvent(d, "anulada", user);
+  await voidDoc(d, user);
   refresh();
 }
 

@@ -1,0 +1,4 @@
+Fuentes de los PDF de documentos:
+- Cormorant Garamond (Christian Thalmann) y Montserrat (Julieta Ulanovsky y colaboradores)
+- Licencia SIL Open Font License 1.1: https://openfontlicense.org
+- Copiadas de Google Fonts (paquetes @expo-google-fonts); en Montserrat los glifos compuestos se convirtieron en simples.

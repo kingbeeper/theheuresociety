@@ -132,3 +132,21 @@ export const DOC_DEFAULTS: Required<DocSettings> = {
   doc_terms_invoice:
     "Title passes to the buyer upon receipt of payment in full. All timepieces are authenticated and sold as described. All sales are final unless otherwise agreed in writing.",
 };
+
+// Los mismos términos en español, para documentos en español mientras no se hayan personalizado
+const TERMS_ES: Record<DocKind, string> = {
+  quote:
+    "Precios en dólares estadounidenses, sujetos a disponibilidad hasta recibir el pago. Esta cotización es válida hasta la fecha indicada. Todos los relojes están autenticados y se venden tal como se describen.",
+  memo:
+    "La mercancía indicada se entrega únicamente en memorándum, para su examen, y sigue siendo propiedad de The Heure Society hasta su pago total. No se vende ni se entrega en consignación para la venta. Quien la recibe responde de su pérdida, robo o daño mientras esté en su poder y debe devolverla, en el mismo estado, antes de la fecha indicada o cuando se le solicite.",
+  invoice:
+    "La propiedad pasa al comprador al recibirse el pago total. Todos los relojes están autenticados y se venden tal como se describen. Todas las ventas son definitivas salvo acuerdo por escrito.",
+  consignment:
+    "El Consignante confirma que es el propietario legítimo del reloj o relojes indicados, libres de cargas, y autoriza a The Heure Society a ofrecerlos a la venta durante el plazo indicado. Al venderse, The Heure Society pagará al Consignante el importe neto indicado dentro de los 5 días hábiles siguientes a recibir los fondos. The Heure Society puede vender por encima del neto y se queda con la diferencia. El reloj estará asegurado mientras esté bajo nuestra custodia. Si no se vende al terminar el plazo, el Consignante puede renovar este acuerdo o retirar el reloj.",
+};
+
+export function termsFor(kind: DocKind, lang: "en" | "es", s: Required<DocSettings>) {
+  const key = `doc_terms_${kind}` as const;
+  const saved = s[key];
+  return lang === "es" && saved === DOC_DEFAULTS[key] ? TERMS_ES[kind] : saved;
+}
