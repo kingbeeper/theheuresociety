@@ -1,7 +1,7 @@
 import "server-only";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import opentype from "opentype.js";
+import * as opentype from "opentype.js";
 import sharp from "sharp";
 
 // Capa de texto del video promocional (PNG transparente 720×1280): marca, modelo, referencia,
