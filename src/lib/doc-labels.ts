@@ -1,6 +1,6 @@
 // Cotizaciones, memos y facturas: etiquetas y cálculos (servidor y navegador)
 
-export type DocKind = "quote" | "memo" | "invoice";
+export type DocKind = "quote" | "memo" | "invoice" | "consignment";
 export type DocStatus = "draft" | "sent" | "accepted" | "rejected" | "returned" | "paid" | "void" | "converted";
 
 export type DocLine = {
@@ -44,15 +44,17 @@ export type Doc = {
   created_at: string;
 };
 
-export const KIND_LABEL: Record<DocKind, string> = { quote: "Cotización", memo: "Memo", invoice: "Factura" };
-export const KIND_PLURAL: Record<DocKind, string> = { quote: "Cotizaciones", memo: "Memos", invoice: "Facturas" };
-export const KIND_PREFIX: Record<DocKind, string> = { quote: "Q", memo: "M", invoice: "INV" };
+export const KIND_LABEL: Record<DocKind, string> = { quote: "Cotización", memo: "Memo", invoice: "Factura", consignment: "Consignación" };
+export const KIND_PLURAL: Record<DocKind, string> = { quote: "Cotizaciones", memo: "Memos", invoice: "Facturas", consignment: "Consignaciones" };
+export const KIND_PREFIX: Record<DocKind, string> = { quote: "Q", memo: "M", invoice: "INV", consignment: "C" };
 
 // Estados posibles de cada tipo, con su etiqueta en el CRM
 export const STATUS_LABEL: Record<DocKind, Partial<Record<DocStatus, string>>> = {
   quote: { draft: "Borrador", sent: "Enviada", accepted: "Aceptada", rejected: "Rechazada", converted: "Facturada", void: "Anulada" },
   memo: { draft: "Borrador", sent: "Reloj fuera", returned: "Devuelto", converted: "Facturado", void: "Anulado" },
   invoice: { draft: "Borrador", sent: "Por cobrar", paid: "Pagada", void: "Anulada" },
+  // Contrato con quien nos deja su reloj: activo mientras lo tenemos; termina devuelto o pagado al dueño
+  consignment: { draft: "Borrador", sent: "Activa", returned: "Devuelto al dueño", paid: "Pagada al dueño", void: "Anulada" },
 };
 
 export const STATUS_STYLE: Partial<Record<DocStatus, string>> = {
@@ -82,29 +84,33 @@ export const usd = (n: number | null | undefined) =>
 // Textos del documento impreso (lo que ve el cliente), en inglés o español
 export const PRINT = {
   en: {
-    quote: "Quotation", memo: "Memorandum", invoice: "Invoice",
-    number: "No.", date: "Date", due: { quote: "Valid until", memo: "Return by", invoice: "Due date" },
-    billTo: { quote: "Prepared for", memo: "Consignee", invoice: "Bill to" },
-    item: "Description", serial: "Serial", qty: "Qty", price: "Price", amount: "Amount",
+    quote: "Quotation", memo: "Memorandum", invoice: "Invoice", consignment: "Consignment Agreement",
+    number: "No.", date: "Date", due: { quote: "Valid until", memo: "Return by", invoice: "Due date", consignment: "Term ends" },
+    billTo: { quote: "Prepared for", memo: "Consignee", invoice: "Bill to", consignment: "Consignor" },
+    item: "Description", serial: "Serial", qty: "Qty", price: "Price", amount: "Amount", net: "Net to consignor",
+    consignSign: ["Consignor — signature", "The Heure Society — signature"],
     subtotal: "Subtotal", discount: "Discount", tax: "Sales tax", shipping: "Shipping & insurance", total: "Total",
     paid: "PAID", void: "VOID", payment: "Payment", notes: "Notes", terms: "Terms & conditions",
     signature: "Received in good condition — signature", print: "Print / Save as PDF",
+    netTotal: "Total net to consignor",
   },
   es: {
-    quote: "Cotización", memo: "Memorándum", invoice: "Factura",
-    number: "N.º", date: "Fecha", due: { quote: "Válida hasta", memo: "Devolver antes de", invoice: "Vencimiento" },
-    billTo: { quote: "Preparada para", memo: "Recibe en memo", invoice: "Facturar a" },
-    item: "Descripción", serial: "Serie", qty: "Cant.", price: "Precio", amount: "Importe",
+    quote: "Cotización", memo: "Memorándum", invoice: "Factura", consignment: "Contrato de consignación",
+    number: "N.º", date: "Fecha", due: { quote: "Válida hasta", memo: "Devolver antes de", invoice: "Vencimiento", consignment: "Vigente hasta" },
+    billTo: { quote: "Preparada para", memo: "Recibe en memo", invoice: "Facturar a", consignment: "Consignante" },
+    item: "Descripción", serial: "Serie", qty: "Cant.", price: "Precio", amount: "Importe", net: "Neto al consignante",
+    consignSign: ["Consignante — firma", "The Heure Society — firma"],
     subtotal: "Subtotal", discount: "Descuento", tax: "Impuesto de ventas", shipping: "Envío y seguro", total: "Total",
     paid: "PAGADA", void: "ANULADA", payment: "Forma de pago", notes: "Notas", terms: "Términos y condiciones",
     signature: "Recibido en buen estado — firma", print: "Imprimir / Guardar PDF",
+    netTotal: "Total neto al consignante",
   },
 } as const;
 
 // Ajustes del negocio que salen en los documentos (se editan en Documentos → Ajustes)
 export const DOC_SETTING_KEYS = [
   "doc_company", "doc_address", "doc_phone", "doc_email", "doc_tax_id", "doc_payment_info", "doc_tax_rate",
-  "doc_terms_quote", "doc_terms_memo", "doc_terms_invoice",
+  "doc_terms_quote", "doc_terms_memo", "doc_terms_invoice", "doc_terms_consignment",
 ] as const;
 export type DocSettings = Partial<Record<(typeof DOC_SETTING_KEYS)[number], string>>;
 
@@ -121,6 +127,8 @@ export const DOC_DEFAULTS: Required<DocSettings> = {
     "Prices are in US dollars and subject to availability until payment is received. This quotation is valid until the date shown. All timepieces are authenticated and sold as described.",
   doc_terms_memo:
     "The merchandise listed is delivered on memorandum only, for examination, and remains the property of The Heure Society until paid for in full. It is not sold or consigned for sale. The recipient is responsible for loss, theft or damage while in their possession and must return it, in the same condition, by the return date shown or upon request.",
+  doc_terms_consignment:
+    "The Consignor confirms they are the lawful owner of the timepiece(s) listed, free of any lien, and authorizes The Heure Society to offer them for sale during the term shown. Upon sale, The Heure Society will pay the Consignor the net amount shown within 5 business days of receiving cleared funds. The Heure Society may sell above the net amount and retains the difference. The timepiece(s) will be insured while in our care. If unsold at the end of the term, the Consignor may renew this agreement or collect the timepiece(s).",
   doc_terms_invoice:
     "Title passes to the buyer upon receipt of payment in full. All timepieces are authenticated and sold as described. All sales are final unless otherwise agreed in writing.",
 };

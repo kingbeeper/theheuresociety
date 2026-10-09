@@ -28,7 +28,8 @@ async function SharedDocument({ params }: { params: Promise<{ token: string }> }
   const totals = docTotals(d);
   const date = (iso: string | null) =>
     iso ? new Intl.DateTimeFormat(d.lang === "es" ? "es-ES" : "en-US", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${iso}T12:00:00Z`)) : "—";
-  const stamp = d.status === "paid" ? t.paid : d.status === "void" ? t.void : null;
+  const consign = d.kind === "consignment";
+  const stamp = d.status === "void" ? t.void : d.status === "paid" && !consign ? t.paid : null;
 
   return (
     <main className="mx-auto max-w-[860px] px-4 py-8 print:max-w-none print:p-0">
@@ -80,7 +81,7 @@ async function SharedDocument({ params }: { params: Promise<{ token: string }> }
               <th className="py-3 font-normal">{t.item}</th>
               <th className="py-3 text-center font-normal">{t.qty}</th>
               <th className="py-3 text-right font-normal">{t.price}</th>
-              <th className="py-3 text-right font-normal">{t.amount}</th>
+              <th className="py-3 text-right font-normal">{consign ? t.net : t.amount}</th>
             </tr>
           </thead>
           <tbody>
@@ -105,7 +106,7 @@ async function SharedDocument({ params }: { params: Promise<{ token: string }> }
             {totals.discount > 0 && (<><dt className="text-[#5d625e]">{t.discount}</dt><dd className="text-right tabular-nums">−{usd(totals.discount)}</dd></>)}
             {totals.tax > 0 && (<><dt className="text-[#5d625e]">{t.tax} ({Number(d.tax_rate)}%)</dt><dd className="text-right tabular-nums">{usd(totals.tax)}</dd></>)}
             {totals.shipping > 0 && (<><dt className="text-[#5d625e]">{t.shipping}</dt><dd className="text-right tabular-nums">{usd(totals.shipping)}</dd></>)}
-            <dt className="mt-2 border-t border-[#1b1f1c] pt-3 font-display text-xl">{t.total}</dt>
+            <dt className="mt-2 border-t border-[#1b1f1c] pt-3 font-display text-xl">{consign ? t.netTotal : t.total}</dt>
             <dd className="mt-2 border-t border-[#1b1f1c] pt-3 text-right font-display text-xl tabular-nums">{usd(totals.total)}</dd>
           </dl>
         </div>
@@ -114,7 +115,7 @@ async function SharedDocument({ params }: { params: Promise<{ token: string }> }
           {d.notes && (
             <div><p className="mb-1 text-[0.6rem] tracking-[0.2em] uppercase text-[#8a7a52]">{t.notes}</p><p className="whitespace-pre-line">{d.notes}</p></div>
           )}
-          {d.kind !== "memo" && (d.payment_method || s.doc_payment_info) && (
+          {d.kind !== "memo" && !consign && (d.payment_method || s.doc_payment_info) && (
             <div>
               <p className="mb-1 text-[0.6rem] tracking-[0.2em] uppercase text-[#8a7a52]">{t.payment}</p>
               <p className="whitespace-pre-line">{[d.payment_method, d.status === "paid" ? null : s.doc_payment_info].filter(Boolean).join("\n")}</p>
@@ -127,6 +128,16 @@ async function SharedDocument({ params }: { params: Promise<{ token: string }> }
             <div className="mt-8 grid gap-10 sm:grid-cols-2">
               <p className="border-t border-[#1b1f1c] pt-2">{t.signature}</p>
               <p className="border-t border-[#1b1f1c] pt-2">{t.date}</p>
+            </div>
+          )}
+          {consign && (
+            <div className="mt-8 grid gap-10 sm:grid-cols-2">
+              {t.consignSign.map((who) => (
+                <div key={who}>
+                  <p className="border-t border-[#1b1f1c] pt-2">{who}</p>
+                  <p className="mt-6 border-t border-[#1b1f1c] pt-2">{t.date}</p>
+                </div>
+              ))}
             </div>
           )}
         </footer>

@@ -95,6 +95,9 @@ export default async function ItemPage({ params }: PageProps<"/admin/inventario/
                 <Link href={`/admin/documentos/nuevo?tipo=quote&reloj=${item.id}`} className={ghostButtonClass}>+ Cotización</Link>
                 <Link href={`/admin/documentos/nuevo?tipo=memo&reloj=${item.id}`} className={ghostButtonClass}>+ Memo</Link>
                 <Link href={`/admin/documentos/nuevo?tipo=invoice&reloj=${item.id}`} className={ghostButtonClass}>+ Factura</Link>
+                {item.acquisition === "consignment" && (
+                  <Link href={`/admin/documentos/nuevo?tipo=consignment&reloj=${item.id}${item.supplier_customer_id ? `&cliente=${item.supplier_customer_id}` : ""}`} className={ghostButtonClass}>+ Contrato de consignación</Link>
+                )}
               </div>
             )}
           </Card>

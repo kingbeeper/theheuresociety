@@ -87,10 +87,12 @@ export async function buildDigest(now = Date.now()) {
   const overdue = unpaid.filter((d) => d.due_date && d.due_date < today);
   const memosLate = docs.filter((d) => d.kind === "memo" && d.due_date && d.due_date < today);
   const quotesEnding = docs.filter((d) => d.kind === "quote" && d.due_date && d.due_date >= today && d.due_date <= new Date(now + 2 * DAY).toISOString().slice(0, 10));
-  if (unpaid.length || memosLate.length || quotesEnding.length) {
+  const consignEnding = docs.filter((d) => d.kind === "consignment" && d.due_date && d.due_date <= new Date(now + 7 * DAY).toISOString().slice(0, 10));
+  if (unpaid.length || memosLate.length || quotesEnding.length || consignEnding.length) {
     lines.push("", "📄 <b>Documentos</b>");
     if (unpaid.length) lines.push(`• ${usd(unpaid.reduce((a, d) => a + Number(d.total), 0))} por cobrar (${unpaid.length} factura/s${overdue.length ? `, ${overdue.length} vencida/s` : ""})`);
     for (const m of memosLate) lines.push(`• ⏳ Memo ${h(m.number)} vencido · ${h(m.client_name ?? "")}`);
+    for (const c of consignEnding) lines.push(`• Consignación ${h(c.number)} de ${h(c.client_name ?? "")} termina el ${c.due_date}: renovar o devolver`);
     for (const q of quotesEnding) lines.push(`• Cotización ${h(q.number)} caduca pronto · ${h(q.client_name ?? "")} · ${usd(Number(q.total))}`);
   }
 

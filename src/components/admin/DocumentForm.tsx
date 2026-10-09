@@ -12,10 +12,11 @@ const label = "mb-1.5 block text-[0.62rem] tracking-[0.22em] uppercase text-ston
 const section = "text-[0.66rem] tracking-[0.24em] uppercase text-brass";
 
 export type CustomerOption = { id: string; label: string; name: string | null; email: string | null; phone: string | null };
-export type StockOption = { id: string; sku: string; title: string; details: string; serial: string | null; price: number | null };
+export type StockOption = { id: string; sku: string; title: string; details: string; serial: string | null; price: number | null; cost?: number | null };
 
 const addDays = (iso: string, n: number) => new Date(new Date(`${iso}T12:00:00Z`).getTime() + n * 86_400_000).toISOString().slice(0, 10);
-const DUE_DAYS: Record<DocKind, number> = { quote: 7, memo: 14, invoice: 0 };
+const DUE_DAYS: Record<DocKind, number> = { quote: 7, memo: 14, invoice: 0, consignment: 90 };
+const noTax = (k: DocKind) => k === "memo" || k === "consignment";
 
 export function DocumentForm({
   doc, kind: initialKind, customers, stock, terms, taxRate, today, presetCustomer, presetItem,
@@ -39,11 +40,12 @@ export function DocumentForm({
     client_email: doc?.client_email ?? preset?.email ?? "",
     client_phone: doc?.client_phone ?? preset?.phone ?? "",
   });
-  const fromStock = (s: StockOption): DocLine => ({ item_id: s.id, sku: s.sku, title: s.title, details: s.details, serial: s.serial, qty: 1, price: s.price ?? 0 });
+  // En consignación, el importe de la línea es el neto al dueño (el «costo» del inventario)
+  const fromStock = (s: StockOption, k: DocKind = kind): DocLine => ({ item_id: s.id, sku: s.sku, title: s.title, details: s.details, serial: s.serial, qty: 1, price: (k === "consignment" ? s.cost : s.price) ?? 0 });
   const presetLine = stock.find((s) => s.id === presetItem);
-  const [lines, setLines] = useState<DocLine[]>(doc?.items ?? (presetLine ? [fromStock(presetLine)] : []));
+  const [lines, setLines] = useState<DocLine[]>(doc?.items ?? (presetLine ? [fromStock(presetLine, initialKind)] : []));
   const [discount, setDiscount] = useState(String(doc?.discount ?? 0));
-  const [tax, setTax] = useState(String(doc?.tax_rate ?? (initialKind === "memo" ? 0 : taxRate)));
+  const [tax, setTax] = useState(String(doc?.tax_rate ?? (noTax(initialKind) ? 0 : taxRate)));
   const [shipping, setShipping] = useState(String(doc?.shipping ?? 0));
   const [termsText, setTermsText] = useState(doc?.terms ?? terms[initialKind]);
   const [due, setDue] = useState(doc?.due_date ?? addDays(today, DUE_DAYS[initialKind]));
@@ -61,7 +63,7 @@ export function DocumentForm({
     setKind(k);
     setTermsText(terms[k]);
     setDue(addDays(today, DUE_DAYS[k]));
-    setTax(String(k === "memo" ? 0 : taxRate));
+    setTax(String(noTax(k) ? 0 : taxRate));
   };
 
   return (
@@ -78,7 +80,7 @@ export function DocumentForm({
         </label>
         <label><span className={label}>Fecha</span><input name="issue_date" type="date" defaultValue={doc?.issue_date ?? today} className={field} /></label>
         <label>
-          <span className={label}>{kind === "quote" ? "Válida hasta" : kind === "memo" ? "Devolver antes de" : "Vence"}</span>
+          <span className={label}>{kind === "quote" ? "Válida hasta" : kind === "memo" ? "Devolver antes de" : kind === "consignment" ? "Vigente hasta" : "Vence"}</span>
           <input name="due_date" type="date" value={due} onChange={(e) => setDue(e.target.value)} className={field} />
         </label>
         <label>
@@ -91,7 +93,7 @@ export function DocumentForm({
       </div>
 
       <div className="grid gap-4">
-        <p className={section}>Cliente</p>
+        <p className={section}>{kind === "consignment" ? "Consignante (dueño del reloj)" : "Cliente"}</p>
         <label>
           <span className={label}>Cliente del CRM</span>
           <select name="customer_id" value={customer} onChange={(e) => pickCustomer(e.target.value)} className={field}>
@@ -110,6 +112,7 @@ export function DocumentForm({
 
       <div className="grid gap-3">
         <p className={section}>Relojes y conceptos</p>
+        {kind === "consignment" && <p className="text-xs text-stone">El precio de cada línea es el <b>neto al dueño</b>: lo que le pagaremos cuando se venda.</p>}
         {lines.map((l, i) => (
           <div key={i} className="grid gap-2 border border-line/70 p-3 sm:grid-cols-[1.4fr_1fr_0.8fr_70px_130px_auto] sm:items-start">
             <div>

@@ -6,7 +6,7 @@ import { requireAdmin } from "@/lib/admin-auth";
 import { adminDb } from "@/lib/supabase";
 import { upsertLead } from "@/lib/crm";
 import { escapeHtml as h, notifyAdmins } from "@/lib/telegram";
-import { advanceStage, docEvent, getDoc, getDocSettings, insertDoc, releaseStock, reserveStock, saveDocSettings, sellStock } from "@/lib/documents";
+import { advanceStage, docEvent, getDoc, getDocSettings, insertDoc, markOwnersPaid, releaseStock, reserveStock, returnConsigned, saveDocSettings, sellStock } from "@/lib/documents";
 import { DOC_SETTING_KEYS, KIND_LABEL, docTotals, usd, type DocKind, type DocLine } from "@/lib/doc-labels";
 
 // Acciones de cotizaciones, memos y facturas. Todas comprueban la sesión.
@@ -93,7 +93,7 @@ export async function saveDocument(id: string | null, _: unknown, f: FormData) {
   const { error } = await adminDb().from("documents").update({ ...fields, kind: before.kind, subtotal: totals.subtotal, total: totals.total, updated_at: new Date().toISOString() }).eq("id", id);
   if (error) return { error: error.message };
   // Ya entregado: si se añadieron relojes, también se reservan
-  if (before.status === "sent" && before.kind !== "quote") await reserveStock({ ...before, ...fields, kind: before.kind }, user);
+  if (before.status === "sent" && (before.kind === "memo" || before.kind === "invoice")) await reserveStock({ ...before, ...fields, kind: before.kind }, user);
   refresh();
   return { ok: true };
 }
@@ -104,7 +104,9 @@ export async function sendDocument(id: string) {
   const d = await getDoc(id);
   if (!d || d.status !== "draft") return;
   await adminDb().from("documents").update({ status: "sent", updated_at: new Date().toISOString() }).eq("id", id);
-  if (d.kind === "quote") {
+  if (d.kind === "consignment") {
+    await docEvent(d, `contrato firmado (neto al dueño ${usd(d.total)})`, user);
+  } else if (d.kind === "quote") {
     await docEvent(d, `enviada (${usd(d.total)})`, user);
     await advanceStage(d.customer_id, "negotiating", user);
   } else {
@@ -127,10 +129,27 @@ export async function setQuoteResult(id: string, accepted: boolean) {
 export async function returnMemo(id: string) {
   const user = await requireAdmin();
   const d = await getDoc(id);
-  if (!d || d.kind !== "memo") return;
+  if (!d || (d.kind !== "memo" && d.kind !== "consignment")) return;
   await adminDb().from("documents").update({ status: "returned", updated_at: new Date().toISOString() }).eq("id", id);
-  await releaseStock(d, user, "devuelto del memo");
-  await docEvent(d, "reloj devuelto", user);
+  if (d.kind === "memo") {
+    await releaseStock(d, user, "devuelto del memo");
+    await docEvent(d, "reloj devuelto", user);
+  } else {
+    await returnConsigned(d, user);
+    await docEvent(d, "reloj devuelto a su dueño", user);
+  }
+  refresh();
+}
+
+// Consignación: se vendió el reloj y se pagó al dueño
+export async function markConsignorPaid(id: string) {
+  const user = await requireAdmin();
+  const d = await getDoc(id);
+  if (!d || d.kind !== "consignment" || d.status !== "sent") return;
+  const paidAt = today();
+  await adminDb().from("documents").update({ status: "paid", paid_at: paidAt, updated_at: new Date().toISOString() }).eq("id", id);
+  await markOwnersPaid(d, user, paidAt);
+  await docEvent(d, `pagado al dueño (${usd(d.total)})`, user);
   refresh();
 }
 
@@ -138,7 +157,7 @@ export async function returnMemo(id: string) {
 export async function convertToInvoice(id: string) {
   const user = await requireAdmin();
   const d = await getDoc(id);
-  if (!d || d.kind === "invoice") return;
+  if (!d || d.kind === "invoice" || d.kind === "consignment") return;
   const settings = await getDocSettings();
   const invoice = await insertDoc({
     kind: "invoice",
@@ -185,7 +204,7 @@ export async function voidDocument(id: string) {
   const d = await getDoc(id);
   if (!d || d.status === "paid") return;
   await adminDb().from("documents").update({ status: "void", updated_at: new Date().toISOString() }).eq("id", id);
-  if (d.status === "sent" && d.kind !== "quote") await releaseStock(d, user, "documento anulado");
+  if (d.status === "sent" && (d.kind === "memo" || d.kind === "invoice")) await releaseStock(d, user, "documento anulado");
   await docEvent(d, "anulada", user);
   refresh();
 }

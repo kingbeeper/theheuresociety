@@ -167,7 +167,7 @@ export default async function LeadPage({ params }: PageProps<"/admin/leads/[id]"
             )}
           </Card>
 
-          <Card title="Cotizaciones, memos y facturas">
+          <Card title="Documentos">
             {docs?.length ? (
               <ul className="mb-3 space-y-2 text-sm">
                 {docs.map((d) => (
@@ -182,6 +182,7 @@ export default async function LeadPage({ params }: PageProps<"/admin/leads/[id]"
               <Link href={`/admin/documentos/nuevo?tipo=quote&cliente=${c.id}`} className="text-brass hover:text-ivory">+ Cotización</Link>
               <Link href={`/admin/documentos/nuevo?tipo=memo&cliente=${c.id}`} className="text-brass hover:text-ivory">+ Memo</Link>
               <Link href={`/admin/documentos/nuevo?tipo=invoice&cliente=${c.id}`} className="text-brass hover:text-ivory">+ Factura</Link>
+              <Link href={`/admin/documentos/nuevo?tipo=consignment&cliente=${c.id}`} className="text-brass hover:text-ivory">+ Consignación</Link>
             </div>
           </Card>
 

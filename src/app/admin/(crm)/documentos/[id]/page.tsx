@@ -9,7 +9,7 @@ import { todayInMiami } from "@/lib/booking";
 import { SITE_URL } from "@/lib/seo";
 import { Card, fmtDate, ghostButtonClass, PageTitle, requestTime } from "@/components/admin/ui";
 import { DocumentForm, PaidForm } from "@/components/admin/DocumentForm";
-import { convertToInvoice, deleteDocument, returnMemo, sendDocument, setQuoteResult, voidDocument } from "../../../document-actions";
+import { convertToInvoice, deleteDocument, markConsignorPaid, returnMemo, sendDocument, setQuoteResult, voidDocument } from "../../../document-actions";
 
 export const metadata = { title: "Documento" };
 
@@ -29,6 +29,7 @@ export default async function DocumentPage({ params }: PageProps<"/admin/documen
   const t = PRINT[d.lang];
   const editable = d.status === "draft" || d.status === "sent";
   const late = d.status === "sent" && d.kind !== "quote" && d.due_date && d.due_date < today;
+  const lateLabel = d.kind === "memo" ? "Memo vencido" : d.kind === "consignment" ? "Plazo cumplido" : "Vencida";
 
   // Mensaje listo para enviar el enlace por WhatsApp o correo
   const first = (d.client_name ?? "").split(" ")[0];
@@ -56,10 +57,10 @@ export default async function DocumentPage({ params }: PageProps<"/admin/documen
 
       <div className="grid grid-cols-2 gap-px border border-line bg-line md:grid-cols-4">
         {[
-          ["Estado", late ? (d.kind === "memo" ? "Memo vencido" : "Vencida") : STATUS_LABEL[d.kind][d.status] ?? d.status],
-          ["Total", usd(d.total)],
+          ["Estado", late ? lateLabel : STATUS_LABEL[d.kind][d.status] ?? d.status],
+          [d.kind === "consignment" ? "Neto al dueño" : "Total", usd(d.total)],
           ["Fecha", fmtDate(`${d.issue_date}T12:00:00`)],
-          [d.kind === "quote" ? "Válida hasta" : d.kind === "memo" ? "Devolver antes de" : d.status === "paid" ? "Pagada el" : "Vence", d.status === "paid" && d.paid_at ? fmtDate(`${d.paid_at}T12:00:00`) : d.due_date ? fmtDate(`${d.due_date}T12:00:00`) : "—"],
+          [d.kind === "quote" ? "Válida hasta" : d.kind === "memo" ? "Devolver antes de" : d.kind === "consignment" ? (d.status === "paid" ? "Pagada al dueño el" : "Vigente hasta") : d.status === "paid" ? "Pagada el" : "Vence", d.status === "paid" && d.paid_at ? fmtDate(`${d.paid_at}T12:00:00`) : d.due_date ? fmtDate(`${d.due_date}T12:00:00`) : "—"],
         ].map(([l, v]) => (
           <div key={l} className="bg-forest px-5 py-4">
             <p className={`font-display text-2xl font-light ${l === "Estado" ? (late ? "text-red-200" : STATUS_STYLE[d.status]) : ""}`}>{v}</p>
@@ -73,7 +74,7 @@ export default async function DocumentPage({ params }: PageProps<"/admin/documen
         <div className="flex flex-wrap items-center gap-2">
           {d.status === "draft" && (
             <form action={sendDocument.bind(null, d.id)}>
-              <button className={button}>{d.kind === "memo" ? "Marcar como entregado" : d.kind === "invoice" ? "Emitir factura" : "Marcar como enviada"}</button>
+              <button className={button}>{d.kind === "memo" ? "Marcar como entregado" : d.kind === "invoice" ? "Emitir factura" : d.kind === "consignment" ? "Marcar como firmado" : "Marcar como enviada"}</button>
             </form>
           )}
           {d.kind === "quote" && d.status === "sent" && (
@@ -88,6 +89,12 @@ export default async function DocumentPage({ params }: PageProps<"/admin/documen
           {d.kind === "memo" && d.status === "sent" && (
             <form action={returnMemo.bind(null, d.id)}><button className={ghostButtonClass}>Reloj devuelto</button></form>
           )}
+          {d.kind === "consignment" && d.status === "sent" && (
+            <>
+              <form action={markConsignorPaid.bind(null, d.id)}><button className={button}>Vendido: pagado al dueño</button></form>
+              <form action={returnMemo.bind(null, d.id)}><button className={ghostButtonClass}>Devuelto al dueño</button></form>
+            </>
+          )}
           {d.status !== "void" && d.status !== "paid" && d.status !== "converted" && (
             <form action={voidDocument.bind(null, d.id)}><button className={ghostButtonClass}>Anular</button></form>
           )}
@@ -101,7 +108,10 @@ export default async function DocumentPage({ params }: PageProps<"/admin/documen
             <p className="mt-2 text-xs text-stone">Al marcarla pagada, los relojes del inventario quedan vendidos (también en la web) y el cliente pasa a «Ganado».</p>
           </div>
         )}
-        {d.kind !== "quote" && d.status === "draft" && (
+        {d.kind === "consignment" && d.status === "sent" && (
+          <p className="mt-3 text-xs text-stone">Registra la venta del reloj en el inventario (o con una factura). Al marcar «Devuelto al dueño», el reloj sale del inventario y de la web.</p>
+        )}
+        {(d.kind === "memo" || d.kind === "invoice") && d.status === "draft" && (
           <p className="mt-3 text-xs text-stone">Al {d.kind === "memo" ? "entregarlo" : "emitirla"}, los relojes del inventario quedan reservados (también en la web).</p>
         )}
         <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-xs text-stone">
@@ -123,7 +133,7 @@ export default async function DocumentPage({ params }: PageProps<"/admin/documen
             kind={d.kind}
             customers={customers}
             stock={[...stock, ...d.items.filter((l) => l.item_id && !stock.some((x) => x.id === l.item_id)).map((l) => ({ id: l.item_id!, sku: l.sku ?? "", title: l.title, details: l.details ?? "", serial: l.serial ?? null, price: l.price }))]}
-            terms={{ quote: s.doc_terms_quote, memo: s.doc_terms_memo, invoice: s.doc_terms_invoice }}
+            terms={{ quote: s.doc_terms_quote, memo: s.doc_terms_memo, invoice: s.doc_terms_invoice, consignment: s.doc_terms_consignment }}
             taxRate={Number(s.doc_tax_rate) || 0}
             today={today}
           />

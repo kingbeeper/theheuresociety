@@ -34,12 +34,13 @@ export default async function DocumentsPage({ searchParams }: PageProps<"/admin/
     <>
       <PageTitle
         eyebrow="CRM"
-        title="Cotizaciones, memos y facturas"
+        title="Cotizaciones, memos, facturas y consignaciones"
         action={
           <div className="flex flex-wrap gap-2">
             <Link href="/admin/documentos/ajustes" className={ghostButtonClass}>Ajustes</Link>
             <Link href="/admin/documentos/nuevo?tipo=quote" className={ghostButtonClass}>+ Cotización</Link>
             <Link href="/admin/documentos/nuevo?tipo=memo" className={ghostButtonClass}>+ Memo</Link>
+            <Link href="/admin/documentos/nuevo?tipo=consignment" className={ghostButtonClass}>+ Consignación</Link>
             <Link href="/admin/documentos/nuevo?tipo=invoice" className={buttonClass}>+ Factura</Link>
           </div>
         }
@@ -57,7 +58,7 @@ export default async function DocumentsPage({ searchParams }: PageProps<"/admin/
       </div>
 
       <div className="mt-6 flex gap-1 overflow-x-auto">
-        {(["all", "quote", "memo", "invoice"] as const).map((k) => (
+        {(["all", "quote", "memo", "invoice", "consignment"] as const).map((k) => (
           <Link
             key={k}
             href={k === "all" ? "/admin/documentos" : `/admin/documentos?tipo=${k}`}
@@ -92,7 +93,7 @@ export default async function DocumentsPage({ searchParams }: PageProps<"/admin/
                     <td className="px-4 py-3 text-stone">{fmtDate(`${d.issue_date}T12:00:00`)}</td>
                     <td className="px-4 py-3 text-right tabular-nums">{usd(d.total)}</td>
                     <td className={`px-4 py-3 text-[0.66rem] tracking-[0.14em] uppercase ${late ? "text-red-200" : STATUS_STYLE[d.status]}`}>
-                      {late ? (d.kind === "memo" ? "Memo vencido" : "Vencida") : STATUS_LABEL[d.kind][d.status]}
+                      {late ? (d.kind === "memo" ? "Memo vencido" : d.kind === "consignment" ? "Plazo cumplido" : "Vencida") : STATUS_LABEL[d.kind][d.status]}
                     </td>
                   </tr>
                 );

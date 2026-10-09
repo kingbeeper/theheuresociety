@@ -60,6 +60,14 @@ export default async function ComprasPage() {
                         ✓ En inventario · {stockOf(r.id as string)!.sku} →
                       </Link>
                     )}
+                    {stockOf(r.id as string) && r.kind === "consign" && (
+                      <Link
+                        href={`/admin/documentos/nuevo?tipo=consignment&reloj=${stockOf(r.id as string)!.id}${r.customer_id ? `&cliente=${r.customer_id}` : ""}`}
+                        className="mt-1 block text-xs text-brass hover:text-ivory"
+                      >
+                        + Contrato de consignación →
+                      </Link>
+                    )}
                     {(r.status ?? "new") === "accepted" && !stockOf(r.id as string) && (
                       <p className="mt-2 text-xs text-stone">Al marcarlo «Reloj recibido» entrará solo al inventario.</p>
                     )}

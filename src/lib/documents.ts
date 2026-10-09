@@ -114,12 +114,34 @@ export async function sellStock(d: Doc, user: string) {
   }
 }
 
+// Consignación terminada sin vender: el reloj sale del inventario y de la web
+export async function returnConsigned(d: Doc, user: string) {
+  for (const item of await stockFor(d)) {
+    if (item.status !== "in_stock" && item.status !== "reserved") continue;
+    await adminDb()
+      .from("inventory_items")
+      .update({ status: "returned", return_date: new Date().toISOString().slice(0, 10), return_reason: `Devuelto al dueño (${docLabel(d)})`, updated_at: new Date().toISOString() })
+      .eq("id", item.id);
+    await logItem(item.id, "return", `Devuelto al consignante · ${docLabel(d)}`, user, { document: d.id });
+    await syncWebStatus(item.watch_id, "draft");
+  }
+}
+
+// Pagado al dueño: queda marcado en cada reloj vendido de la consignación
+export async function markOwnersPaid(d: Doc, user: string, paidAt: string) {
+  for (const item of await stockFor(d)) {
+    if (item.owner_paid_at) continue;
+    await adminDb().from("inventory_items").update({ owner_paid_at: paidAt }).eq("id", item.id);
+    await logItem(item.id, "owner_paid", `Pagado al dueño · ${docLabel(d)}`, user, { document: d.id });
+  }
+}
+
 // Opciones del formulario: clientes del CRM y relojes disponibles del inventario
 export async function formOptions() {
   const db = adminDb();
   const [customers, stock] = await Promise.all([
     db.from("customers").select("id, name, phone, email").order("last_activity_at", { ascending: false }).limit(500),
-    db.from("inventory_items").select("id, sku, brand, model, reference, serial, condition, comes_with, papers_date, asking_price").in("status", ["in_stock", "reserved"]).order("sku"),
+    db.from("inventory_items").select("id, sku, brand, model, reference, serial, condition, comes_with, papers_date, asking_price, cost").in("status", ["in_stock", "reserved"]).order("sku"),
   ]);
   return {
     customers: (customers.data ?? []).map((c) => ({
@@ -133,6 +155,7 @@ export async function formOptions() {
       details: [i.condition, i.papers_date ? `Papers ${String(i.papers_date).slice(0, 7)}` : null, i.comes_with].filter(Boolean).join(" · "),
       serial: i.serial as string | null,
       price: i.asking_price == null ? null : Number(i.asking_price),
+      cost: i.cost == null ? null : Number(i.cost),
     })),
   };
 }
