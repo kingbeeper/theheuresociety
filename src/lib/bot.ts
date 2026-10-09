@@ -11,7 +11,7 @@ import { downloadFile, escapeHtml as h, keyboard, sendMessage, sendPhoto, tg } f
 import { toSlug } from "./watches";
 import { MENU, WELCOME, mainKeyboard } from "./bot-keyboard";
 import { isMenuAction, onMenuCallback, onMenuText } from "./bot-menu";
-import { FLOW_COMMANDS, afterAnalysis, onSellerIdPhoto, appraisePending, clearAppraise, onAppraisalPhoto, runAppraisal, startAppraisal, askCost, costCommand, onCostText, attachDraft, clearFlow, getFlow, demandSummary, listFollowUps, listOpenDocs, onCallback, onContact, onText, resendDoc, startFlow } from "./bot-docs";
+import { FLOW_COMMANDS, afterAnalysis, onSellerIdPhoto, appraisePending, clearAppraise, onAppraisalPhoto, onAppraisalText, startAppraisal, askCost, costCommand, onCostText, attachDraft, clearFlow, getFlow, demandSummary, listFollowUps, listOpenDocs, onCallback, onContact, onText, resendDoc, startFlow } from "./bot-docs";
 
 // ───────────────────────── Tipos de Telegram (solo lo que usamos) ─────────────────────────
 type TgPhoto = { file_id: string; width: number; height: number };
@@ -102,7 +102,7 @@ export async function handleMessage(msg: TgMessage) {
   if (text.startsWith("/")) return handleCommand(chatId, text, await userLabel(msg.from));
   if (text && (await onMenuText(chatId, text, await userLabel(msg.from)))) return;
   // Nota de la tasación (después de las fotos)
-  if (text && (await appraisePending(chatId))) return runAppraisal(chatId, text);
+  if (text && (await appraisePending(chatId))) return onAppraisalText(chatId, text);
 
   // Asistente de documentos en curso: los textos y contactos son sus respuestas
   const flow = await getFlow(chatId);

@@ -849,17 +849,20 @@ export async function onCostButton(chatId: number, arg: string, user: string) {
 }
 
 // ───────────────────────────── Tasación por foto ─────────────────────────────
+// Uno o varios relojes: la nota (referencias, lo que piden) puede ir antes o después de las fotos,
+// y las fotos pueden ser una por reloj o una con todos.
+type AppraiseState = { photos: string[]; note?: string | null };
 const appraiseKey = (chatId: number) => `tgappraise:${chatId}`;
 
 export async function appraisePending(chatId: number) {
   const { data } = await adminDb().from("integration_settings").select("value").eq("key", appraiseKey(chatId)).maybeSingle();
   try {
-    return data ? (JSON.parse(data.value as string) as { photos: string[] }) : null;
+    return data ? (JSON.parse(data.value as string) as AppraiseState) : null;
   } catch {
     return null;
   }
 }
-const saveAppraise = (chatId: number, v: { photos: string[] }) =>
+const saveAppraise = (chatId: number, v: AppraiseState) =>
   adminDb().from("integration_settings").upsert({ key: appraiseKey(chatId), value: JSON.stringify(v), updated_at: new Date().toISOString() }, { onConflict: "key" });
 export const clearAppraise = (chatId: number) => adminDb().from("integration_settings").delete().eq("key", appraiseKey(chatId));
 
@@ -867,57 +870,92 @@ export async function startAppraisal(chatId: number) {
   await clearFlow(chatId);
   await clearPendingCost(chatId);
   await saveAppraise(chatId, { photos: [] });
-  return sendMessage(chatId, "🔎 <b>Tasar un reloj</b>\n\n1. Envíame fotos del reloj que te ofrecen (esfera, caja, brazalete, papeles…).\n2. Después escribe lo que sepas: referencia, año, si trae caja y papeles y lo que pide el vendedor.\n<i>Ej.: 126610LN 2021, full set, pide 12.500</i>\n\nTe daré un rango de oferta según tus compras y ventas.", {
-    reply_markup: keyboard([[{ text: "Cancelar", callback_data: "dappr:cancel" }]]),
-  });
+  return sendMessage(
+    chatId,
+    "🔎 <b>Tasar uno o varios relojes</b>\n\n• Escribe las referencias y lo que sepas: año, caja y papeles, y lo que pide el cliente.\n<i>Ej.: 126500LN 2023 full set y 5711/1A 2019 con papeles, piden 99k por los dos</i>\n• Envía las fotos: una por reloj o una con todos juntos.\n\nEl orden da igual. Busco precios actuales en Chrono24 y los comparo con tus compras y ventas.",
+    { reply_markup: keyboard([[{ text: "Cancelar", callback_data: "dappr:cancel" }]]) }
+  );
+}
+
+// Nota de la tasación: si ya hay fotos, se tasa; si no, se guarda y se piden las fotos
+export async function onAppraisalText(chatId: number, text: string) {
+  const state = (await appraisePending(chatId)) ?? { photos: [] };
+  if (state.photos.length) return runAppraisal(chatId, text);
+  await saveAppraise(chatId, { ...state, note: text });
+  return sendMessage(chatId, "📝 Anotado. Ahora envíame la foto o fotos de los relojes (una por reloj, o una con todos).");
 }
 
 // Foto para la tasación (bucket privado; la IA la lee con un enlace temporal)
 export async function onAppraisalPhoto(chatId: number, fileId: string, messageId: number, caption: string | undefined) {
-  const state = (await appraisePending(chatId)) ?? { photos: [] };
   const { downloadFile } = await import("./telegram");
   const { uploadPrivate } = await import("./private-files");
   const path = await uploadPrivate(`appraisals/${chatId}-${messageId}.jpg`, await downloadFile(fileId), "image/jpeg");
   // En un álbum las fotos llegan a la vez: se relee el estado justo antes de guardar
-  const fresh = (await appraisePending(chatId)) ?? state;
+  const fresh = (await appraisePending(chatId)) ?? { photos: [] };
   fresh.photos = [...new Set([...fresh.photos, path])].slice(-8);
+  if (caption?.trim()) fresh.note = [fresh.note, caption.trim()].filter(Boolean).join("\n");
   await saveAppraise(chatId, fresh);
-  if (caption?.trim()) {
-    await new Promise((r) => setTimeout(r, 3500));
-    return runAppraisal(chatId, caption.trim());
+  if (!fresh.note) {
+    if (fresh.photos.length === 1) await sendMessage(chatId, "📸 Recibida. Envía más fotos si quieres y luego escribe las referencias y lo que pide el cliente.");
+    return;
   }
-  if (fresh.photos.length === 1) await sendMessage(chatId, "📸 Recibida. Envía más fotos si quieres, y luego escribe lo que sepas del reloj.");
+  // Con la nota ya escrita, se tasa cuando llega la última foto del álbum
+  await new Promise((r) => setTimeout(r, 4000));
+  const latest = await appraisePending(chatId);
+  if (latest && latest.photos[latest.photos.length - 1] === path) return runAppraisal(chatId, latest.note ?? "");
 }
+
+const money = (n: number | null) => (n == null ? "—" : usd(n));
+const range = (a: number | null, b: number | null) => (a != null && b != null ? `${money(a)} – ${money(b)}` : "sin datos");
 
 export async function runAppraisal(chatId: number, note: string) {
   const state = await appraisePending(chatId);
   if (!state?.photos.length) return sendMessage(chatId, "Envíame primero al menos una foto del reloj.");
+  const fullNote = [state.note, note].filter((v, i, a) => v && a.indexOf(v) === i).join("\n");
   await clearAppraise(chatId);
   await tg("sendChatAction", { chat_id: chatId, action: "typing" }).catch(() => {});
-  await sendMessage(chatId, "🔎 Analizando las fotos y comparando con tus compras y ventas… (alrededor de un minuto)");
+  await sendMessage(chatId, "🔎 Identificando los relojes, buscando precios actuales en Chrono24 y comparando con tus ventas… (1-2 minutos)");
   const { privateUrl } = await import("./private-files");
   const urls = (await Promise.all(state.photos.map((p) => privateUrl(p, 900)))).filter(Boolean) as string[];
   const { appraise } = await import("./appraisal");
-  const a = await appraise(urls, note);
-  const conf = { high: "alta", medium: "media", low: "baja" }[a.confidence];
-  const range = a.offer_low != null && a.offer_high != null ? `${usd(a.offer_low)} – ${usd(a.offer_high)}` : "sin datos suficientes";
-  const basis = { our_data: "según tus datos", general_estimate: "estimación general ⚠️", insufficient: "sin datos" }[a.basis];
+  const a = await appraise(urls, fullNote);
+  const conf = { high: "alta", medium: "media", low: "baja" } as const;
+  const basis = { market_and_our_data: "mercado + tus datos", market: "precios de mercado", our_data: "tus datos", general_estimate: "estimación general ⚠️", insufficient: "sin datos" }[a.basis];
+
+  const blocks = a.watches.map((w, i) =>
+    [
+      `${a.watches.length > 1 ? `${i + 1}. ` : ""}⌚ <b>${h(w.brand)} ${h(w.model)}</b>${w.reference ? ` · ${h(w.reference)}` : ""} <i>(confianza ${conf[w.confidence]})</i>`,
+      ...w.observations.slice(0, 3).map((o) => `   • ${h(o)}`),
+      `   📈 Mercado: <b>${range(w.market_low, w.market_high)}</b> — ${h(w.market_summary)}`,
+      `   📊 Tus datos: ${h(w.our_data)}`,
+      `   💵 Oferta sugerida: <b>${range(w.offer_low, w.offer_high)}</b>${w.expected_sale != null ? ` · venta esperada ~${money(w.expected_sale)}` : ""}`,
+    ].join("\n")
+  );
+  const total =
+    a.watches.length > 1 || a.asked_total != null
+      ? [
+          "",
+          `🧮 <b>Total: oferta ${range(a.total_offer_low, a.total_offer_high)}</b>${a.asked_total != null ? ` · piden ${money(a.asked_total)}` : ""}`,
+        ]
+      : [];
   const lines = [
-    "🔎 <b>Tasación orientativa</b>",
+    `🔎 <b>Tasación orientativa</b> (${basis})`,
     "",
-    `⌚ <b>${h(a.brand)} ${h(a.model)}</b>${a.reference ? ` · ${h(a.reference)}` : ""} <i>(confianza ${conf})</i>`,
-    ...(a.observations.length ? ["", ...a.observations.slice(0, 6).map((o) => `• ${h(o)}`)] : []),
+    blocks.join("\n\n"),
+    ...total,
     "",
-    `📊 ${h(a.data_summary)}`,
-    ...a.comparables.slice(0, 4).map((c) => `   ↳ ${h(c.sku)}: ${h(c.note)}`),
+    `🗣 ${h(a.verdict)}`,
+    ...a.warnings.slice(0, 3).map((w) => `⚠️ ${h(w)}`),
+    a.sources.length ? `\n🔗 ${a.sources.slice(0, 4).map((s) => h(s)).join("\n🔗 ")}` : "",
     "",
-    `💵 <b>Oferta sugerida: ${range}</b> (${basis})`,
-    a.expected_sale != null ? `🏷 Venta esperada: ~${usd(a.expected_sale)}` : "",
-    ...(a.warnings.length ? ["", ...a.warnings.slice(0, 4).map((w) => `⚠️ ${h(w)}`)] : []),
-    "",
-    "<i>Orientativo: revisa en mano referencia, serie, estado y papeles, y contrasta con el mercado antes de ofertar.</i>",
-  ].filter((l, i, arr) => l !== "" || arr[i - 1] !== "");
-  return sendMessage(chatId, lines.join("\n"), { reply_markup: keyboard([[{ text: "🛒 Lo compré: registrar compra", callback_data: "mnew:purchase" }]]) });
+    "<i>Orientativo: los anuncios son precios pedidos, no de venta. Revisa en mano referencia, serie, estado y papeles antes de ofertar.</i>",
+  ];
+  const text = lines.join("\n").replace(/\n{3,}/g, "\n\n");
+  // Telegram admite hasta 4096 caracteres por mensaje
+  const chunks = text.match(/[\s\S]{1,3900}(?=\n|$)/g) ?? [text];
+  for (const [i, c] of chunks.entries()) {
+    await sendMessage(chatId, c, i === chunks.length - 1 ? { reply_markup: keyboard([[{ text: a.watches.length > 1 ? "🛒 Los compré: registrar compra" : "🛒 Lo compré: registrar compra", callback_data: "mnew:purchase" }], [{ text: "🤝 Me los deja en consignación", callback_data: "mnew:consignment" }]]) } : {});
+  }
 }
 
 // /seguimientos: lo que toca hoy, con el mensaje de WhatsApp listo y botón de hecho
