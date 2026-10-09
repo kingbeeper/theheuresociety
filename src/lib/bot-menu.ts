@@ -2,7 +2,7 @@ import "server-only";
 import { after } from "next/server";
 import { adminDb } from "./supabase";
 import { escapeHtml as h, keyboard, sendMessage, tg, type InlineButton } from "./telegram";
-import { clearFlow, clearPendingCost, costCommand, demandSummary, listFollowUps, listOpenDocs, startFlow } from "./bot-docs";
+import { clearFlow, clearPendingCost, costCommand, demandSummary, listFollowUps, listOpenDocs, clearAppraise, startAppraisal, startFlow } from "./bot-docs";
 import { cutoutJob, setWatchStatus } from "./bot";
 
 // Menú con botones: un teclado fijo abajo con lo principal, y submenús con botones para todo lo
@@ -23,6 +23,7 @@ export async function onMenuText(chatId: number, text: string, user: string) {
       // Lo que estuviera a medias (un documento, la pregunta del costo) se deja: ahora las fotos son para publicar
       await clearFlow(chatId);
       await clearPendingCost(chatId);
+      await clearAppraise(chatId);
       await sendMessage(chatId, "📸 <b>Publicar un reloj</b>\n\n1. Envíame las fotos (de 1 a 10).\n2. Después escríbeme la referencia, el precio y los extras.\n<i>Ej.: Rolex 126610LN, 14500, caja y papeles</i>\n\nPrepararé la ficha y te la enseño antes de publicarla.");
       return true;
     case MENU.docs:
@@ -57,6 +58,7 @@ export async function onMenuText(chatId: number, text: string, user: string) {
             { text: "🟢 Volver a disponible", callback_data: "mst:available" },
             { text: "✂️ Repetir recorte", callback_data: "mst:case" },
           ]),
+          [{ text: "🔎 Tasar un reloj (fotos)", callback_data: "mappr:1" }],
           [{ text: "📊 Qué buscan los clientes", callback_data: "mdem:1" }],
         ]),
       });
@@ -72,7 +74,7 @@ export async function onMenuText(chatId: number, text: string, user: string) {
   return false;
 }
 
-const MENU_ACTIONS = new Set(["mnew", "mopen", "mcost", "mlist", "mst", "mset", "mcase", "mdem"]);
+const MENU_ACTIONS = new Set(["mnew", "mopen", "mcost", "mlist", "mst", "mset", "mcase", "mdem", "mappr"]);
 export const isMenuAction = (action: string) => MENU_ACTIONS.has(action);
 
 type Watch = { id: string; brand: string; model: string; reference: string; status: string };
@@ -108,6 +110,10 @@ export async function onMenuCallback(chatId: number, cbId: string, messageId: nu
 
     case "mdem":
       return demandSummary(chatId);
+
+    case "mappr":
+      await clearButtons();
+      return startAppraisal(chatId);
 
     case "mlist": {
       const { data } = await adminDb().from("watches").select("brand, model, reference, status, price, currency").in("status", ["available", "reserved", "sold"]).order("published_at", { ascending: false }).limit(20);

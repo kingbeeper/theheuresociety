@@ -80,6 +80,7 @@ export async function startFlow(chatId: number, kind: FlowKind, arg: string, use
   const { data: open } = await adminDb().from("bot_drafts").select("id").eq("chat_id", chatId).in("status", ["collecting", "analyzing", "ready"]);
   for (const d of open ?? []) await updateDraft(d.id as string, { status: "cancelled", awaiting: null });
 
+  await clearAppraise(chatId);
   const flow: DocFlow = { kind, step: "watch", user, lang: "en", tax: kind === "invoice" ? Number(settings.doc_tax_rate) || 0 : 0 };
   await saveFlow(chatId, flow);
   if (kind === "purchase") {
@@ -494,6 +495,13 @@ export async function onCallback(chatId: number, cbId: string, messageId: number
   const clearButtons = () => tg("editMessageReplyMarkup", { chat_id: chatId, message_id: messageId, reply_markup: keyboard([]) }).catch(() => {});
 
   // Botones de un documento ya creado (no dependen del asistente)
+  if (action === "dappr") {
+    await answer("Cancelado");
+    await clearButtons();
+    await clearAppraise(chatId);
+    return;
+  }
+
   if (action === "dcost") {
     await answer();
     await clearButtons();
@@ -818,6 +826,78 @@ export async function onCostButton(chatId: number, arg: string, user: string) {
     return mode === "cost" ? setCost(chatId, itemId, p.amount, user) : addExtra(chatId, itemId, p.amount, p.concept ?? null, user);
   }
   return askCost(chatId, itemId, mode);
+}
+
+// ───────────────────────────── Tasación por foto ─────────────────────────────
+const appraiseKey = (chatId: number) => `tgappraise:${chatId}`;
+
+export async function appraisePending(chatId: number) {
+  const { data } = await adminDb().from("integration_settings").select("value").eq("key", appraiseKey(chatId)).maybeSingle();
+  try {
+    return data ? (JSON.parse(data.value as string) as { photos: string[] }) : null;
+  } catch {
+    return null;
+  }
+}
+const saveAppraise = (chatId: number, v: { photos: string[] }) =>
+  adminDb().from("integration_settings").upsert({ key: appraiseKey(chatId), value: JSON.stringify(v), updated_at: new Date().toISOString() }, { onConflict: "key" });
+export const clearAppraise = (chatId: number) => adminDb().from("integration_settings").delete().eq("key", appraiseKey(chatId));
+
+export async function startAppraisal(chatId: number) {
+  await clearFlow(chatId);
+  await clearPendingCost(chatId);
+  await saveAppraise(chatId, { photos: [] });
+  return sendMessage(chatId, "🔎 <b>Tasar un reloj</b>\n\n1. Envíame fotos del reloj que te ofrecen (esfera, caja, brazalete, papeles…).\n2. Después escribe lo que sepas: referencia, año, si trae caja y papeles y lo que pide el vendedor.\n<i>Ej.: 126610LN 2021, full set, pide 12.500</i>\n\nTe daré un rango de oferta según tus compras y ventas.", {
+    reply_markup: keyboard([[{ text: "Cancelar", callback_data: "dappr:cancel" }]]),
+  });
+}
+
+// Foto para la tasación (bucket privado; la IA la lee con un enlace temporal)
+export async function onAppraisalPhoto(chatId: number, fileId: string, messageId: number, caption: string | undefined) {
+  const state = (await appraisePending(chatId)) ?? { photos: [] };
+  const { downloadFile } = await import("./telegram");
+  const { uploadPrivate } = await import("./private-files");
+  const path = await uploadPrivate(`appraisals/${chatId}-${messageId}.jpg`, await downloadFile(fileId), "image/jpeg");
+  // En un álbum las fotos llegan a la vez: se relee el estado justo antes de guardar
+  const fresh = (await appraisePending(chatId)) ?? state;
+  fresh.photos = [...new Set([...fresh.photos, path])].slice(-8);
+  await saveAppraise(chatId, fresh);
+  if (caption?.trim()) {
+    await new Promise((r) => setTimeout(r, 3500));
+    return runAppraisal(chatId, caption.trim());
+  }
+  if (fresh.photos.length === 1) await sendMessage(chatId, "📸 Recibida. Envía más fotos si quieres, y luego escribe lo que sepas del reloj.");
+}
+
+export async function runAppraisal(chatId: number, note: string) {
+  const state = await appraisePending(chatId);
+  if (!state?.photos.length) return sendMessage(chatId, "Envíame primero al menos una foto del reloj.");
+  await clearAppraise(chatId);
+  await tg("sendChatAction", { chat_id: chatId, action: "typing" }).catch(() => {});
+  await sendMessage(chatId, "🔎 Analizando las fotos y comparando con tus compras y ventas… (alrededor de un minuto)");
+  const { privateUrl } = await import("./private-files");
+  const urls = (await Promise.all(state.photos.map((p) => privateUrl(p, 900)))).filter(Boolean) as string[];
+  const { appraise } = await import("./appraisal");
+  const a = await appraise(urls, note);
+  const conf = { high: "alta", medium: "media", low: "baja" }[a.confidence];
+  const range = a.offer_low != null && a.offer_high != null ? `${usd(a.offer_low)} – ${usd(a.offer_high)}` : "sin datos suficientes";
+  const basis = { our_data: "según tus datos", general_estimate: "estimación general ⚠️", insufficient: "sin datos" }[a.basis];
+  const lines = [
+    "🔎 <b>Tasación orientativa</b>",
+    "",
+    `⌚ <b>${h(a.brand)} ${h(a.model)}</b>${a.reference ? ` · ${h(a.reference)}` : ""} <i>(confianza ${conf})</i>`,
+    ...(a.observations.length ? ["", ...a.observations.slice(0, 6).map((o) => `• ${h(o)}`)] : []),
+    "",
+    `📊 ${h(a.data_summary)}`,
+    ...a.comparables.slice(0, 4).map((c) => `   ↳ ${h(c.sku)}: ${h(c.note)}`),
+    "",
+    `💵 <b>Oferta sugerida: ${range}</b> (${basis})`,
+    a.expected_sale != null ? `🏷 Venta esperada: ~${usd(a.expected_sale)}` : "",
+    ...(a.warnings.length ? ["", ...a.warnings.slice(0, 4).map((w) => `⚠️ ${h(w)}`)] : []),
+    "",
+    "<i>Orientativo: revisa en mano referencia, serie, estado y papeles, y contrasta con el mercado antes de ofertar.</i>",
+  ].filter((l, i, arr) => l !== "" || arr[i - 1] !== "");
+  return sendMessage(chatId, lines.join("\n"), { reply_markup: keyboard([[{ text: "🛒 Lo compré: registrar compra", callback_data: "mnew:purchase" }]]) });
 }
 
 // /seguimientos: lo que toca hoy, con el mensaje de WhatsApp listo y botón de hecho

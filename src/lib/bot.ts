@@ -11,7 +11,7 @@ import { downloadFile, escapeHtml as h, keyboard, sendMessage, sendPhoto, tg } f
 import { toSlug } from "./watches";
 import { MENU, WELCOME, mainKeyboard } from "./bot-keyboard";
 import { isMenuAction, onMenuCallback, onMenuText } from "./bot-menu";
-import { FLOW_COMMANDS, afterAnalysis, onSellerIdPhoto, askCost, costCommand, onCostText, attachDraft, clearFlow, getFlow, demandSummary, listFollowUps, listOpenDocs, onCallback, onContact, onText, resendDoc, startFlow } from "./bot-docs";
+import { FLOW_COMMANDS, afterAnalysis, onSellerIdPhoto, appraisePending, clearAppraise, onAppraisalPhoto, runAppraisal, startAppraisal, askCost, costCommand, onCostText, attachDraft, clearFlow, getFlow, demandSummary, listFollowUps, listOpenDocs, onCallback, onContact, onText, resendDoc, startFlow } from "./bot-docs";
 
 // ───────────────────────── Tipos de Telegram (solo lo que usamos) ─────────────────────────
 type TgPhoto = { file_id: string; width: number; height: number };
@@ -97,6 +97,8 @@ export async function handleMessage(msg: TgMessage) {
   const text = (msg.text ?? "").trim();
   if (text.startsWith("/")) return handleCommand(chatId, text, userLabel(msg.from));
   if (text && (await onMenuText(chatId, text, userLabel(msg.from)))) return;
+  // Nota de la tasación (después de las fotos)
+  if (text && (await appraisePending(chatId))) return runAppraisal(chatId, text);
 
   // Asistente de documentos en curso: los textos y contactos son sus respuestas
   const flow = await getFlow(chatId);
@@ -128,6 +130,9 @@ export async function handleMessage(msg: TgMessage) {
 async function handlePhoto(msg: TgMessage) {
   const chatId = msg.chat.id;
   const best = msg.photo!.reduce((a, b) => (b.width * b.height > a.width * a.height ? b : a));
+
+  // Tasación en curso: las fotos son del reloj a tasar
+  if (await appraisePending(chatId)) return onAppraisalPhoto(chatId, best.file_id, msg.message_id, msg.caption);
 
   // Compra en curso esperando la identificación del vendedor: la foto es su documento
   const idFlow = await getFlow(chatId);
@@ -589,6 +594,8 @@ async function handleCommand(chatId: number, text: string, user: string) {
   switch (command) {
     case "/documentos":
       return listOpenDocs(chatId);
+    case "/tasar":
+      return startAppraisal(chatId);
     case "/costo":
       return costCommand(chatId, arg, user);
     case "/gasto":
@@ -629,6 +636,7 @@ async function handleCommand(chatId: number, text: string, user: string) {
       const flow = await getFlow(chatId);
       if (draft) await updateDraft(draft.id, { status: "cancelled", awaiting: null });
       if (flow) await clearFlow(chatId);
+      await clearAppraise(chatId);
       return sendMessage(chatId, draft || flow ? "Cancelado." : "No hay nada en curso.");
     }
 
