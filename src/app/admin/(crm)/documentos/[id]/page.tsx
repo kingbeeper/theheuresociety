@@ -59,7 +59,7 @@ export default async function DocumentPage({ params }: PageProps<"/admin/documen
       <div className="grid grid-cols-2 gap-px border border-line bg-line md:grid-cols-4">
         {[
           ["Estado", late ? lateLabel : STATUS_LABEL[d.kind][d.status] ?? d.status],
-          [d.kind === "consignment" ? "Neto al dueño" : "Total", usd(d.total)],
+          [d.kind === "consignment" ? "Neto al dueño" : d.kind === "purchase" ? "Pagado al vendedor" : "Total", usd(d.total)],
           ["Fecha", fmtDate(`${d.issue_date}T12:00:00`)],
           [d.kind === "quote" ? "Válida hasta" : d.kind === "memo" ? "Devolver antes de" : d.kind === "consignment" ? (d.status === "paid" ? "Pagada al dueño el" : "Vigente hasta") : d.status === "paid" ? "Pagada el" : "Vence", d.status === "paid" && d.paid_at ? fmtDate(`${d.paid_at}T12:00:00`) : d.due_date ? fmtDate(`${d.due_date}T12:00:00`) : "—"],
         ].map(([l, v]) => (
@@ -75,7 +75,7 @@ export default async function DocumentPage({ params }: PageProps<"/admin/documen
         <div className="flex flex-wrap items-center gap-2">
           {d.status === "draft" && (
             <form action={sendDocument.bind(null, d.id)}>
-              <button className={button}>{d.kind === "memo" ? "Marcar como entregado" : d.kind === "invoice" ? "Emitir factura" : d.kind === "consignment" ? "Marcar como firmado" : "Marcar como enviada"}</button>
+              <button className={button}>{d.kind === "memo" ? "Marcar como entregado" : d.kind === "invoice" ? "Emitir factura" : (d.kind === "consignment" || d.kind === "purchase") ? "Marcar como firmado" : "Marcar como enviada"}</button>
             </form>
           )}
           {d.kind === "quote" && d.status === "sent" && (
@@ -134,7 +134,7 @@ export default async function DocumentPage({ params }: PageProps<"/admin/documen
             kind={d.kind}
             customers={customers}
             stock={[...stock, ...d.items.filter((l) => l.item_id && !stock.some((x) => x.id === l.item_id)).map((l) => ({ id: l.item_id!, sku: l.sku ?? "", title: l.title, details: l.details ?? "", serial: l.serial ?? null, price: l.price }))]}
-            terms={{ quote: s.doc_terms_quote, memo: s.doc_terms_memo, invoice: s.doc_terms_invoice, consignment: s.doc_terms_consignment }}
+            terms={{ quote: s.doc_terms_quote, memo: s.doc_terms_memo, invoice: s.doc_terms_invoice, consignment: s.doc_terms_consignment, purchase: s.doc_terms_purchase }}
             taxRate={Number(s.doc_tax_rate) || 0}
             today={today}
           />

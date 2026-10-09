@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { markPaid, saveDocument } from "@/app/admin/document-actions";
-import { KIND_LABEL, docTotals, usd, type Doc, type DocKind, type DocLine } from "@/lib/doc-labels";
+import { ID_TYPES, KIND_LABEL, docTotals, usd, type Doc, type DocKind, type DocLine } from "@/lib/doc-labels";
 import { PAYMENT } from "@/lib/stock-labels";
 
 const field =
@@ -15,8 +15,8 @@ export type CustomerOption = { id: string; label: string; name: string | null; e
 export type StockOption = { id: string; sku: string; title: string; details: string; serial: string | null; price: number | null; cost?: number | null };
 
 const addDays = (iso: string, n: number) => new Date(new Date(`${iso}T12:00:00Z`).getTime() + n * 86_400_000).toISOString().slice(0, 10);
-const DUE_DAYS: Record<DocKind, number> = { quote: 7, memo: 14, invoice: 0, consignment: 90 };
-const noTax = (k: DocKind) => k === "memo" || k === "consignment";
+const DUE_DAYS: Record<DocKind, number> = { quote: 7, memo: 14, invoice: 0, consignment: 90, purchase: 0 };
+const noTax = (k: DocKind) => k === "memo" || k === "consignment" || k === "purchase";
 
 export function DocumentForm({
   doc, kind: initialKind, customers, stock, terms, taxRate, today, presetCustomer, presetItem,
@@ -41,7 +41,7 @@ export function DocumentForm({
     client_phone: doc?.client_phone ?? preset?.phone ?? "",
   });
   // En consignación, el importe de la línea es el neto al dueño (el «costo» del inventario)
-  const fromStock = (s: StockOption, k: DocKind = kind): DocLine => ({ item_id: s.id, sku: s.sku, title: s.title, details: s.details, serial: s.serial, qty: 1, price: (k === "consignment" ? s.cost : s.price) ?? 0 });
+  const fromStock = (s: StockOption, k: DocKind = kind): DocLine => ({ item_id: s.id, sku: s.sku, title: s.title, details: s.details, serial: s.serial, qty: 1, price: (k === "consignment" || k === "purchase" ? s.cost : s.price) ?? 0 });
   const presetLine = stock.find((s) => s.id === presetItem);
   const [lines, setLines] = useState<DocLine[]>(doc?.items ?? (presetLine ? [fromStock(presetLine, initialKind)] : []));
   const [discount, setDiscount] = useState(String(doc?.discount ?? 0));
@@ -79,10 +79,14 @@ export function DocumentForm({
           {doc && <input type="hidden" name="kind" value={kind} />}
         </label>
         <label><span className={label}>Fecha</span><input name="issue_date" type="date" defaultValue={doc?.issue_date ?? today} className={field} /></label>
-        <label>
-          <span className={label}>{kind === "quote" ? "Válida hasta" : kind === "memo" ? "Devolver antes de" : kind === "consignment" ? "Vigente hasta" : "Vence"}</span>
-          <input name="due_date" type="date" value={due} onChange={(e) => setDue(e.target.value)} className={field} />
-        </label>
+        {kind !== "purchase" ? (
+          <label>
+            <span className={label}>{kind === "quote" ? "Válida hasta" : kind === "memo" ? "Devolver antes de" : kind === "consignment" ? "Vigente hasta" : "Vence"}</span>
+            <input name="due_date" type="date" value={due} onChange={(e) => setDue(e.target.value)} className={field} />
+          </label>
+        ) : (
+          <div />
+        )}
         <label>
           <span className={label}>Idioma del documento</span>
           <select name="lang" defaultValue={doc?.lang ?? "en"} className={field}>
@@ -93,7 +97,7 @@ export function DocumentForm({
       </div>
 
       <div className="grid gap-4">
-        <p className={section}>{kind === "consignment" ? "Consignante (dueño del reloj)" : "Cliente"}</p>
+        <p className={section}>{kind === "consignment" ? "Consignante (dueño del reloj)" : kind === "purchase" ? "Vendedor" : "Cliente"}</p>
         <label>
           <span className={label}>Cliente del CRM</span>
           <select name="customer_id" value={customer} onChange={(e) => pickCustomer(e.target.value)} className={field}>
@@ -112,6 +116,20 @@ export function DocumentForm({
 
       <div className="grid gap-3">
         <p className={section}>Relojes y conceptos</p>
+        {kind === "purchase" && (
+          <div className="grid gap-4 sm:grid-cols-3">
+            <label>
+              <span className={label}>Identificación</span>
+              <select name="seller_id_type" defaultValue={doc?.seller_id_type ?? "Driver's license"} className={field}>
+                {ID_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </label>
+            <label><span className={label}>Número</span><input name="seller_id_number" defaultValue={doc?.seller_id_number ?? ""} autoComplete="off" className={field} /></label>
+            <label><span className={label}>Fecha de nacimiento</span><input name="seller_dob" type="date" defaultValue={doc?.seller_dob ?? ""} className={field} /></label>
+            <p className="text-xs text-stone sm:col-span-3">El número completo y la fecha de nacimiento quedan solo en el CRM; el documento muestra los 4 últimos caracteres.</p>
+          </div>
+        )}
+        {kind === "purchase" && <p className="text-xs text-stone">El precio de cada línea es lo que <b>pagamos al vendedor</b>.</p>}
         {kind === "consignment" && <p className="text-xs text-stone">El precio de cada línea es el <b>neto al dueño</b>: lo que le pagaremos cuando se venda.</p>}
         {lines.map((l, i) => (
           <div key={i} className="grid gap-2 border border-line/70 p-3 sm:grid-cols-[1.4fr_1fr_0.8fr_70px_130px_auto] sm:items-start">

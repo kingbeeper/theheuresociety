@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { PDFDocument, degrees, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import fontkit from "@pdf-lib/fontkit";
-import { PRINT, docTotals, usd, type Doc, type DocSettings } from "./doc-labels";
+import { PRINT, docTotals, maskedId, usd, type Doc, type DocSettings } from "./doc-labels";
 
 // PDF de cotizaciones, memos, facturas y consignaciones, con el mismo diseño que la página del
 // cliente (/d/…). Se genera en el servidor: sirve para descargarlo y para enviarlo por Telegram.
@@ -36,6 +36,8 @@ export async function renderDocPdf(d: Doc, s: Required<DocSettings>) {
   const logo = await pdf.embedPng(a.logo);
   const t = PRINT[d.lang];
   const consign = d.kind === "consignment";
+  const purchase = d.kind === "purchase";
+  const sellerId = purchase ? maskedId(d) : null;
   const totals = docTotals(d);
   pdf.setTitle(`${t[d.kind]} ${d.number} · ${s.doc_company}`);
   pdf.setAuthor(s.doc_company);
@@ -95,7 +97,7 @@ export async function renderDocPdf(d: Doc, s: Required<DocSettings>) {
   text(title, W - M, y - 20, { font: display, size: consign ? 21 : 26, align: "right", track: 0.6 });
   const date = (iso: string | null) =>
     iso ? new Intl.DateTimeFormat(d.lang === "es" ? "es-ES" : "en-US", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${iso}T12:00:00Z`)) : "-";
-  const meta: [string, string][] = [[t.number, d.number], [t.date, date(d.issue_date)], ...(d.due_date ? [[t.due[d.kind], date(d.due_date)] as [string, string]] : [])];
+  const meta: [string, string][] = [[t.number, d.number], [t.date, date(d.issue_date)], ...(d.due_date && t.due[d.kind] ? [[t.due[d.kind], date(d.due_date)] as [string, string]] : [])];
   meta.forEach(([k, v], i) => {
     text(v, W - M, y - 40 - i * 12, { size: 8.5, align: "right" });
     text(k, W - M - 110, y - 40 - i * 12, { font: light, size: 8.5, color: GRAY, align: "right" });
@@ -115,7 +117,7 @@ export async function renderDocPdf(d: Doc, s: Required<DocSettings>) {
   label(t.billTo[d.kind], M, y, { color: BRASS });
   y -= 18;
   text(d.client_name ?? "", M, y, { font: display, size: 14 });
-  const who = [d.client_company, ...(d.client_address ?? "").split("\n"), [d.client_phone, d.client_email].filter(Boolean).join(" · ")].filter(Boolean) as string[];
+  const who = [d.client_company, ...(d.client_address ?? "").split("\n"), [d.client_phone, d.client_email].filter(Boolean).join(" · "), sellerId && `${t.sellerId}: ${sellerId}`].filter(Boolean) as string[];
   for (const l of who) {
     y -= 12;
     text(l, M, y, { font: light, size: 9, color: GRAY });
@@ -169,7 +171,7 @@ export async function renderDocPdf(d: Doc, s: Required<DocSettings>) {
   }
   rule(y + 6, tx, right, INK, 0.9);
   y -= 12;
-  text(consign ? t.netTotal : t.total, tx, y, { font: display, size: 14 });
+  text(consign ? t.netTotal : purchase ? t.paidTotal : t.total, tx, y, { font: display, size: 14 });
   text(usd(totals.total), right, y, { font: display, size: 14, align: "right" });
 
   // ── notas, pago, términos ──
@@ -187,7 +189,7 @@ export async function renderDocPdf(d: Doc, s: Required<DocSettings>) {
     }
   };
   if (d.notes) block(t.notes, d.notes);
-  const payment = [d.payment_method, d.status === "paid" ? null : s.doc_payment_info].filter(Boolean).join("\n");
+  const payment = [d.payment_method, d.status === "paid" || purchase ? null : s.doc_payment_info].filter(Boolean).join("\n");
   if (d.kind !== "memo" && !consign && payment) block(t.payment, payment);
   if (d.terms) block(t.terms, d.terms);
 
@@ -203,11 +205,12 @@ export async function renderDocPdf(d: Doc, s: Required<DocSettings>) {
     sign(M, y, t.signature);
     sign(M + half + 30, y, t.date);
   }
-  if (consign) {
+  if (consign || purchase) {
+    const who = purchase ? t.purchaseSign : t.consignSign;
     ensure(110);
     y -= 50;
-    sign(M, y, t.consignSign[0]);
-    sign(M + half + 30, y, t.consignSign[1]);
+    sign(M, y, who[0]);
+    sign(M + half + 30, y, who[1]);
     y -= 34;
     sign(M, y, t.date);
     sign(M + half + 30, y, t.date);

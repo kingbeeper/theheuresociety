@@ -68,7 +68,12 @@ export async function saveDocument(id: string | null, _: unknown, f: FormData) {
     client_address: text(f, "client_address"),
     lang: text(f, "lang") === "es" ? ("es" as const) : ("en" as const),
     issue_date: date(f, "issue_date") ?? today(),
-    due_date: date(f, "due_date"),
+    due_date: kind === "purchase" ? null : date(f, "due_date"),
+    ...(kind === "purchase" && {
+      seller_id_type: text(f, "seller_id_type"),
+      seller_id_number: text(f, "seller_id_number"),
+      seller_dob: date(f, "seller_dob"),
+    }),
     items,
     discount: num(f, "discount"),
     tax_rate: num(f, "tax_rate"),
@@ -135,7 +140,7 @@ export async function markConsignorPaid(id: string) {
 export async function convertToInvoice(id: string) {
   const user = await requireAdmin();
   const d = await getDoc(id);
-  if (!d || d.kind === "invoice" || d.kind === "consignment") return;
+  if (!d || d.kind === "invoice" || d.kind === "consignment" || d.kind === "purchase") return;
   const invoice = await toInvoice(d, user);
   redirect(`/admin/documentos/${invoice.id}`);
 }

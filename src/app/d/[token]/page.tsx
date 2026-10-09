@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { adminDb } from "@/lib/supabase";
 import { getDocSettings } from "@/lib/documents";
-import { PRINT, docTotals, usd, type Doc } from "@/lib/doc-labels";
+import { PRINT, docTotals, maskedId, usd, type Doc } from "@/lib/doc-labels";
 import { PrintButton } from "./PrintButton";
 
 // Lo que ve el cliente: solo los datos del documento (nunca costos, proveedores ni notas internas)
@@ -29,6 +29,8 @@ async function SharedDocument({ params }: { params: Promise<{ token: string }> }
   const date = (iso: string | null) =>
     iso ? new Intl.DateTimeFormat(d.lang === "es" ? "es-ES" : "en-US", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${iso}T12:00:00Z`)) : "—";
   const consign = d.kind === "consignment";
+  const purchase = d.kind === "purchase";
+  const sellerId = purchase ? maskedId(d) : null;
   const stamp = d.status === "void" ? t.void : d.status === "paid" && !consign ? t.paid : null;
 
   return (
@@ -65,7 +67,7 @@ async function SharedDocument({ params }: { params: Promise<{ token: string }> }
             <dl className="mt-3 grid grid-cols-[auto_auto] justify-start gap-x-4 gap-y-1 text-xs sm:justify-end">
               <dt className="text-[#5d625e]">{t.number}</dt><dd>{d.number}</dd>
               <dt className="text-[#5d625e]">{t.date}</dt><dd>{date(d.issue_date)}</dd>
-              {d.due_date && (<><dt className="text-[#5d625e]">{t.due[d.kind]}</dt><dd>{date(d.due_date)}</dd></>)}
+              {d.due_date && t.due[d.kind] && (<><dt className="text-[#5d625e]">{t.due[d.kind]}</dt><dd>{date(d.due_date)}</dd></>)}
             </dl>
           </div>
         </header>
@@ -74,7 +76,7 @@ async function SharedDocument({ params }: { params: Promise<{ token: string }> }
           <p className="text-[0.62rem] tracking-[0.24em] uppercase text-[#8a7a52]">{t.billTo[d.kind]}</p>
           <p className="mt-2 font-display text-xl">{d.client_name}</p>
           <p className="whitespace-pre-line text-sm text-[#5d625e]">
-            {[d.client_company, d.client_address, [d.client_phone, d.client_email].filter(Boolean).join(" · ")].filter(Boolean).join("\n")}
+            {[d.client_company, d.client_address, [d.client_phone, d.client_email].filter(Boolean).join(" · "), sellerId && `${t.sellerId}: ${sellerId}`].filter(Boolean).join("\n")}
           </p>
         </section>
 
@@ -124,7 +126,7 @@ async function SharedDocument({ params }: { params: Promise<{ token: string }> }
             {totals.discount > 0 && (<><dt className="text-[#5d625e]">{t.discount}</dt><dd className="text-right tabular-nums">−{usd(totals.discount)}</dd></>)}
             {totals.tax > 0 && (<><dt className="text-[#5d625e]">{t.tax} ({Number(d.tax_rate)}%)</dt><dd className="text-right tabular-nums">{usd(totals.tax)}</dd></>)}
             {totals.shipping > 0 && (<><dt className="text-[#5d625e]">{t.shipping}</dt><dd className="text-right tabular-nums">{usd(totals.shipping)}</dd></>)}
-            <dt className="mt-2 border-t border-[#1b1f1c] pt-3 font-display text-xl">{consign ? t.netTotal : t.total}</dt>
+            <dt className="mt-2 border-t border-[#1b1f1c] pt-3 font-display text-xl">{consign ? t.netTotal : purchase ? t.paidTotal : t.total}</dt>
             <dd className="mt-2 border-t border-[#1b1f1c] pt-3 text-right font-display text-xl tabular-nums">{usd(totals.total)}</dd>
           </dl>
         </div>
@@ -133,10 +135,10 @@ async function SharedDocument({ params }: { params: Promise<{ token: string }> }
           {d.notes && (
             <div><p className="mb-1 text-[0.6rem] tracking-[0.2em] uppercase text-[#8a7a52]">{t.notes}</p><p className="whitespace-pre-line">{d.notes}</p></div>
           )}
-          {d.kind !== "memo" && !consign && (d.payment_method || s.doc_payment_info) && (
+          {d.kind !== "memo" && !consign && (d.payment_method || (!purchase && s.doc_payment_info)) && (
             <div>
               <p className="mb-1 text-[0.6rem] tracking-[0.2em] uppercase text-[#8a7a52]">{t.payment}</p>
-              <p className="whitespace-pre-line">{[d.payment_method, d.status === "paid" ? null : s.doc_payment_info].filter(Boolean).join("\n")}</p>
+              <p className="whitespace-pre-line">{[d.payment_method, d.status === "paid" || purchase ? null : s.doc_payment_info].filter(Boolean).join("\n")}</p>
             </div>
           )}
           {d.terms && (
@@ -148,9 +150,9 @@ async function SharedDocument({ params }: { params: Promise<{ token: string }> }
               <p className="border-t border-[#1b1f1c] pt-2">{t.date}</p>
             </div>
           )}
-          {consign && (
+          {(consign || purchase) && (
             <div className="mt-8 grid gap-10 sm:grid-cols-2">
-              {t.consignSign.map((who) => (
+              {(purchase ? t.purchaseSign : t.consignSign).map((who) => (
                 <div key={who}>
                   <p className="border-t border-[#1b1f1c] pt-2">{who}</p>
                   <p className="mt-6 border-t border-[#1b1f1c] pt-2">{t.date}</p>

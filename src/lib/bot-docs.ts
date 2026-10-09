@@ -21,7 +21,7 @@ import type { WatchDraft } from "./watch-ai";
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://theheuresociety.vercel.app";
 
 type FlowKind = DocKind | "purchase";
-type Step = "watch" | "photos" | "client" | "price" | "asking" | "confirm";
+type Step = "watch" | "photos" | "client" | "sellerid" | "price" | "asking" | "confirm";
 type StockPick = { id: string; sku: string; title: string; details: string; serial: string | null; price: number | null; cost: number | null; ownerId: string | null; ownerName: string | null };
 
 export type DocFlow = {
@@ -33,6 +33,7 @@ export type DocFlow = {
   watch?: { title: string; details: string; suggested: number | null };
   customerId?: string | null;
   client?: { name: string | null; phone: string | null; email: string | null };
+  sellerId?: { type: string | null; number: string } | null; // compra: identificación del vendedor
   price?: number;
   asking?: number | null; // precio en la web (consignación y compra); null = no publicar
   lang: "en" | "es";
@@ -51,7 +52,7 @@ export const FLOW_COMMANDS: Record<string, FlowKind> = {
 };
 const NAME: Record<FlowKind, string> = { ...KIND_LABEL, purchase: "Compra" };
 const ICON: Record<FlowKind, string> = { invoice: "🧾", memo: "📋", consignment: "🤝", quote: "💬", purchase: "🛒" };
-const DUE_DAYS: Record<DocKind, number> = { quote: 7, memo: 14, invoice: 0, consignment: 90 };
+const DUE_DAYS: Record<DocKind, number> = { quote: 7, memo: 14, invoice: 0, consignment: 90, purchase: 0 };
 
 // ───────────────────────────── Estado (uno por chat) ─────────────────────────────
 const key = (chatId: number) => `tgdoc:${chatId}`;
@@ -103,6 +104,14 @@ export async function onText(chatId: number, text: string, flow: DocFlow) {
     }
     case "client":
       return pickClient(chatId, parseClient(text), flow);
+    case "sellerid": {
+      // «Licencia FL D123-456-78-900» → tipo «Licencia FL», número «D123-456-78-900»
+      const m = text.trim().match(/^(.*?)\s*([A-Z0-9][A-Z0-9-]{4,})$/i);
+      flow.sellerId = m ? { type: m[1].trim() || null, number: m[2] } : { type: null, number: text.trim() };
+      flow.step = "price";
+      await saveFlow(chatId, flow);
+      return askPrice(chatId, flow);
+    }
     case "price": {
       const p = parsePrice(text);
       if (!p) return sendMessage(chatId, "No entendí el precio. Escribe un número, ej. <code>14500</code> o <code>14.5k</code>.");
@@ -250,6 +259,13 @@ async function chooseClient(chatId: number, customerId: string | null, flow: Doc
     const { data } = await adminDb().from("customers").select("name, phone, email").eq("id", customerId).single();
     flow.client = { name: data?.name ?? null, phone: data?.phone ?? null, email: data?.email ?? null };
   }
+  if (flow.kind === "purchase") {
+    flow.step = "sellerid";
+    await saveFlow(chatId, flow);
+    return sendMessage(chatId, "🪪 Identificación del vendedor: tipo y número.\n<i>Ej.: Licencia FL D123-456-78-900 · Pasaporte X1234567</i>\n\nEn el contrato solo salen los 4 últimos caracteres.", {
+      reply_markup: keyboard([[{ text: "Omitir", callback_data: "dsid:skip" }]]),
+    });
+  }
   flow.step = "price";
   await saveFlow(chatId, flow);
   return askPrice(chatId, flow);
@@ -314,13 +330,14 @@ async function confirm(chatId: number, flow: DocFlow, prefix = "") {
   if (flow.kind === "consignment" || flow.kind === "purchase") {
     if (flow.draftId) lines.push(flow.asking ? `🌐 Se publica en la web a <b>${usd(flow.asking)}</b>` : "🌐 No se publica en la web");
   }
-  if (flow.kind !== "purchase") lines.push(`📄 Documento en ${flow.lang === "en" ? "inglés" : "español"}`);
+  if (flow.kind === "purchase") lines.push(`🪪 ${flow.sellerId ? h([flow.sellerId.type, `•••• ${flow.sellerId.number.replace(/[^a-z0-9]/gi, "").slice(-4)}`].filter(Boolean).join(" ")) : "Sin identificación"}`);
+  lines.push(`📄 Documento en ${flow.lang === "en" ? "inglés" : "español"}`);
   if (flow.notes) lines.push(`📝 ${h(flow.notes)}`);
-  if (flow.kind !== "purchase") lines.push("", "<i>Escribe un texto si quieres añadir una nota al documento.</i>");
+  lines.push("", "<i>Escribe un texto si quieres añadir una nota al documento.</i>");
 
-  const rows: InlineButton[][] = [[{ text: flow.kind === "purchase" ? "✅ Registrar compra" : "✅ Crear y enviar", callback_data: "dok:1" }]];
+  const rows: InlineButton[][] = [[{ text: flow.kind === "purchase" ? "✅ Registrar compra y contrato" : "✅ Crear y enviar", callback_data: "dok:1" }]];
   const opts: InlineButton[] = [];
-  if (flow.kind !== "purchase") opts.push({ text: flow.lang === "en" ? "🌐 Cambiar a español" : "🌐 Cambiar a inglés", callback_data: "dlang:1" });
+  opts.push({ text: flow.lang === "en" ? "🌐 Cambiar a español" : "🌐 Cambiar a inglés", callback_data: "dlang:1" });
   if (flow.kind === "invoice") opts.push({ text: flow.tax ? "Sin impuesto" : "Con impuesto", callback_data: "dtax:1" });
   if (opts.length) rows.push(opts);
   rows.push([
@@ -392,11 +409,11 @@ export async function finish(chatId: number, flow: DocFlow) {
   }
   if (!item) return sendMessage(chatId, "Falta el reloj. Empieza de nuevo con el comando.");
 
-  // Compra: no lleva documento, solo el alta (con costo y vendedor)
+  // Compra: el alta queda hecha; a continuación su contrato (bill of sale) para que lo firme el vendedor
   if (flow.kind === "purchase") {
-    return sendMessage(
+    await sendMessage(
       chatId,
-      [`✅ <b>Compra registrada</b> · ${h(item.sku)}`, `${h(item.title)} · costo ${usd(price)}${name ? ` · de ${h(name)}` : ""}`, published ? `🌐 Publicado: ${published}` : "🌐 No publicado en la web", "", `${SITE_URL}/admin/inventario/${item.id}`].join("\n")
+      [`✅ <b>Compra registrada</b> · ${h(item.sku)}`, `${h(item.title)} · costo ${usd(price)}${name ? ` · de ${h(name)}` : ""}`, published ? `🌐 Publicado: ${published}` : "🌐 No publicado en la web", `${SITE_URL}/admin/inventario/${item.id}`].join("\n")
     );
   }
 
@@ -410,10 +427,12 @@ export async function finish(chatId: number, flow: DocFlow) {
     client_name: name, client_email: c?.email ?? null, client_phone: c?.phone ?? null,
     lang: flow.lang,
     issue_date: today,
-    due_date: due,
+    due_date: kind === "purchase" ? null : due,
+    ...(kind === "purchase" && flow.sellerId && { seller_id_type: flow.sellerId.type, seller_id_number: flow.sellerId.number }),
     items: [{ item_id: item.id, sku: item.sku, title: item.title, details: item.details || null, serial: item.serial, qty: 1, price }],
     tax_rate: kind === "invoice" ? flow.tax : 0,
     show_serial: kind !== "quote",
+    payment_method: null,
     notes: [flow.notes, kind === "consignment" && flow.asking ? (flow.lang === "es" ? `Precio de venta acordado: ${usd(flow.asking)}` : `Agreed listing price: ${usd(flow.asking)}`) : null].filter(Boolean).join("\n") || null,
     terms: termsFor(kind, flow.lang, settings),
     created_by: flow.user,
@@ -427,7 +446,7 @@ export async function finish(chatId: number, flow: DocFlow) {
 export async function deliver(chatId: number, d: Doc) {
   const link = `${SITE_URL}/d/${d.token}`;
   const first = (d.client_name ?? "").split(" ")[0];
-  const label = d.lang === "es" ? KIND_LABEL[d.kind].toLowerCase() : { quote: "quotation", memo: "memorandum", invoice: "invoice", consignment: "consignment agreement" }[d.kind];
+  const label = d.lang === "es" ? KIND_LABEL[d.kind].toLowerCase() : { quote: "quotation", memo: "memorandum", invoice: "invoice", consignment: "consignment agreement", purchase: "bill of sale" }[d.kind];
   const msg = d.lang === "es"
     ? `Hola ${first}, le comparto su ${label} ${d.number} de The Heure Society: ${link}`
     : `Hi ${first}, here is your ${label} ${d.number} from The Heure Society: ${link}`;
@@ -559,6 +578,12 @@ export async function onCallback(chatId: number, cbId: string, messageId: number
         return askPrice(chatId, flow);
       }
       return chooseClient(chatId, arg === "new" ? null : arg, flow);
+    case "dsid":
+      await clearButtons();
+      flow.sellerId = null;
+      flow.step = "price";
+      await saveFlow(chatId, flow);
+      return askPrice(chatId, flow);
     case "dprice":
       await clearButtons();
       flow.price = Number(arg);

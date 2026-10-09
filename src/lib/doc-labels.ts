@@ -1,6 +1,6 @@
 // Cotizaciones, memos y facturas: etiquetas y cálculos (servidor y navegador)
 
-export type DocKind = "quote" | "memo" | "invoice" | "consignment";
+export type DocKind = "quote" | "memo" | "invoice" | "consignment" | "purchase";
 export type DocStatus = "draft" | "sent" | "accepted" | "rejected" | "returned" | "paid" | "void" | "converted";
 
 export type DocLine = {
@@ -42,11 +42,15 @@ export type Doc = {
   source_id: string | null;
   created_by: string | null;
   created_at: string;
+  // Contrato de compra: identificación del vendedor (el número completo solo se ve en el CRM)
+  seller_id_type?: string | null;
+  seller_id_number?: string | null;
+  seller_dob?: string | null;
 };
 
-export const KIND_LABEL: Record<DocKind, string> = { quote: "Cotización", memo: "Memo", invoice: "Factura", consignment: "Consignación" };
-export const KIND_PLURAL: Record<DocKind, string> = { quote: "Cotizaciones", memo: "Memos", invoice: "Facturas", consignment: "Consignaciones" };
-export const KIND_PREFIX: Record<DocKind, string> = { quote: "Q", memo: "M", invoice: "INV", consignment: "C" };
+export const KIND_LABEL: Record<DocKind, string> = { quote: "Cotización", memo: "Memo", invoice: "Factura", consignment: "Consignación", purchase: "Contrato de compra" };
+export const KIND_PLURAL: Record<DocKind, string> = { quote: "Cotizaciones", memo: "Memos", invoice: "Facturas", consignment: "Consignaciones", purchase: "Compras" };
+export const KIND_PREFIX: Record<DocKind, string> = { quote: "Q", memo: "M", invoice: "INV", consignment: "C", purchase: "P" };
 
 // Estados posibles de cada tipo, con su etiqueta en el CRM
 export const STATUS_LABEL: Record<DocKind, Partial<Record<DocStatus, string>>> = {
@@ -55,6 +59,8 @@ export const STATUS_LABEL: Record<DocKind, Partial<Record<DocStatus, string>>> =
   invoice: { draft: "Borrador", sent: "Por cobrar", paid: "Pagada", void: "Anulada" },
   // Contrato con quien nos deja su reloj: activo mientras lo tenemos; termina devuelto o pagado al dueño
   consignment: { draft: "Borrador", sent: "Activa", returned: "Devuelto al dueño", paid: "Pagada al dueño", void: "Anulada" },
+  // Contrato de compra (bill of sale): reloj que compramos a un particular o dealer
+  purchase: { draft: "Borrador", sent: "Firmado", void: "Anulado" },
 };
 
 export const STATUS_STYLE: Partial<Record<DocStatus, string>> = {
@@ -84,9 +90,11 @@ export const usd = (n: number | null | undefined) =>
 // Textos del documento impreso (lo que ve el cliente), en inglés o español
 export const PRINT = {
   en: {
-    quote: "Quotation", memo: "Memorandum", invoice: "Invoice", consignment: "Consignment Agreement",
-    number: "No.", date: "Date", due: { quote: "Valid until", memo: "Return by", invoice: "Due date", consignment: "Term ends" },
-    billTo: { quote: "Prepared for", memo: "Consignee", invoice: "Bill to", consignment: "Consignor" },
+    quote: "Quotation", memo: "Memorandum", invoice: "Invoice", consignment: "Consignment Agreement", purchase: "Bill of Sale",
+    number: "No.", date: "Date", due: { quote: "Valid until", memo: "Return by", invoice: "Due date", consignment: "Term ends", purchase: "" },
+    billTo: { quote: "Prepared for", memo: "Consignee", invoice: "Bill to", consignment: "Consignor", purchase: "Seller" },
+    purchaseSign: ["Seller — signature", "The Heure Society — signature"],
+    paidTotal: "Total paid to seller", sellerId: "ID",
     item: "Description", serial: "Serial", qty: "Qty", price: "Price", amount: "Amount", net: "Net to consignor",
     consignSign: ["Consignor — signature", "The Heure Society — signature"],
     subtotal: "Subtotal", discount: "Discount", tax: "Sales tax", shipping: "Shipping & insurance", total: "Total",
@@ -95,9 +103,11 @@ export const PRINT = {
     netTotal: "Total net to consignor",
   },
   es: {
-    quote: "Cotización", memo: "Memorándum", invoice: "Factura", consignment: "Contrato de consignación",
-    number: "N.º", date: "Fecha", due: { quote: "Válida hasta", memo: "Devolver antes de", invoice: "Vencimiento", consignment: "Vigente hasta" },
-    billTo: { quote: "Preparada para", memo: "Recibe en memo", invoice: "Facturar a", consignment: "Consignante" },
+    quote: "Cotización", memo: "Memorándum", invoice: "Factura", consignment: "Contrato de consignación", purchase: "Contrato de compraventa",
+    number: "N.º", date: "Fecha", due: { quote: "Válida hasta", memo: "Devolver antes de", invoice: "Vencimiento", consignment: "Vigente hasta", purchase: "" },
+    billTo: { quote: "Preparada para", memo: "Recibe en memo", invoice: "Facturar a", consignment: "Consignante", purchase: "Vendedor" },
+    purchaseSign: ["Vendedor — firma", "The Heure Society — firma"],
+    paidTotal: "Total pagado al vendedor", sellerId: "Identificación",
     item: "Descripción", serial: "Serie", qty: "Cant.", price: "Precio", amount: "Importe", net: "Neto al consignante",
     consignSign: ["Consignante — firma", "The Heure Society — firma"],
     subtotal: "Subtotal", discount: "Descuento", tax: "Impuesto de ventas", shipping: "Envío y seguro", total: "Total",
@@ -110,7 +120,7 @@ export const PRINT = {
 // Ajustes del negocio que salen en los documentos (se editan en Documentos → Ajustes)
 export const DOC_SETTING_KEYS = [
   "doc_company", "doc_address", "doc_phone", "doc_email", "doc_tax_id", "doc_payment_info", "doc_tax_rate",
-  "doc_terms_quote", "doc_terms_memo", "doc_terms_invoice", "doc_terms_consignment", "doc_review_url",
+  "doc_terms_quote", "doc_terms_memo", "doc_terms_invoice", "doc_terms_consignment", "doc_terms_purchase", "doc_review_url",
 ] as const;
 export type DocSettings = Partial<Record<(typeof DOC_SETTING_KEYS)[number], string>>;
 
@@ -130,6 +140,8 @@ export const DOC_DEFAULTS: Required<DocSettings> = {
     "The merchandise listed is delivered on memorandum only, for examination, and remains the property of The Heure Society until paid for in full. It is not sold or consigned for sale. The recipient is responsible for loss, theft or damage while in their possession and must return it, in the same condition, by the return date shown or upon request.",
   doc_terms_consignment:
     "The Consignor confirms they are the lawful owner of the timepiece(s) listed, free of any lien, and authorizes The Heure Society to offer them for sale during the term shown. Upon sale, The Heure Society will pay the Consignor the net amount shown within 5 business days of receiving cleared funds. The Heure Society may sell above the net amount and retains the difference. The timepiece(s) will be insured while in our care. If unsold at the end of the term, the Consignor may renew this agreement or collect the timepiece(s).",
+  doc_terms_purchase:
+    "The Seller sells the timepiece(s) listed to The Heure Society for the total shown and confirms that they are the lawful owner; that the timepiece(s) are free of any lien, claim or encumbrance and have not been reported lost or stolen; and that, to the best of their knowledge, they are authentic and as described. The Seller will indemnify The Heure Society for any loss arising from a breach of these statements. Title passes to The Heure Society upon payment.",
   doc_terms_invoice:
     "Title passes to the buyer upon receipt of payment in full. All timepieces are authenticated and sold as described. All sales are final unless otherwise agreed in writing.",
 };
@@ -142,6 +154,8 @@ const TERMS_ES: Record<DocKind, string> = {
     "La mercancía indicada se entrega únicamente en memorándum, para su examen, y sigue siendo propiedad de The Heure Society hasta su pago total. No se vende ni se entrega en consignación para la venta. Quien la recibe responde de su pérdida, robo o daño mientras esté en su poder y debe devolverla, en el mismo estado, antes de la fecha indicada o cuando se le solicite.",
   invoice:
     "La propiedad pasa al comprador al recibirse el pago total. Todos los relojes están autenticados y se venden tal como se describen. Todas las ventas son definitivas salvo acuerdo por escrito.",
+  purchase:
+    "El Vendedor vende a The Heure Society el reloj o relojes indicados por el total que figura y confirma que es su propietario legítimo; que están libres de cargas o reclamaciones y no han sido denunciados como perdidos o robados; y que, a su leal saber, son auténticos y tal como se describen. El Vendedor indemnizará a The Heure Society por cualquier perjuicio derivado del incumplimiento de estas declaraciones. La propiedad pasa a The Heure Society al realizarse el pago.",
   consignment:
     "El Consignante confirma que es el propietario legítimo del reloj o relojes indicados, libres de cargas, y autoriza a The Heure Society a ofrecerlos a la venta durante el plazo indicado. Al venderse, The Heure Society pagará al Consignante el importe neto indicado dentro de los 5 días hábiles siguientes a recibir los fondos. The Heure Society puede vender por encima del neto y se queda con la diferencia. El reloj estará asegurado mientras esté bajo nuestra custodia. Si no se vende al terminar el plazo, el Consignante puede renovar este acuerdo o retirar el reloj.",
 };
@@ -151,3 +165,9 @@ export function termsFor(kind: DocKind, lang: "en" | "es", s: Required<DocSettin
   const saved = s[key];
   return lang === "es" && saved === DOC_DEFAULTS[key] ? TERMS_ES[kind] : saved;
 }
+
+// En el documento solo salen los 4 últimos caracteres del documento de identidad
+export const maskedId = (d: Pick<Doc, "seller_id_type" | "seller_id_number">) =>
+  d.seller_id_number ? `${d.seller_id_type ? `${d.seller_id_type} ` : ""}•••• ${d.seller_id_number.replace(/[^a-z0-9]/gi, "").slice(-4)}` : null;
+
+export const ID_TYPES = ["Driver's license", "Passport", "State ID", "Otro"];

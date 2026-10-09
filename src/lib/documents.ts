@@ -145,7 +145,9 @@ const isoToday = () => new Date().toISOString().slice(0, 10);
 // Enviado / entregado / firmado
 export async function issueDoc(d: Doc, user: string) {
   await touch(d.id, { status: "sent" });
-  if (d.kind === "consignment") {
+  if (d.kind === "purchase") {
+    await docEvent(d, `contrato de compra firmado (${usd(d.total)})`, user);
+  } else if (d.kind === "consignment") {
     await docEvent(d, `contrato firmado (neto al dueño ${usd(d.total)})`, user);
   } else if (d.kind === "quote") {
     await docEvent(d, `enviada (${usd(d.total)})`, user);

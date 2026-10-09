@@ -21,13 +21,13 @@ export default async function NewDocumentPage({ searchParams }: PageProps<"/admi
   return (
     <>
       <Link href="/admin/documentos" className="text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">← Documentos</Link>
-      <PageTitle eyebrow="Documentos" title={kind === "memo" ? "Nuevo memo" : kind === "consignment" ? "Nuevo contrato de consignación" : `Nueva ${KIND_LABEL[kind].toLowerCase()}`} />
+      <PageTitle eyebrow="Documentos" title={kind === "memo" ? "Nuevo memo" : kind === "consignment" ? "Nuevo contrato de consignación" : kind === "purchase" ? "Nuevo contrato de compra" : `Nueva ${KIND_LABEL[kind].toLowerCase()}`} />
       <Card>
         <DocumentForm
           kind={kind}
           customers={customers}
           stock={stock}
-          terms={{ quote: s.doc_terms_quote, memo: s.doc_terms_memo, invoice: s.doc_terms_invoice, consignment: s.doc_terms_consignment }}
+          terms={{ quote: s.doc_terms_quote, memo: s.doc_terms_memo, invoice: s.doc_terms_invoice, consignment: s.doc_terms_consignment, purchase: s.doc_terms_purchase }}
           taxRate={Number(s.doc_tax_rate) || 0}
           today={todayInMiami(new Date(requestTime()))}
           presetCustomer={one(sp.cliente)}
