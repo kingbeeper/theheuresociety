@@ -151,7 +151,7 @@ async function pickWatch(chatId: number, query: string, flow: DocFlow) {
   const found = (data ?? []).filter((i) => {
     const hay = `${i.sku} ${i.brand} ${i.model ?? ""} ${i.reference ?? ""}`;
     const w = words(hay);
-    return q.every((x) => w.some((y) => y.includes(x))) || (i.reference && compact(query).includes(compact(i.reference as string)));
+    return q.every((x) => w.some((y) => y.includes(x))) || (i.reference && compact(query).includes(compact(i.reference as string))) || compact(hay).includes(compact(query));
   });
   if (!found.length) {
     return sendMessage(chatId, `No encontré «${h(query)}» entre los relojes disponibles del inventario.\n\n📸 Envíame las <b>fotos</b> del reloj y lo doy de alta, o escribe otra referencia.`);
@@ -479,6 +479,17 @@ export async function onCallback(chatId: number, cbId: string, messageId: number
   const clearButtons = () => tg("editMessageReplyMarkup", { chat_id: chatId, message_id: messageId, reply_markup: keyboard([]) }).catch(() => {});
 
   // Botones de un documento ya creado (no dependen del asistente)
+  if (action === "dcost") {
+    await answer();
+    await clearButtons();
+    if (arg === "skip") {
+      await clearPendingCost(chatId);
+      return sendMessage(chatId, "De acuerdo. Cuando quieras: <code>/costo</code> te muestra los relojes sin costo.");
+    }
+    const [itemId, amount] = arg.split("|");
+    return amount ? setCost(chatId, itemId, Number(amount), user) : askCost(chatId, itemId);
+  }
+
   if (action === "dtask") {
     const { completeTask } = await import("./tasks");
     const done = await completeTask(arg, user);
@@ -656,6 +667,94 @@ export async function demandSummary(chatId: number) {
     return `${gap > 0 ? "🟢" : "⚪"} <b>${h(r.family)}</b>: ${r.people.length} cliente(s) · ${r.stock.length} en stock${gap > 0 ? ` → <b>comprar ${gap}</b>` : ""}`;
   });
   return sendMessage(chatId, `<b>Demanda frente a inventario</b>\n🟢 = conviene comprar\n\n${lines.join("\n")}\n\n${SITE_URL}/admin/demanda`);
+}
+
+// ───────────────────────────── Costo de un reloj ─────────────────────────────
+// /costo · /costo 126610LN · /costo THS-0004 9500 · y la pregunta que llega al publicar
+const costKey = (chatId: number) => `tgcost:${chatId}`;
+
+export async function pendingCost(chatId: number) {
+  const { data } = await adminDb().from("integration_settings").select("value").eq("key", costKey(chatId)).maybeSingle();
+  return (data?.value as string | undefined) ?? null;
+}
+const clearPendingCost = (chatId: number) => adminDb().from("integration_settings").delete().eq("key", costKey(chatId));
+
+export async function askCost(chatId: number, itemId: string, intro = "") {
+  const { data: i } = await adminDb().from("inventory_items").select("sku, brand, model, reference, cost, asking_price").eq("id", itemId).single();
+  if (!i) return sendMessage(chatId, "Ese reloj ya no está en el inventario.");
+  await adminDb().from("integration_settings").upsert({ key: costKey(chatId), value: itemId, updated_at: new Date().toISOString() }, { onConflict: "key" });
+  return sendMessage(
+    chatId,
+    `${intro}💵 ¿Cuánto te costó <b>${h(i.brand)} ${h(i.model ?? "")}</b> (${h(i.sku)})?${i.cost != null ? `\nAhora: ${usd(Number(i.cost))}` : ""}\nEscribe el número, ej. <code>9500</code> o <code>9.5k</code>.`,
+    { reply_markup: keyboard([[{ text: "Más tarde", callback_data: "dcost:skip" }]]) }
+  );
+}
+
+export async function setCost(chatId: number, itemId: string, cost: number, user: string) {
+  await clearPendingCost(chatId);
+  const db = adminDb();
+  const { data: i } = await db.from("inventory_items").select("sku, brand, model, cost, extra_costs, asking_price, acquisition").eq("id", itemId).single();
+  if (!i) return sendMessage(chatId, "Ese reloj ya no está en el inventario.");
+  await db.from("inventory_items").update({ cost, updated_at: new Date().toISOString() }).eq("id", itemId);
+  const { logItem } = await import("./stock");
+  await logItem(itemId, "cost", `Costo: ${i.cost == null ? "—" : usd(Number(i.cost))} → ${usd(cost)} (Telegram)`, user);
+  const total = cost + Number(i.extra_costs ?? 0);
+  const ask = i.asking_price == null ? null : Number(i.asking_price);
+  const margin = ask ? `\nPrecio previsto ${usd(ask)} → margen ${usd(ask - total)} (${Math.round(((ask - total) / ask) * 100)}%)` : "";
+  return sendMessage(chatId, `✅ Costo de ${h(i.sku)} ${h(i.brand)} ${h(i.model ?? "")}: <b>${usd(cost)}</b>${margin}`);
+}
+
+// Respuesta a la pregunta del costo (devuelve false si no había ninguna pendiente)
+export async function onCostText(chatId: number, text: string, user: string) {
+  const itemId = await pendingCost(chatId);
+  if (!itemId) return false;
+  // Solo un importe («9500», «$9,500», «9.5k»): otro texto (p. ej. la nota de un reloj nuevo) no es la respuesta
+  if (!/^\s*\$?\s*\d[\d.,]*\s*k?\s*$/i.test(text)) {
+    await clearPendingCost(chatId);
+    return false;
+  }
+  const cost = parsePrice(text);
+  if (!cost) {
+    await sendMessage(chatId, "No entendí el costo. Escribe un número (ej. <code>9500</code>) o toca «Más tarde».");
+    return true;
+  }
+  await setCost(chatId, itemId, cost, user);
+  return true;
+}
+
+export async function costCommand(chatId: number, arg: string, user: string) {
+  const { data } = await adminDb()
+    .from("inventory_items")
+    .select("id, sku, brand, model, reference, cost")
+    .in("status", ["in_stock", "reserved", "sold"])
+    .order("sku");
+  const items = data ?? [];
+  // «/costo»: los que no tienen costo
+  if (!arg) {
+    const missing = items.filter((i) => i.cost == null);
+    if (!missing.length) return sendMessage(chatId, "✅ Todos los relojes tienen costo. Para cambiar uno: <code>/costo THS-0004 9500</code>");
+    return sendMessage(chatId, `<b>Relojes sin costo</b> (${missing.length})\nToca uno para ponérselo:`, {
+      reply_markup: keyboard(missing.slice(0, 20).map((i) => [{ text: `${i.sku} · ${i.brand} ${i.model ?? ""}`.replace(/\s+/g, " ").slice(0, 60), callback_data: `dcost:${i.id}` }])),
+    });
+  }
+  // «/costo 126610LN 9500»: el último número (si hay más palabras) es el costo
+  const parts = arg.trim().split(/\s+/);
+  const last = parts.length > 1 ? parsePrice(parts[parts.length - 1]) : undefined;
+  const query = last ? parts.slice(0, -1).join(" ") : arg;
+  const q = words(query);
+  const found = items.filter((i) => {
+    const hay = `${i.sku} ${i.brand} ${i.model ?? ""} ${i.reference ?? ""}`;
+    const w = words(hay);
+    // «skydweller» encuentra «Sky-Dweller»: también se compara sin espacios ni guiones
+    return q.every((x) => w.some((y) => y.includes(x))) || (i.reference && compact(query).includes(compact(i.reference as string))) || compact(hay).includes(compact(query));
+  });
+  if (!found.length) return sendMessage(chatId, `No encontré «${h(query)}» en el inventario.`);
+  if (found.length > 1) {
+    return sendMessage(chatId, "¿Cuál de estos?", {
+      reply_markup: keyboard(found.slice(0, 8).map((i) => [{ text: `${i.sku} · ${i.brand} ${i.model ?? ""}`.replace(/\s+/g, " ").slice(0, 60), callback_data: `dcost:${i.id}${last ? `|${last}` : ""}` }])),
+    });
+  }
+  return last ? setCost(chatId, found[0].id as string, last, user) : askCost(chatId, found[0].id as string);
 }
 
 // /seguimientos: lo que toca hoy, con el mensaje de WhatsApp listo y botón de hecho

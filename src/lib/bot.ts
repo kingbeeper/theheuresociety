@@ -9,7 +9,7 @@ import { reactivateBot } from "./wa-bot";
 import { addEvent, matchAlerts } from "./crm";
 import { downloadFile, escapeHtml as h, keyboard, sendMessage, sendPhoto, tg } from "./telegram";
 import { toSlug } from "./watches";
-import { FLOW_COMMANDS, afterAnalysis, attachDraft, clearFlow, getFlow, demandSummary, listFollowUps, listOpenDocs, onCallback, onContact, onText, resendDoc, startFlow } from "./bot-docs";
+import { FLOW_COMMANDS, afterAnalysis, askCost, costCommand, onCostText, attachDraft, clearFlow, getFlow, demandSummary, listFollowUps, listOpenDocs, onCallback, onContact, onText, resendDoc, startFlow } from "./bot-docs";
 
 // ───────────────────────── Tipos de Telegram (solo lo que usamos) ─────────────────────────
 type TgPhoto = { file_id: string; width: number; height: number };
@@ -61,6 +61,7 @@ Para cambiar el recorte de un reloj ya publicado, envía una foto de frente con 
 /compra — reloj comprado fuera de la oficina (alta y web)
 /documentos — documentos abiertos
 /consignaciones — consignaciones activas (devolver o pagar al dueño)
+/costo — relojes sin costo · <code>/costo THS-0004 9500</code> para ponerlo directo
 /seguimientos — clientes a contactar hoy (reseñas, aniversarios, servicio…)
 /demanda — qué buscan los clientes frente a lo que hay en stock
 /memos — relojes en memo · /facturas — facturas por cobrar
@@ -123,6 +124,8 @@ export async function handleMessage(msg: TgMessage) {
   if (flow && msg.contact) return onContact(chatId, msg.contact, flow);
   if (!text) return;
   if (flow) return onText(chatId, text, flow);
+  // Respuesta a «¿cuánto te costó?»
+  if (await onCostText(chatId, text, userLabel(msg.from))) return;
 
   const draft = await openDraft(chatId);
 
@@ -309,6 +312,9 @@ export async function handleCallback(cb: TgCallback) {
     after(() => cutoutJob(chatId, id));
     // Compradores que esperaban una pieza así (búsquedas «avísenme» del CRM)
     after(() => notifyAlertMatches(chatId, draft.data!, slug).catch((e) => console.error("Avisos:", e)));
+    // El costo (para el margen): se pregunta al momento; se puede dejar para más tarde
+    const { data: stock } = await adminDb().from("inventory_items").select("id").eq("watch_id", id).maybeSingle();
+    if (stock) await askCost(chatId, stock.id as string);
     return;
   }
 
@@ -575,6 +581,8 @@ async function handleCommand(chatId: number, text: string, user: string) {
   switch (command) {
     case "/documentos":
       return listOpenDocs(chatId);
+    case "/costo":
+      return costCommand(chatId, arg, user);
     case "/seguimientos":
       return listFollowUps(chatId);
     case "/demanda":
