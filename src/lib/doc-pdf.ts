@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { PDFDocument, degrees, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import fontkit from "@pdf-lib/fontkit";
 import { PRINT, docTotals, maskedId, usd, type Doc, type DocSettings } from "./doc-labels";
+import { downloadPrivate } from "./private-files";
 
 // PDF de cotizaciones, memos, facturas y consignaciones, con el mismo diseño que la página del
 // cliente (/d/…). Se genera en el servidor: sirve para descargarlo y para enviarlo por Telegram.
@@ -195,25 +196,51 @@ export async function renderDocPdf(d: Doc, s: Required<DocSettings>) {
 
   // ── firmas ──
   const half = (W - 2 * M - 30) / 2;
-  const sign = (x: number, yy: number, caption: string) => {
+  const sigBytes = d.signature_path ? await downloadPrivate(d.signature_path) : null;
+  const sigImage = sigBytes ? await pdf.embedPng(sigBytes) : null;
+  const signedOn = d.signed_at
+    ? new Intl.DateTimeFormat(d.lang === "es" ? "es-ES" : "en-US", { dateStyle: "long", timeStyle: "short", timeZone: "America/New_York" }).format(new Date(d.signed_at))
+    : "";
+  const drawSignature = (x: number, lineY: number) => {
+    if (!sigImage) return;
+    const h = 34;
+    const w = Math.min(half - 10, (sigImage.width / sigImage.height) * h);
+    page.drawImage(sigImage, { x: x + 4, y: lineY + 2, width: w, height: (w / ((sigImage.width / sigImage.height) * h)) * h });
+  };
+  const signedCaption = (x: number, yy: number, label: string) =>
+    text(`${label} ${d.signer_name ?? ""} · ${signedOn} (Miami)`, x, yy, { font: light, size: 6.8, color: GRAY });
+  const sign = (x: number, yy: number, caption: string, client = false) => {
+    if (client) drawSignature(x, yy);
     rule(yy, x, x + half, INK, 0.8);
     text(caption, x, yy - 11, { font: light, size: 8, color: GRAY });
+    if (client && sigImage) signedCaption(x, yy - 22, t.signedBy);
   };
   if (d.kind === "memo") {
     ensure(70);
     y -= 50;
-    sign(M, y, t.signature);
+    sign(M, y, t.signature, true);
     sign(M + half + 30, y, t.date);
+    if (sigImage) text(signedOn, M + half + 34, y + 4, { size: 8.5 });
   }
   if (consign || purchase) {
     const who = purchase ? t.purchaseSign : t.consignSign;
     ensure(110);
     y -= 50;
-    sign(M, y, who[0]);
+    sign(M, y, who[0], true);
     sign(M + half + 30, y, who[1]);
     y -= 34;
+    if (sigImage) text(signedOn, M + 4, y + 4, { size: 8.5 });
     sign(M, y, t.date);
     sign(M + half + 30, y, t.date);
+  }
+
+  // Factura o cotización firmada: bloque «aceptado y firmado por»
+  if (sigImage && (d.kind === "invoice" || d.kind === "quote")) {
+    ensure(80);
+    y -= 56;
+    drawSignature(M, y);
+    rule(y, M, M + half, INK, 0.8);
+    signedCaption(M, y - 11, t.acceptedBy);
   }
 
   return pdf.save();

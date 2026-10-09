@@ -4,8 +4,10 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { adminDb } from "@/lib/supabase";
 import { getDocSettings } from "@/lib/documents";
-import { PRINT, docTotals, maskedId, usd, type Doc } from "@/lib/doc-labels";
+import { PRINT, SIGNABLE, docTotals, maskedId, usd, type Doc } from "@/lib/doc-labels";
 import { PrintButton } from "./PrintButton";
+import { SignaturePad } from "./SignaturePad";
+import { downloadPrivate } from "@/lib/private-files";
 
 // Lo que ve el cliente: solo los datos del documento (nunca costos, proveedores ni notas internas)
 export default function Page({ params }: PageProps<"/d/[token]">) {
@@ -31,6 +33,12 @@ async function SharedDocument({ params }: { params: Promise<{ token: string }> }
   const consign = d.kind === "consignment";
   const purchase = d.kind === "purchase";
   const sellerId = purchase ? maskedId(d) : null;
+  // Firma del cliente (imagen privada, se incrusta en la página)
+  const sigBytes = d.signature_path ? await downloadPrivate(d.signature_path) : null;
+  const signature = sigBytes ? `data:image/png;base64,${Buffer.from(sigBytes).toString("base64")}` : null;
+  const signedOn = d.signed_at
+    ? new Intl.DateTimeFormat(d.lang === "es" ? "es-ES" : "en-US", { dateStyle: "long", timeStyle: "short", timeZone: "America/New_York" }).format(new Date(d.signed_at))
+    : null;
   const stamp = d.status === "void" ? t.void : d.status === "paid" && !consign ? t.paid : null;
 
   return (
@@ -165,8 +173,18 @@ async function SharedDocument({ params }: { params: Promise<{ token: string }> }
               ))}
             </div>
           )}
+          {signature && (
+            <div className="mt-6 border-t border-[#d8d2c4] pt-4">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={signature} alt="" className="h-20 w-auto" />
+              <p className="mt-1 text-[0.7rem] text-[#5d625e]">
+                {consign || purchase || d.kind === "memo" ? t.signedBy : t.acceptedBy} <b>{d.signer_name}</b> · {signedOn} (Miami)
+              </p>
+            </div>
+          )}
         </footer>
       </article>
+      {!d.signed_at && d.status === "sent" && SIGNABLE.includes(d.kind) && <SignaturePad token={d.token} lang={d.lang} defaultName={d.client_name ?? ""} />}
     </main>
   );
 }

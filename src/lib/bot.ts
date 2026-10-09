@@ -11,7 +11,7 @@ import { downloadFile, escapeHtml as h, keyboard, sendMessage, sendPhoto, tg } f
 import { toSlug } from "./watches";
 import { MENU, WELCOME, mainKeyboard } from "./bot-keyboard";
 import { isMenuAction, onMenuCallback, onMenuText } from "./bot-menu";
-import { FLOW_COMMANDS, afterAnalysis, askCost, costCommand, onCostText, attachDraft, clearFlow, getFlow, demandSummary, listFollowUps, listOpenDocs, onCallback, onContact, onText, resendDoc, startFlow } from "./bot-docs";
+import { FLOW_COMMANDS, afterAnalysis, onSellerIdPhoto, askCost, costCommand, onCostText, attachDraft, clearFlow, getFlow, demandSummary, listFollowUps, listOpenDocs, onCallback, onContact, onText, resendDoc, startFlow } from "./bot-docs";
 
 // ───────────────────────── Tipos de Telegram (solo lo que usamos) ─────────────────────────
 type TgPhoto = { file_id: string; width: number; height: number };
@@ -128,6 +128,10 @@ export async function handleMessage(msg: TgMessage) {
 async function handlePhoto(msg: TgMessage) {
   const chatId = msg.chat.id;
   const best = msg.photo!.reduce((a, b) => (b.width * b.height > a.width * a.height ? b : a));
+
+  // Compra en curso esperando la identificación del vendedor: la foto es su documento
+  const idFlow = await getFlow(chatId);
+  if (idFlow?.step === "sellerid") return onSellerIdPhoto(chatId, best.file_id, msg.message_id, msg.caption, idFlow);
 
   // «estuche 126610LN»: foto para el recorte de un reloj ya publicado (no abre borrador)
   const forCase = msg.caption?.trim().match(/^\/?estuche\s+(.+)$/i);

@@ -46,7 +46,15 @@ export type Doc = {
   seller_id_type?: string | null;
   seller_id_number?: string | null;
   seller_dob?: string | null;
+  // Firma electrónica del cliente y foto de la identificación (archivos privados)
+  signed_at?: string | null;
+  signer_name?: string | null;
+  signature_path?: string | null;
+  signed_ip?: string | null;
+  id_photo_path?: string | null;
 };
+
+export const SIGNABLE: DocKind[] = ["memo", "consignment", "purchase", "invoice", "quote"];
 
 export const KIND_LABEL: Record<DocKind, string> = { quote: "Cotización", memo: "Memo", invoice: "Factura", consignment: "Consignación", purchase: "Contrato de compra" };
 export const KIND_PLURAL: Record<DocKind, string> = { quote: "Cotizaciones", memo: "Memos", invoice: "Facturas", consignment: "Consignaciones", purchase: "Compras" };
@@ -101,6 +109,7 @@ export const PRINT = {
     paid: "PAID", void: "VOID", payment: "Payment", notes: "Notes", terms: "Terms & conditions",
     signature: "Received in good condition — signature", print: "Print / Save as PDF",
     netTotal: "Total net to consignor",
+    signedBy: "Signed electronically by", acceptedBy: "Accepted and signed by",
   },
   es: {
     quote: "Cotización", memo: "Memorándum", invoice: "Factura", consignment: "Contrato de consignación", purchase: "Contrato de compraventa",
@@ -114,6 +123,7 @@ export const PRINT = {
     paid: "PAGADA", void: "ANULADA", payment: "Forma de pago", notes: "Notas", terms: "Términos y condiciones",
     signature: "Recibido en buen estado — firma", print: "Imprimir / Guardar PDF",
     netTotal: "Total neto al consignante",
+    signedBy: "Firmado electrónicamente por", acceptedBy: "Aceptado y firmado por",
   },
 } as const;
 

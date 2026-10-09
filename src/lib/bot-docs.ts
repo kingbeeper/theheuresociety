@@ -34,6 +34,7 @@ export type DocFlow = {
   customerId?: string | null;
   client?: { name: string | null; phone: string | null; email: string | null };
   sellerId?: { type: string | null; number: string } | null; // compra: identificación del vendedor
+  sellerIdPhoto?: string | null; // foto de la identificación (bucket privado)
   price?: number;
   asking?: number | null; // precio en la web (consignación y compra); null = no publicar
   lang: "en" | "es";
@@ -187,6 +188,18 @@ async function setItem(chatId: number, id: string, flow: DocFlow) {
   return askClient(chatId, `⌚ <b>${h(flow.item.title)}</b> (${h(i.sku)})`, flow);
 }
 
+// Foto de la identificación del vendedor (compra): al bucket privado, nunca a la web
+export async function onSellerIdPhoto(chatId: number, fileId: string, messageId: number, caption: string | undefined, flow: DocFlow) {
+  const { downloadFile } = await import("./telegram");
+  const { uploadPrivate } = await import("./private-files");
+  flow.sellerIdPhoto = await uploadPrivate(`ids/${chatId}-${messageId}.jpg`, await downloadFile(fileId), "image/jpeg");
+  await saveFlow(chatId, flow);
+  if (caption?.trim()) return onText(chatId, caption.trim(), flow);
+  return sendMessage(chatId, "📸 Identificación guardada en privado.\nAhora escribe el tipo y número, o sigue sin ellos:", {
+    reply_markup: keyboard([[{ text: "Seguir sin el número", callback_data: "dsid:skip" }]]),
+  });
+}
+
 // Fotos: el borrador de publicación de siempre, pero al terminar la IA vuelve aquí
 export async function attachDraft(chatId: number, draftId: string, flow: DocFlow, first: boolean) {
   if (flow.draftId === draftId && flow.step === "photos" && !first) return;
@@ -262,7 +275,7 @@ async function chooseClient(chatId: number, customerId: string | null, flow: Doc
   if (flow.kind === "purchase") {
     flow.step = "sellerid";
     await saveFlow(chatId, flow);
-    return sendMessage(chatId, "🪪 Identificación del vendedor: tipo y número.\n<i>Ej.: Licencia FL D123-456-78-900 · Pasaporte X1234567</i>\n\nEn el contrato solo salen los 4 últimos caracteres.", {
+    return sendMessage(chatId, "🪪 <b>Identificación del vendedor</b>\n📸 Envía una <b>foto</b> de su licencia o pasaporte (se guarda en privado)\n✍️ y/o escribe el tipo y número.\n<i>Ej.: Licencia FL D123-456-78-900 · Pasaporte X1234567</i>\n\nEn el contrato solo salen los 4 últimos caracteres.", {
       reply_markup: keyboard([[{ text: "Omitir", callback_data: "dsid:skip" }]]),
     });
   }
@@ -330,6 +343,7 @@ async function confirm(chatId: number, flow: DocFlow, prefix = "") {
   if (flow.kind === "consignment" || flow.kind === "purchase") {
     if (flow.draftId) lines.push(flow.asking ? `🌐 Se publica en la web a <b>${usd(flow.asking)}</b>` : "🌐 No se publica en la web");
   }
+  if (flow.kind === "purchase" && flow.sellerIdPhoto) lines.push("📸 Foto de la identificación guardada");
   if (flow.kind === "purchase") lines.push(`🪪 ${flow.sellerId ? h([flow.sellerId.type, `•••• ${flow.sellerId.number.replace(/[^a-z0-9]/gi, "").slice(-4)}`].filter(Boolean).join(" ")) : "Sin identificación"}`);
   lines.push(`📄 Documento en ${flow.lang === "en" ? "inglés" : "español"}`);
   if (flow.notes) lines.push(`📝 ${h(flow.notes)}`);
@@ -429,6 +443,7 @@ export async function finish(chatId: number, flow: DocFlow) {
     issue_date: today,
     due_date: kind === "purchase" ? null : due,
     ...(kind === "purchase" && flow.sellerId && { seller_id_type: flow.sellerId.type, seller_id_number: flow.sellerId.number }),
+    ...(kind === "purchase" && flow.sellerIdPhoto && { id_photo_path: flow.sellerIdPhoto }),
     items: [{ item_id: item.id, sku: item.sku, title: item.title, details: item.details || null, serial: item.serial, qty: 1, price }],
     tax_rate: kind === "invoice" ? flow.tax : 0,
     show_serial: kind !== "quote",
@@ -466,7 +481,7 @@ export async function deliver(chatId: number, d: Doc) {
     `📄 <b>${KIND_LABEL[d.kind]} ${h(d.number)}</b>`,
     `${h(d.client_name ?? "")} · <b>${usd(d.total)}</b>${d.kind === "consignment" ? " neto al dueño" : ""}`,
     "",
-    `Enlace para el cliente:\n${link}`,
+    `Enlace para el cliente${d.status === "sent" && !d.signed_at ? " (puede firmarlo ahí con el dedo)" : ""}:\n${link}`,
     phone ? "" : "\n<i>Sin teléfono: reenvía este PDF o el enlace.</i>",
   ].join("\n");
   const pdf = await renderDocPdf(d, await getDocSettings());
@@ -596,7 +611,7 @@ export async function onCallback(chatId: number, cbId: string, messageId: number
       return chooseClient(chatId, arg === "new" ? null : arg, flow);
     case "dsid":
       await clearButtons();
-      flow.sellerId = null;
+      flow.sellerId = flow.sellerId ?? null;
       flow.step = "price";
       await saveFlow(chatId, flow);
       return askPrice(chatId, flow);

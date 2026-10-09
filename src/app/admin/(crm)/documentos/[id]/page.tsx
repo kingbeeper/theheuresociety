@@ -50,6 +50,7 @@ export default async function DocumentPage({ params }: PageProps<"/admin/documen
           <div className="flex flex-wrap gap-2">
             <a href={`/d/${d.token}`} target="_blank" rel="noreferrer" className={ghostButtonClass}>Ver</a>
             {d.status !== "draft" && <a href={`/d/${d.token}/pdf`} target="_blank" rel="noreferrer" className={ghostButtonClass}>PDF</a>}
+            {d.id_photo_path && <a href={`/api/private/id/${d.id}`} target="_blank" rel="noreferrer" className={ghostButtonClass}>🪪 Identificación</a>}
             {d.kind === "invoice" && d.status !== "draft" && d.items.some((l) => l.item_id) && <a href={`/d/${d.token}/certificate`} target="_blank" rel="noreferrer" className={ghostButtonClass}>Certificado</a>}
             {phone && <a href={`https://wa.me/${phone}?text=${encodeURIComponent(message)}`} target="_blank" rel="noreferrer" className={ghostButtonClass}>Enviar por WhatsApp</a>}
             {d.client_email && <a href={`mailto:${d.client_email}?subject=${encodeURIComponent(`${d.lang === "es" ? KIND_LABEL[d.kind] : t[d.kind]} ${d.number} · The Heure Society`)}&body=${encodeURIComponent(message)}`} className={ghostButtonClass}>Enviar por correo</a>}
@@ -70,6 +71,13 @@ export default async function DocumentPage({ params }: PageProps<"/admin/documen
           </div>
         ))}
       </div>
+
+      {d.signed_at && (
+        <p className="mt-6 border border-emerald-300/40 bg-emerald-300/5 p-4 text-sm">
+          ✍️ Firmado electrónicamente por <b>{d.signer_name}</b> el {new Intl.DateTimeFormat("es-ES", { dateStyle: "long", timeStyle: "short", timeZone: "America/New_York" }).format(new Date(d.signed_at))}
+          {d.signed_ip ? <span className="text-stone"> · IP {d.signed_ip}</span> : null}
+        </p>
+      )}
 
       {/* Siguiente paso según el tipo y el estado */}
       <Card className="mt-6" title="Acciones">
