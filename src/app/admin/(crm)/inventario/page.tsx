@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { connection } from "next/server";
 import { adminDb } from "@/lib/supabase";
-import { requireAdmin } from "@/lib/admin-auth";
+import { requireUser } from "@/lib/admin-auth";
+import { can } from "@/lib/crm-perms";
 import { daysInStock, margin, summarize, type Item } from "@/lib/stock";
 import { ACQUISITION, ITEM_STATUS, isOwnerStock } from "@/lib/stock-labels";
 import { buttonClass, Card, fieldClass, fmtDate, ghostButtonClass, money, PageTitle, requestTime } from "@/components/admin/ui";
@@ -19,7 +20,9 @@ const STATUS_STYLE: Record<string, string> = {
 
 export default async function InventarioPage({ searchParams }: PageProps<"/admin/inventario">) {
   await connection();
-  await requireAdmin();
+  const user = await requireUser("inventario");
+  // Sin el permiso «costos» no se ven costos, proveedores ni márgenes
+  const showCosts = can(user, "costos");
   const sp = await searchParams;
   const tab = typeof sp.status === "string" ? sp.status : "available";
   const q = typeof sp.q === "string" ? sp.q.trim().toLowerCase() : "";
@@ -52,7 +55,7 @@ export default async function InventarioPage({ searchParams }: PageProps<"/admin
     ["all", "Todos", items.length],
   ];
 
-  const kpis = [
+  const allKpis = [
     { label: "Relojes disponibles", value: String(s.inStock), sub: s.consignedCount ? `${s.consignedCount} en consignación/memo` : "" },
     { label: "Capital invertido", value: money(s.capital), sub: "costo + gastos del stock propio" },
     { label: "Valor a la venta", value: money(s.stockValue), sub: "precio previsto del stock" },
@@ -60,6 +63,7 @@ export default async function InventarioPage({ searchParams }: PageProps<"/admin
     { label: "Ganancia del mes", value: money(s.profitMonth), sub: "venta − costo − gastos" },
     { label: "Margen medio · 90 d", value: s.avgMargin == null ? "—" : `${Math.round(s.avgMargin * 100)}%`, sub: s.avgDays == null ? "" : `se venden en ${s.avgDays} días de media` },
   ];
+  const kpis = showCosts ? allKpis : allKpis.filter((k) => !["Capital invertido", "Ganancia del mes", "Margen medio · 90 d"].includes(k.label));
 
   return (
     <>
@@ -68,9 +72,9 @@ export default async function InventarioPage({ searchParams }: PageProps<"/admin
         title="Inventario"
         action={
           <div className="flex flex-wrap gap-2">
-            <ImportInventory />
+            {showCosts && <ImportInventory />}
             {/* Descarga de archivo: enlace normal, no navegación de Next */}
-            <a href="/api/inventory/export" download className={ghostButtonClass}>Exportar a Excel</a>
+            {showCosts && <a href="/api/inventory/export" download className={ghostButtonClass}>Exportar a Excel</a>}
             <Link href="/admin/inventario/nuevo" className={buttonClass}>+ Añadir reloj</Link>
           </div>
         }
@@ -87,9 +91,9 @@ export default async function InventarioPage({ searchParams }: PageProps<"/admin
       </div>
 
       {/* Avisos: lo que requiere atención */}
-      {(s.aged.length > 0 || s.memoDue.length > 0 || s.owed.length > 0 || s.missingCost.length > 0) && (
+      {(s.aged.length > 0 || s.memoDue.length > 0 || (showCosts && (s.owed.length > 0 || s.missingCost.length > 0))) && (
         <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          {s.owed.length > 0 && (
+          {showCosts && s.owed.length > 0 && (
             <Link href="/admin/inventario?status=owed" className="border border-amber-300/40 bg-amber-300/5 p-4 text-sm hover:border-amber-200">
               💵 <b>{money(s.owedAmount)}</b> pendientes de pagar a dueños ({s.owed.length} venta/s de consignación o memo)
             </Link>
@@ -102,7 +106,7 @@ export default async function InventarioPage({ searchParams }: PageProps<"/admin
               🕰 {s.aged.length} reloj(es) con más de 90 días en stock: revisa el precio
             </Link>
           )}
-          {s.missingCost.length > 0 && (
+          {showCosts && s.missingCost.length > 0 && (
             <div className="border border-line bg-forest/60 p-4 text-sm">✎ {s.missingCost.length} reloj(es) sin costo: complétalo para calcular el margen</div>
           )}
         </div>
@@ -146,7 +150,7 @@ export default async function InventarioPage({ searchParams }: PageProps<"/admin
                         {i.status === "sold" && isOwnerStock(i.acquisition) && !i.owner_paid_at && <span className="text-amber-200"> · dueño sin pagar</span>}
                       </span>
                       <span className={`tabular-nums text-stone ${(d ?? 0) > 90 && i.status !== "sold" ? "text-amber-200" : ""}`}>
-                        {m ? `Margen ${money(m.amount)}` : `Costo ${money(i.cost)}`}{d != null ? ` · ${d} d` : ""}
+                        {showCosts ? (m ? `Margen ${money(m.amount)}` : `Costo ${money(i.cost)}`) : ""}{d != null ? `${showCosts ? " · " : ""}${d} d` : ""}
                       </span>
                     </p>
                   </Link>
@@ -165,10 +169,10 @@ export default async function InventarioPage({ searchParams }: PageProps<"/admin
                   <th className="pb-2 font-normal">Reloj</th>
                   <th className="pb-2 font-normal">Entrada</th>
                   <th className="pb-2 text-right font-normal">Días</th>
-                  <th className="pb-2 text-right font-normal">Costo</th>
+                  {showCosts && <th className="pb-2 text-right font-normal">Costo</th>}
                   <th className="pb-2 text-right font-normal">Precio</th>
                   <th className="pb-2 text-right font-normal">Venta</th>
-                  <th className="pb-2 text-right font-normal">Margen</th>
+                  {showCosts && <th className="pb-2 text-right font-normal">Margen</th>}
                   <th className="pb-2 pl-4 font-normal">Estado</th>
                 </tr>
               </thead>
@@ -190,12 +194,14 @@ export default async function InventarioPage({ searchParams }: PageProps<"/admin
                         <p className="text-stone">{i.purchase_date ? fmtDate(i.purchase_date) : "—"}</p>
                       </td>
                       <td className={`py-2.5 text-right tabular-nums ${(d ?? 0) > 90 && i.status !== "sold" ? "text-amber-200" : ""}`}>{d ?? "—"}</td>
-                      <td className="py-2.5 text-right tabular-nums">{money(i.cost)}</td>
+                      {showCosts && <td className="py-2.5 text-right tabular-nums">{money(i.cost)}</td>}
                       <td className="py-2.5 text-right tabular-nums">{money(i.asking_price)}</td>
                       <td className="py-2.5 text-right tabular-nums">{money(i.sale_price)}</td>
-                      <td className="py-2.5 text-right tabular-nums">
-                        {m ? <>{money(m.amount)}<span className="block text-xs text-stone">{m.onSale != null ? `${Math.round(m.onSale * 100)}%` : ""}</span></> : "—"}
-                      </td>
+                      {showCosts && (
+                        <td className="py-2.5 text-right tabular-nums">
+                          {m ? <>{money(m.amount)}<span className="block text-xs text-stone">{m.onSale != null ? `${Math.round(m.onSale * 100)}%` : ""}</span></> : "—"}
+                        </td>
+                      )}
                       <td className={`py-2.5 pl-4 text-xs ${STATUS_STYLE[i.status]}`}>
                         {ITEM_STATUS[i.status]}
                         {i.status === "sold" && isOwnerStock(i.acquisition) && !i.owner_paid_at && <span className="block text-amber-200">dueño sin pagar</span>}

@@ -10,7 +10,7 @@ export const metadata = { title: "Documentos" };
 
 export default async function DocumentsPage({ searchParams }: PageProps<"/admin/documentos">) {
   await connection();
-  await requireAdmin();
+  await requireAdmin("documentos");
   const sp = await searchParams;
   const tab = (typeof sp.tipo === "string" && sp.tipo in KIND_LABEL ? sp.tipo : "all") as DocKind | "all";
   const { data, error } = await adminDb().from("documents").select("*").order("created_at", { ascending: false }).limit(500);

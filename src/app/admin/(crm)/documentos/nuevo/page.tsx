@@ -11,7 +11,7 @@ export const metadata = { title: "Nuevo documento" };
 
 export default async function NewDocumentPage({ searchParams }: PageProps<"/admin/documentos/nuevo">) {
   await connection();
-  await requireAdmin();
+  await requireAdmin("documentos");
   const sp = await searchParams;
   const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
   const tipo = one(sp.tipo);

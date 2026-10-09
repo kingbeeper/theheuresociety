@@ -18,7 +18,7 @@ const STATUS = { requested: "Pendiente de confirmar", confirmed: "Confirmada", c
 export default async function CitasPage({ searchParams }: PageProps<"/admin/citas">) {
   await connection();
   // La plantilla y la página se generan en paralelo: cada página comprueba la sesión antes de leer datos
-  await requireAdmin();
+  await requireAdmin("citas");
   const db = adminDb();
   const since = new Date(requestTime() - 30 * 86_400_000).toISOString();
   const sp = await searchParams;

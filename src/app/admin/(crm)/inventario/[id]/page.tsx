@@ -2,7 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { adminDb } from "@/lib/supabase";
-import { requireAdmin } from "@/lib/admin-auth";
+import { requireUser } from "@/lib/admin-auth";
+import { can } from "@/lib/crm-perms";
 import { daysInStock, margin, totalCost, type Item } from "@/lib/stock";
 import { ACQUISITION, ITEM_STATUS, isOwnerStock } from "@/lib/stock-labels";
 import { Card, fieldClass, fmtDate, fmtDateTime, ghostButtonClass, money, PageTitle, requestTime } from "@/components/admin/ui";
@@ -17,7 +18,8 @@ const EVENT_ICON: Record<string, string> = { service: "🔧", entry: "⇢", pric
 
 export default async function ItemPage({ params }: PageProps<"/admin/inventario/[id]">) {
   await connection();
-  await requireAdmin();
+  const user = await requireUser("inventario");
+  const showCosts = can(user, "costos");
   const { id } = await params;
   const db = adminDb();
   const { data } = await db.from("inventory_items").select("*").eq("id", id).maybeSingle();
@@ -69,10 +71,9 @@ export default async function ItemPage({ params }: PageProps<"/admin/inventario/
       <div className="grid grid-cols-2 gap-px border border-line bg-line md:grid-cols-5">
         {[
           ["Estado", ITEM_STATUS[item.status]],
-          [owner ? "A pagar al dueño" : "Costo", money(item.cost)],
-          ["Costo total", item.cost == null ? "—" : money(totalCost(item))],
+          ...(showCosts ? [[owner ? "A pagar al dueño" : "Costo", money(item.cost)], ["Costo total", item.cost == null ? "—" : money(totalCost(item))]] : []),
           [item.status === "sold" ? "Venta" : "Precio previsto", money(item.status === "sold" ? item.sale_price : item.asking_price)],
-          [item.status === "sold" ? "Margen" : "Días en stock", item.status === "sold" ? (m ? `${money(m.amount)} · ${m.onSale != null ? Math.round(m.onSale * 100) : "—"}%` : "—") : days == null ? "—" : `${days} días`],
+          [item.status === "sold" && showCosts ? "Margen" : "Días en stock", item.status === "sold" && showCosts ? (m ? `${money(m.amount)} · ${m.onSale != null ? Math.round(m.onSale * 100) : "—"}%` : "—") : days == null ? "—" : `${days} días`],
         ].map(([l, v]) => (
           <div key={l} className="bg-forest px-5 py-4">
             <p className="font-display text-2xl font-light">{v}</p>
@@ -154,7 +155,7 @@ export default async function ItemPage({ params }: PageProps<"/admin/inventario/
                 {fmtDate(item.sale_date!)} · {money(item.sale_price)} · {item.payment_method ?? "—"} ·{" "}
                 {item.buyer_customer_id ? <Link href={`/admin/leads/${item.buyer_customer_id}`} className="text-brass hover:text-ivory">{item.buyer_name ?? "Cliente"}</Link> : item.buyer_name ?? "—"}
               </p>
-              {owner && (
+              {owner && showCosts && (
                 <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4 text-sm">
                   {item.owner_paid_at ? (
                     <p className="text-emerald-200">Pagado al dueño el {fmtDate(item.owner_paid_at)}</p>
@@ -183,7 +184,7 @@ export default async function ItemPage({ params }: PageProps<"/admin/inventario/
           )}
 
           <Card title="Ficha del reloj">
-            <ItemForm item={item} watches={watchOptions} />
+            <ItemForm item={item} watches={watchOptions} showCosts={showCosts} />
           </Card>
 
           <form action={deleteItem.bind(null, item.id)} className="text-right">

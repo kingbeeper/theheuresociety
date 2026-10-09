@@ -15,7 +15,7 @@ const section = "text-[0.66rem] tracking-[0.24em] uppercase text-brass";
 type WatchOption = { id: string; label: string };
 
 // Ficha del reloj y de su entrada (mismos datos que la plantilla de Excel, más lo que faltaba)
-export function ItemForm({ item, watches }: { item?: Item; watches: WatchOption[] }) {
+export function ItemForm({ item, watches, showCosts = true }: { item?: Item; watches: WatchOption[]; showCosts?: boolean }) {
   const [state, action, pending] = useActionState(saveItem.bind(null, item?.id ?? null), null);
   const [acq, setAcq] = useState(item?.acquisition ?? "purchase");
   const owner = acq === "consignment" || acq === "memo";
@@ -53,11 +53,15 @@ export function ItemForm({ item, watches }: { item?: Item; watches: WatchOption[
           </label>
           <label><span className={label}>Fecha de entrada</span><input name="purchase_date" type="date" defaultValue={v("purchase_date")} className={field} /></label>
           {acq === "memo" && <label><span className={label}>Devolver antes de</span><input name="memo_due" type="date" defaultValue={v("memo_due")} className={field} /></label>}
-          <label><span className={label}>{owner ? "Dueño / dealer (contacto)" : "Proveedor (contacto)"}</span><input name="supplier_name" defaultValue={v("supplier_name")} className={field} /></label>
-          <label><span className={label}>Empresa</span><input name="supplier_company" defaultValue={v("supplier_company")} className={field} /></label>
-          <label><span className={label}>Ubicación</span><input name="supplier_location" defaultValue={v("supplier_location")} placeholder="Miami, FL" className={field} /></label>
-          <label><span className={label}>{owner ? "A pagar al dueño al vender (USD)" : "Costo (USD)"}</span><input name="cost" inputMode="decimal" defaultValue={v("cost")} className={field} /></label>
-          <label><span className={label}>Gastos extra (USD)</span><input name="extra_costs" inputMode="decimal" defaultValue={item?.extra_costs ?? ""} placeholder="Servicio, pulido, envío…" className={field} /></label>
+          {showCosts && (
+            <>
+              <label><span className={label}>{owner ? "Dueño / dealer (contacto)" : "Proveedor (contacto)"}</span><input name="supplier_name" defaultValue={v("supplier_name")} className={field} /></label>
+              <label><span className={label}>Empresa</span><input name="supplier_company" defaultValue={v("supplier_company")} className={field} /></label>
+              <label><span className={label}>Ubicación</span><input name="supplier_location" defaultValue={v("supplier_location")} placeholder="Miami, FL" className={field} /></label>
+              <label><span className={label}>{owner ? "A pagar al dueño al vender (USD)" : "Costo (USD)"}</span><input name="cost" inputMode="decimal" defaultValue={v("cost")} className={field} /></label>
+              <label><span className={label}>Gastos extra (USD)</span><input name="extra_costs" inputMode="decimal" defaultValue={item?.extra_costs ?? ""} placeholder="Servicio, pulido, envío…" className={field} /></label>
+            </>
+          )}
           <label><span className={label}>Precio de venta previsto (USD)</span><input name="asking_price" inputMode="decimal" defaultValue={v("asking_price")} className={field} /></label>
         </div>
       </div>

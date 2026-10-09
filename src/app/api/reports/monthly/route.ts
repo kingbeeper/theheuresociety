@@ -4,7 +4,7 @@ import { monthlyReport } from "@/lib/report";
 
 // Informe mensual en Excel (una hoja por apartado) para el contador
 export async function GET(request: Request) {
-  if (!(await adminEmail())) return new Response("Unauthorized", { status: 401 });
+  if (!(await adminEmail("informes"))) return new Response("Unauthorized", { status: 401 });
   const month = new URL(request.url).searchParams.get("mes") ?? "";
   if (!/^\d{4}-\d{2}$/.test(month)) return new Response("Mes no válido (AAAA-MM)", { status: 400 });
   const r = await monthlyReport(month);

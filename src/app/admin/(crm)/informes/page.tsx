@@ -9,7 +9,7 @@ export const metadata = { title: "Informes" };
 
 export default async function ReportsPage({ searchParams }: PageProps<"/admin/informes">) {
   await connection();
-  await requireAdmin();
+  await requireAdmin("informes");
   const sp = await searchParams;
   const current = todayInMiami(new Date(requestTime())).slice(0, 7);
   const month = typeof sp.mes === "string" && /^\d{4}-\d{2}$/.test(sp.mes) ? sp.mes : current;

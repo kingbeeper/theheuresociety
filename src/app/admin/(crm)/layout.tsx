@@ -1,5 +1,7 @@
 import { Suspense } from "react";
-import { requireAdmin } from "@/lib/admin-auth";
+import Link from "next/link";
+import { requireUser } from "@/lib/admin-auth";
+import { ALL_SECTIONS, can, ROLE_LABEL } from "@/lib/crm-perms";
 import { AdminNav } from "@/components/admin/AdminNav";
 import { signOut } from "../actions";
 
@@ -13,7 +15,8 @@ export default function CrmLayout({ children }: { children: React.ReactNode }) {
 }
 
 async function Guard({ children }: { children: React.ReactNode }) {
-  const email = await requireAdmin();
+  const user = await requireUser();
+  const allowed = ALL_SECTIONS.filter((s) => can(user, s));
   return (
     <div className="min-h-screen md:grid md:grid-cols-[230px_1fr]">
       <aside className="border-b border-line bg-forest md:sticky md:top-0 md:h-screen md:border-b-0 md:border-r">
@@ -22,13 +25,17 @@ async function Guard({ children }: { children: React.ReactNode }) {
             <p className="font-display text-xl tracking-[0.12em] uppercase">The Heure</p>
             <p className="text-[0.62rem] tracking-[0.3em] uppercase text-brass">Society · CRM</p>
           </div>
-          <form action={signOut} className="md:hidden">
-            <button className="text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">Salir</button>
-          </form>
+          <div className="flex items-center gap-4 md:hidden">
+            <Link href="/admin/cuenta" className="text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">Cuenta</Link>
+            <form action={signOut}>
+              <button className="text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">Salir</button>
+            </form>
+          </div>
         </div>
-        <AdminNav />
+        <AdminNav allowed={allowed} />
         <div className="hidden px-6 py-8 md:absolute md:bottom-0 md:block">
-          <p className="truncate text-xs text-stone">{email}</p>
+          <Link href="/admin/cuenta" className="block truncate text-xs text-stone hover:text-ivory">{user.name ?? user.email}</Link>
+          <p className="text-[0.6rem] tracking-[0.16em] uppercase text-stone/70">{ROLE_LABEL[user.role]}</p>
           <form action={signOut} className="mt-2">
             <button className="text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">Cerrar sesión</button>
           </form>

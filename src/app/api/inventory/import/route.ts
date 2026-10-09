@@ -69,7 +69,7 @@ const asMoney = (v: unknown) => {
 };
 
 export async function POST(request: Request) {
-  const user = await adminEmail();
+  const user = await adminEmail("costos");
   if (!user) return Response.json({ ok: false, error: "Sesión no válida" }, { status: 401 });
   const form = await request.formData();
   const file = form.get("file");

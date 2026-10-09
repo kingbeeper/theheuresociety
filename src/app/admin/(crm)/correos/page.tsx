@@ -8,7 +8,7 @@ export const metadata = { title: "Correos" };
 
 export default async function NewsletterPage({ searchParams }: PageProps<"/admin/correos">) {
   await connection();
-  await requireAdmin();
+  await requireAdmin("correos");
   const sp = await searchParams;
   const watches = await recentWatches(60);
   // Sin elección: los publicados en las últimas 2 semanas

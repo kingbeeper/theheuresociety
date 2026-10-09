@@ -9,7 +9,7 @@ export const metadata = { title: "Ajustes de documentos" };
 
 export default async function DocSettingsPage() {
   await connection();
-  await requireAdmin();
+  await requireAdmin("usuarios");
   const s = await getDocSettings();
   return (
     <>

@@ -9,7 +9,7 @@ import { GRAPH, graph, META_APP_ID, META_APP_SECRET, saveSettings } from "@/lib/
 type Page = { id: string; name: string; access_token: string; instagram_business_account?: { id: string; username?: string } };
 
 export async function POST(request: Request) {
-  const email = await adminEmail();
+  const email = await adminEmail("redes");
   if (!email) return Response.json({ ok: false, error: "Sesión no válida" }, { status: 401 });
   if (!META_APP_ID || !META_APP_SECRET) return Response.json({ ok: false, error: "Faltan el ID o la clave secreta de la app de Meta" }, { status: 400 });
 

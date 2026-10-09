@@ -8,7 +8,7 @@ export const metadata = { title: "Demanda" };
 
 export default async function DemandPage() {
   await connection();
-  await requireAdmin();
+  await requireAdmin("demanda");
   const rows = await demandBoard();
   const max = Math.max(1, ...rows.map((r) => Math.max(r.people.length, r.stock.length)));
 

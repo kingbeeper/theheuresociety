@@ -21,7 +21,7 @@ const KIND = { sell: "Venta", trade: "Intercambio", consign: "Consignación" } a
 export default async function ComprasPage() {
   await connection();
   // La plantilla y la página se generan en paralelo: cada página comprueba la sesión antes de leer datos
-  await requireAdmin();
+  await requireAdmin("compras");
   const { data } = await adminDb().from("sell_requests").select("*").order("created_at", { ascending: false }).limit(300);
   const rows = data ?? [];
   // Relojes que ya entraron al inventario desde una solicitud (si falta la migración, queda vacío)

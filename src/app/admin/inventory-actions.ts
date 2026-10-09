@@ -2,7 +2,8 @@
 
 import { redirect } from "next/navigation";
 import { refresh } from "next/cache";
-import { requireAdmin } from "@/lib/admin-auth";
+import { requireAdmin, requireUser } from "@/lib/admin-auth";
+import { can } from "@/lib/crm-perms";
 import { adminDb } from "@/lib/supabase";
 import { addEvent, notifyPriceDrop, upsertLead } from "@/lib/crm";
 import { SITE_URL } from "@/lib/seo";
@@ -60,8 +61,12 @@ function itemFields(f: FormData) {
 }
 
 export async function saveItem(id: string | null, _: unknown, f: FormData) {
-  const user = await requireAdmin();
-  const fields = itemFields(f);
+  const me = await requireUser("inventario");
+  const user = me.email;
+  const fields: Partial<ReturnType<typeof itemFields>> & ReturnType<typeof itemFields> = itemFields(f);
+  if (!can(me, "costos")) {
+    for (const k of ["cost", "extra_costs", "supplier_name", "supplier_company", "supplier_location"] as const) delete (fields as Partial<typeof fields>)[k];
+  }
   if (!fields.brand) return { error: "Falta la marca." };
   const db = adminDb();
   // Enlazado a una ficha de la web sin precio en el inventario: se toma el de la web
@@ -94,13 +99,13 @@ export async function saveItem(id: string | null, _: unknown, f: FormData) {
     }
   }
   if (Number(before.cost ?? NaN) !== Number(fields.cost ?? NaN) && fields.cost != null) await logItem(id, "cost", `Costo: ${usd(before.cost)} → ${usd(fields.cost)}`, user);
-  if (Number(before.extra_costs) !== Number(fields.extra_costs)) await logItem(id, "cost", `Gastos: ${usd(before.extra_costs)} → ${usd(fields.extra_costs)}`, user);
+  if ("extra_costs" in fields && Number(before.extra_costs) !== Number(fields.extra_costs)) await logItem(id, "cost", `Gastos: ${usd(before.extra_costs)} → ${usd(fields.extra_costs)}`, user);
   refresh();
   return { ok: true };
 }
 
 export async function setReserved(id: string, reserved: boolean) {
-  const user = await requireAdmin();
+  const user = await requireAdmin("inventario");
   const item = await getItem(id);
   if (item.status === "sold" || item.status === "returned") return;
   await adminDb().from("inventory_items").update({ status: reserved ? "reserved" : "in_stock", updated_at: new Date().toISOString() }).eq("id", id);
@@ -110,7 +115,7 @@ export async function setReserved(id: string, reserved: boolean) {
 }
 
 export async function sellItem(id: string, _: unknown, f: FormData) {
-  const user = await requireAdmin();
+  const user = await requireAdmin("inventario");
   const item = await getItem(id);
   const price = money(f, "sale_price");
   const saleDate = date(f, "sale_date") ?? new Date().toISOString().slice(0, 10);
@@ -170,7 +175,7 @@ export async function sellItem(id: string, _: unknown, f: FormData) {
 }
 
 export async function returnItem(id: string, _: unknown, f: FormData) {
-  const user = await requireAdmin();
+  const user = await requireAdmin("inventario");
   const item = await getItem(id);
   const reason = text(f, "return_reason");
   const returnDate = date(f, "return_date") ?? new Date().toISOString().slice(0, 10);
@@ -184,7 +189,7 @@ export async function returnItem(id: string, _: unknown, f: FormData) {
 }
 
 export async function markOwnerPaid(id: string) {
-  const user = await requireAdmin();
+  const user = await requireAdmin("inventario");
   const item = await getItem(id);
   await adminDb().from("inventory_items").update({ owner_paid_at: new Date().toISOString().slice(0, 10) }).eq("id", id);
   await logItem(id, "owner_paid", `Pagado al dueño: $${Number(item.cost ?? 0).toLocaleString("en-US")}`, user);
@@ -193,7 +198,7 @@ export async function markOwnerPaid(id: string) {
 
 // Deshacer una venta o devolución por error: vuelve a stock
 export async function reopenItem(id: string) {
-  const user = await requireAdmin();
+  const user = await requireAdmin("inventario");
   const item = await getItem(id);
   await adminDb()
     .from("inventory_items")
@@ -206,7 +211,7 @@ export async function reopenItem(id: string) {
 
 // ── Relojero ──
 export async function sendToServiceAction(itemId: string, f: FormData) {
-  const user = await requireAdmin();
+  const user = await requireAdmin("inventario");
   const provider = text(f, "provider");
   if (!provider) return;
   const { sendToService } = await import("@/lib/services");
@@ -215,14 +220,14 @@ export async function sendToServiceAction(itemId: string, f: FormData) {
 }
 
 export async function returnFromServiceAction(serviceId: string, f: FormData) {
-  const user = await requireAdmin();
+  const user = await requireAdmin("inventario");
   const { returnFromService } = await import("@/lib/services");
   await returnFromService(serviceId, money(f, "cost"), text(f, "notes"), user);
   refresh();
 }
 
 export async function deleteItem(id: string) {
-  await requireAdmin();
+  await requireAdmin("inventario");
   await adminDb().from("inventory_items").delete().eq("id", id);
   redirect("/admin/inventario");
 }

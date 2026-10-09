@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { connection } from "next/server";
 import { adminDb } from "@/lib/supabase";
-import { requireAdmin } from "@/lib/admin-auth";
+import { requireUser } from "@/lib/admin-auth";
+import { can } from "@/lib/crm-perms";
 import { followUpsDue, SOURCE_LABEL, STAGES, STAGE_LABEL, type Customer } from "@/lib/crm";
 import { salesByChannel, type Item } from "@/lib/stock";
 import { topCustomers } from "@/lib/customer-value";
@@ -11,10 +12,11 @@ import { ago, Card, fmtDateTime, money, PageTitle, SourceTag, StageBadge, reques
 
 export const metadata = { title: "Panel" };
 
-export default async function Dashboard() {
+export default async function Dashboard({ searchParams }: PageProps<"/admin">) {
   await connection();
   // La plantilla y la página se generan en paralelo: cada página comprueba la sesión antes de leer datos
-  await requireAdmin();
+  const user = await requireUser();
+  const showCosts = can(user, "costos");
   const db = adminDb();
   const now = requestTime();
   const weekAgo = new Date(now - 7 * 86_400_000).toISOString();
@@ -54,6 +56,9 @@ export default async function Dashboard() {
   return (
     <>
       <PageTitle eyebrow="The Heure Society" title="Panel" />
+      {(await searchParams)["sin-permiso"] && (
+        <p className="mb-6 border border-amber-300/40 bg-amber-300/5 p-4 text-sm">No tienes permiso para esa sección. Pídeselo a un administrador.</p>
+      )}
 
       <div className="grid grid-cols-2 gap-px border border-line bg-line lg:grid-cols-6">
         {kpis.map((k) => (
@@ -162,6 +167,7 @@ export default async function Dashboard() {
           )}
         </Card>
 
+        {showCosts && (
         <Card title="Ventas por canal · 12 meses" href="/admin/inventario?status=sold" className="xl:col-span-2">
           {channels.length ? (
             <table className="w-full text-sm">
@@ -188,6 +194,7 @@ export default async function Dashboard() {
             <p className="text-sm text-stone">Aún no hay ventas registradas en el inventario. Al registrar una venta, el canal sale del origen del comprador.</p>
           )}
         </Card>
+        )}
 
         <Card title="Leads recientes" href="/admin/leads" className="xl:col-span-2">
           {recent.data?.length ? (

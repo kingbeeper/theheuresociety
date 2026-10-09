@@ -5,7 +5,7 @@ import { audience, defaultIntro, recentWatches, sendNewsletter } from "@/lib/new
 
 // Envío de los correos de novedades (prueba al propio usuario, o a todos los destinatarios)
 export async function sendNewsletterAction(_: unknown, f: FormData) {
-  const user = await requireAdmin();
+  const user = await requireAdmin("correos");
   const ids = f.getAll("w").map(String);
   const watches = (await recentWatches(60)).filter((w) => ids.includes(w.id));
   if (!watches.length) return { error: "Elige al menos un reloj." };

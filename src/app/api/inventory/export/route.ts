@@ -6,7 +6,7 @@ import { ACQUISITION, ITEM_STATUS } from "@/lib/stock-labels";
 // Exporta el inventario a CSV (se abre en Excel) con las columnas de la plantilla INVENTORY CONTROL
 // y las nuevas (estado, cómo entró, gastos, devoluciones…).
 export async function GET() {
-  if (!(await adminEmail())) return new Response("Unauthorized", { status: 401 });
+  if (!(await adminEmail("costos"))) return new Response("Unauthorized", { status: 401 });
   const { data } = await adminDb().from("inventory_items").select("*").order("purchase_date", { ascending: true, nullsFirst: true });
   const now = Date.now();
 

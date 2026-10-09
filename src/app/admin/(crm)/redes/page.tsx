@@ -21,7 +21,7 @@ const SORTS = { reach: "Alcance", views: "Visualizaciones", interactions: "Inter
 
 export default async function RedesPage({ searchParams }: PageProps<"/admin/redes">) {
   await connection();
-  await requireAdmin();
+  await requireAdmin("redes");
   const sp = await searchParams;
   const sort = (typeof sp.sort === "string" && sp.sort in SORTS ? sp.sort : "reach") as keyof typeof SORTS;
   const platform = sp.platform === "facebook" ? "facebook" : sp.platform === "instagram" ? "instagram" : "";

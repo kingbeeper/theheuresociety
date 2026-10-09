@@ -18,6 +18,6 @@ export async function GET(request: Request) {
 }
 
 export async function POST() {
-  if (!(await adminEmail())) return new Response("Unauthorized", { status: 401 });
+  if (!(await adminEmail("redes"))) return new Response("Unauthorized", { status: 401 });
   return run();
 }

@@ -4,7 +4,7 @@ import { certItems, renderCertificates } from "@/lib/certificate";
 
 // Certificado de un reloj del inventario (desde el CRM)
 export async function GET(request: Request, { params }: RouteContext<"/api/certificate/[id]">) {
-  if (!(await adminEmail())) return new Response("Unauthorized", { status: 401 });
+  if (!(await adminEmail("inventario"))) return new Response("Unauthorized", { status: 401 });
   const { id } = await params;
   const lang = new URL(request.url).searchParams.get("lang") === "es" ? "es" : "en";
   const items = await certItems([id], null);

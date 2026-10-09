@@ -15,7 +15,7 @@ import { escapeHtml, notifyAdmins } from "@/lib/telegram";
 export async function signIn(_: unknown, form: FormData) {
   const email = String(form.get("email") ?? "").trim().toLowerCase();
   const password = String(form.get("password") ?? "");
-  if (!isAllowed(email)) return { error: "Correo o contraseña incorrectos." };
+  if (!(await isAllowed(email))) return { error: "Correo o contraseña incorrectos." };
   const { error } = await (await authClient()).auth.signInWithPassword({ email, password });
   if (error) return { error: "Correo o contraseña incorrectos." };
   redirect("/admin");
@@ -34,7 +34,7 @@ const text = (form: FormData, key: string) => {
 const money = (v: string | null) => (v ? Number(v.replace(/[^\d.]/g, "")) || null : null);
 
 export async function createLead(form: FormData) {
-  const user = await requireAdmin();
+  const user = await requireAdmin("leads");
   const customer = await upsertLead({
     name: text(form, "name"),
     phone: text(form, "phone"),
@@ -49,7 +49,7 @@ export async function createLead(form: FormData) {
 }
 
 export async function updateLead(id: string, _: unknown, form: FormData) {
-  const user = await requireAdmin();
+  const user = await requireAdmin("leads");
   const db = adminDb();
   const { data: before } = await db.from("customers").select("*").eq("id", id).single();
   const stage = text(form, "stage") as Stage | null;
@@ -84,7 +84,7 @@ export async function updateLead(id: string, _: unknown, form: FormData) {
 }
 
 export async function setStage(id: string, stage: Stage) {
-  const user = await requireAdmin();
+  const user = await requireAdmin("leads");
   if (!STAGES.includes(stage)) return;
   const db = adminDb();
   const { data: before } = await db.from("customers").select("stage").eq("id", id).single();
@@ -95,7 +95,7 @@ export async function setStage(id: string, stage: Stage) {
 }
 
 export async function addNote(id: string, form: FormData) {
-  const user = await requireAdmin();
+  const user = await requireAdmin("leads");
   const body = text(form, "note");
   if (!body) return;
   await addEvent(id, "note", body, {}, user);
@@ -105,7 +105,7 @@ export async function addNote(id: string, form: FormData) {
 
 // Seguimiento hecho: se borra la fecha y queda en el historial (con lo que se hizo, si se escribe)
 export async function completeFollowUp(id: string, form: FormData) {
-  const user = await requireAdmin();
+  const user = await requireAdmin("leads");
   const db = adminDb();
   const { data: c } = await db.from("customers").select("follow_up_note").eq("id", id).single();
   const done = text(form, "done");
@@ -115,21 +115,21 @@ export async function completeFollowUp(id: string, form: FormData) {
 }
 
 export async function completeTaskAction(id: string) {
-  const user = await requireAdmin();
+  const user = await requireAdmin("leads");
   const { completeTask } = await import("@/lib/tasks");
   await completeTask(id, user);
   refresh();
 }
 
 export async function toggleAlert(alertId: string, active: boolean) {
-  await requireAdmin();
+  await requireAdmin("leads");
   await adminDb().from("watch_alerts").update({ active }).eq("id", alertId);
   refresh();
 }
 
 // Pausar o reactivar el bot de WhatsApp en la conversación de un cliente
 export async function setBot(waId: string, on: boolean) {
-  await requireAdmin();
+  await requireAdmin("leads");
   if (on) await reactivateBot(waId);
   else
     await adminDb()
@@ -140,7 +140,7 @@ export async function setBot(waId: string, on: boolean) {
 }
 
 export async function setAppointmentStatus(id: string, status: "requested" | "confirmed" | "cancelled") {
-  const user = await requireAdmin();
+  const user = await requireAdmin("citas");
   const { data } = await adminDb().from("appointments").update({ status }).eq("id", id).select("customer_id").single();
   if (data?.customer_id) {
     const label = { requested: "pendiente", confirmed: "confirmada", cancelled: "cancelada" }[status];
@@ -158,7 +158,7 @@ const clashText = (c: { name: string; starts_at: string }) =>
   `Ese horario choca con la cita de ${c.name} (${new Intl.DateTimeFormat("es-ES", { timeZone: TIME_ZONE, hour: "2-digit", minute: "2-digit" }).format(new Date(c.starts_at))}).`;
 
 export async function createAppointment(_: unknown, form: FormData) {
-  const user = await requireAdmin();
+  const user = await requireAdmin("citas");
   const db = adminDb();
   const date = text(form, "date");
   const time = text(form, "time");
@@ -213,7 +213,7 @@ export async function createAppointment(_: unknown, form: FormData) {
 
 // Cambiar día u hora de una cita (sigue bloqueando un solo horario)
 export async function rescheduleAppointment(id: string, _: unknown, form: FormData) {
-  const user = await requireAdmin();
+  const user = await requireAdmin("citas");
   const date = text(form, "date");
   const time = text(form, "time");
   if (!date || !time) return { error: "Falta la fecha o la hora." };
@@ -228,7 +228,7 @@ export async function rescheduleAppointment(id: string, _: unknown, form: FormDa
 }
 
 export async function updateSellRequest(id: string, form: FormData) {
-  const user = await requireAdmin();
+  const user = await requireAdmin("compras");
   const status = text(form, "status");
   const offer = text(form, "offer");
   const db = adminDb();
@@ -289,7 +289,7 @@ const SELL_STATUS: Record<string, string> = {
 
 // ───────────────────────────── Redes (Instagram y Facebook) ─────────────────────────────
 export async function saveSocialSettings(form: FormData) {
-  await requireAdmin();
+  await requireAdmin("redes");
   const { saveSettings } = await import("@/lib/meta");
   await saveSettings({
     bot_dm: form.get("bot_dm") === "on" ? "on" : "off",
@@ -300,14 +300,14 @@ export async function saveSocialSettings(form: FormData) {
 }
 
 export async function disconnectSocial() {
-  await requireAdmin();
+  await requireAdmin("redes");
   const { saveSettings } = await import("@/lib/meta");
   await saveSettings({ page_id: null, page_name: null, page_token: null, ig_id: null, ig_username: null, connected_at: null, connected_by: null });
   refresh();
 }
 
 export async function setSocialBot(contactId: string, on: boolean) {
-  await requireAdmin();
+  await requireAdmin("leads");
   if (on) {
     const { reactivateSocialBot } = await import("@/lib/social-bot");
     await reactivateSocialBot(contactId);

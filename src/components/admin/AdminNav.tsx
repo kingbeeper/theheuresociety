@@ -2,25 +2,28 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import type { Section } from "@/lib/crm-perms";
 
-const ITEMS = [
+// Menú del CRM: cada usuario ve solo las secciones para las que tiene permiso
+const ITEMS: { href: string; label: string; section?: Section }[] = [
   { href: "/admin", label: "Panel" },
-  { href: "/admin/leads", label: "Leads" },
-  { href: "/admin/citas", label: "Citas" },
-  { href: "/admin/inventario", label: "Inventario" },
-  { href: "/admin/demanda", label: "Demanda" },
-  { href: "/admin/documentos", label: "Documentos" },
-  { href: "/admin/informes", label: "Informes" },
-  { href: "/admin/compras", label: "Compras y consignas" },
-  { href: "/admin/correos", label: "Correos" },
-  { href: "/admin/redes", label: "Redes" },
+  { href: "/admin/leads", label: "Leads", section: "leads" },
+  { href: "/admin/citas", label: "Citas", section: "citas" },
+  { href: "/admin/inventario", label: "Inventario", section: "inventario" },
+  { href: "/admin/demanda", label: "Demanda", section: "demanda" },
+  { href: "/admin/documentos", label: "Documentos", section: "documentos" },
+  { href: "/admin/informes", label: "Informes", section: "informes" },
+  { href: "/admin/compras", label: "Compras y consignas", section: "compras" },
+  { href: "/admin/correos", label: "Correos", section: "correos" },
+  { href: "/admin/redes", label: "Redes", section: "redes" },
+  { href: "/admin/usuarios", label: "Usuarios", section: "usuarios" },
 ];
 
-export function AdminNav() {
+export function AdminNav({ allowed }: { allowed: Section[] }) {
   const path = usePathname();
   return (
     <nav className="flex gap-1 overflow-x-auto px-3 pb-3 md:flex-col md:px-3 md:pb-0">
-      {ITEMS.map((i) => {
+      {ITEMS.filter((i) => !i.section || allowed.includes(i.section)).map((i) => {
         const on = i.href === "/admin" ? path === "/admin" : path.startsWith(i.href);
         return (
           <Link

@@ -25,7 +25,7 @@ type Item = { at: string; kind: "event" | "msg"; icon: string; who: string; body
 export default async function LeadPage({ params }: PageProps<"/admin/leads/[id]">) {
   await connection();
   // La plantilla y la página se generan en paralelo: cada página comprueba la sesión antes de leer datos
-  await requireAdmin();
+  await requireAdmin("leads");
   const { id } = await params;
   const db = adminDb();
   const { data } = await db.from("customers").select("*").eq("id", id).maybeSingle();

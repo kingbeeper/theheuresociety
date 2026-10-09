@@ -44,7 +44,7 @@ function parseLines(raw: string | null): DocLine[] {
 }
 
 export async function saveDocument(id: string | null, _: unknown, f: FormData) {
-  const user = await requireAdmin();
+  const user = await requireAdmin("documentos");
   const kind = (text(f, "kind") ?? "quote") as DocKind;
   if (!(kind in KIND_LABEL)) return { error: "Tipo de documento no válido." };
   const items = parseLines(text(f, "items"));
@@ -104,7 +104,7 @@ export async function saveDocument(id: string | null, _: unknown, f: FormData) {
 
 // Marcar como enviado / entregado / firmado
 export async function sendDocument(id: string) {
-  const user = await requireAdmin();
+  const user = await requireAdmin("documentos");
   const d = await getDoc(id);
   if (!d || d.status !== "draft") return;
   await issueDoc(d, user);
@@ -112,7 +112,7 @@ export async function sendDocument(id: string) {
 }
 
 export async function setQuoteResult(id: string, accepted: boolean) {
-  const user = await requireAdmin();
+  const user = await requireAdmin("documentos");
   const d = await getDoc(id);
   if (!d || d.kind !== "quote") return;
   await adminDb().from("documents").update({ status: accepted ? "accepted" : "rejected", updated_at: new Date().toISOString() }).eq("id", id);
@@ -121,7 +121,7 @@ export async function setQuoteResult(id: string, accepted: boolean) {
 }
 
 export async function returnMemo(id: string) {
-  const user = await requireAdmin();
+  const user = await requireAdmin("documentos");
   const d = await getDoc(id);
   if (!d || (d.kind !== "memo" && d.kind !== "consignment") || d.status !== "sent") return;
   await closeReturned(d, user);
@@ -130,7 +130,7 @@ export async function returnMemo(id: string) {
 
 // Consignación: se vendió el reloj y se pagó al dueño
 export async function markConsignorPaid(id: string) {
-  const user = await requireAdmin();
+  const user = await requireAdmin("documentos");
   const d = await getDoc(id);
   if (!d || d.kind !== "consignment" || d.status !== "sent") return;
   await consignorPaid(d, user);
@@ -138,7 +138,7 @@ export async function markConsignorPaid(id: string) {
 }
 
 export async function convertToInvoice(id: string) {
-  const user = await requireAdmin();
+  const user = await requireAdmin("documentos");
   const d = await getDoc(id);
   if (!d || d.kind === "invoice" || d.kind === "consignment" || d.kind === "purchase") return;
   const invoice = await toInvoice(d, user);
@@ -146,7 +146,7 @@ export async function convertToInvoice(id: string) {
 }
 
 export async function markPaid(id: string, _: unknown, f: FormData) {
-  const user = await requireAdmin();
+  const user = await requireAdmin("documentos");
   const d = await getDoc(id);
   if (!d || d.kind !== "invoice" || d.status === "paid" || d.status === "void") return { error: "Esta factura no se puede marcar como pagada." };
   await payInvoice(d, text(f, "payment_method"), date(f, "paid_at") ?? today(), user);
@@ -155,7 +155,7 @@ export async function markPaid(id: string, _: unknown, f: FormData) {
 }
 
 export async function voidDocument(id: string) {
-  const user = await requireAdmin();
+  const user = await requireAdmin("documentos");
   const d = await getDoc(id);
   if (!d || d.status === "paid") return;
   await voidDoc(d, user);
@@ -163,7 +163,7 @@ export async function voidDocument(id: string) {
 }
 
 export async function deleteDocument(id: string) {
-  await requireAdmin();
+  await requireAdmin("documentos");
   const d = await getDoc(id);
   if (d?.status !== "draft") return;
   await adminDb().from("documents").delete().eq("id", id);
@@ -171,7 +171,7 @@ export async function deleteDocument(id: string) {
 }
 
 export async function saveDocumentSettings(_: unknown, f: FormData) {
-  await requireAdmin();
+  await requireAdmin("usuarios");
   await saveDocSettings(Object.fromEntries(DOC_SETTING_KEYS.map((k) => [k, String(f.get(k) ?? "").trim()])));
   refresh();
   return { ok: true };

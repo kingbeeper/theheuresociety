@@ -14,7 +14,7 @@ export const metadata = { title: "Leads" };
 export default async function LeadsPage({ searchParams }: PageProps<"/admin/leads">) {
   await connection();
   // La plantilla y la página se generan en paralelo: cada página comprueba la sesión antes de leer datos
-  await requireAdmin();
+  await requireAdmin("leads");
   const sp = await searchParams;
   const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? "";
   const stage = one(sp.stage) as Stage | "";

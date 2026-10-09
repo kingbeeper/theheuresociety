@@ -15,7 +15,7 @@ export const metadata = { title: "Documento" };
 
 export default async function DocumentPage({ params }: PageProps<"/admin/documentos/[id]">) {
   await connection();
-  await requireAdmin();
+  await requireAdmin("documentos");
   const { id } = await params;
   const d = await getDoc(id);
   if (!d) notFound();
