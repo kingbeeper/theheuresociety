@@ -5,7 +5,7 @@ import { refresh } from "next/cache";
 import { requireAdmin } from "@/lib/admin-auth";
 import { adminDb } from "@/lib/supabase";
 import { addEvent, upsertLead } from "@/lib/crm";
-import { logItem, recordPurchase, syncWebStatus, type Item } from "@/lib/stock";
+import { createStockItem, logItem, recordPurchase, syncWebPrice, syncWebStatus, webPrice, type Item } from "@/lib/stock";
 import { ACQUISITION, ITEM_STATUS, isOwnerStock } from "@/lib/stock-labels";
 
 // Acciones del inventario. Todas comprueban la sesión y dejan rastro en el historial del reloj.
@@ -62,21 +62,26 @@ export async function saveItem(id: string | null, _: unknown, f: FormData) {
   const fields = itemFields(f);
   if (!fields.brand) return { error: "Falta la marca." };
   const db = adminDb();
+  // Enlazado a una ficha de la web sin precio en el inventario: se toma el de la web
+  if (fields.watch_id && fields.asking_price == null) fields.asking_price = await webPrice(fields.watch_id);
 
   if (!id) {
     const { data, error } = await db.from("inventory_items").insert(fields).select("id, sku").single();
     if (error) return { error: error.message };
     await logItem(data.id, "entry", `Entrada · ${ACQUISITION[fields.acquisition]}${fields.cost != null ? ` · costo ${usd(fields.cost)}` : ""}${fields.supplier_name ? ` · de ${fields.supplier_name}` : ""}`, user);
+    await syncWebPrice(fields.watch_id, fields.asking_price);
     redirect(`/admin/inventario/${data.id}`);
   }
 
   const before = await getItem(id);
   const { error } = await db.from("inventory_items").update({ ...fields, updated_at: new Date().toISOString() }).eq("id", id);
   if (error) return { error: error.message };
-  // Cambios relevantes en el historial
-  if (before.asking_price !== fields.asking_price && (before.asking_price != null || fields.asking_price != null)) {
-    await logItem(id, "price", `Precio: ${usd(before.asking_price)} → ${usd(fields.asking_price)}`, user);
+  // Cambios relevantes en el historial (y el precio nuevo pasa a la web)
+  const priceChanged = Number(before.asking_price ?? NaN) !== Number(fields.asking_price ?? NaN) && (before.asking_price != null || fields.asking_price != null);
+  if (priceChanged) {
+    await logItem(id, "price", `Precio: ${usd(before.asking_price)} → ${usd(fields.asking_price)}${fields.watch_id && fields.asking_price != null ? " (actualizado en la web)" : ""}`, user);
   }
+  if (priceChanged || before.watch_id !== fields.watch_id) await syncWebPrice(fields.watch_id, fields.asking_price);
   if (Number(before.cost ?? NaN) !== Number(fields.cost ?? NaN) && fields.cost != null) await logItem(id, "cost", `Costo: ${usd(before.cost)} → ${usd(fields.cost)}`, user);
   if (Number(before.extra_costs) !== Number(fields.extra_costs)) await logItem(id, "cost", `Gastos: ${usd(before.extra_costs)} → ${usd(fields.extra_costs)}`, user);
   refresh();
@@ -122,6 +127,30 @@ export async function sellItem(id: string, _: unknown, f: FormData) {
   await logItem(id, "sale", `Vendido a ${name ?? "cliente"} por ${usd(price)}${text(f, "payment_method") ? ` (${text(f, "payment_method")})` : ""}`, user);
   await recordPurchase(buyerId, sold, user);
   await syncWebStatus(item.watch_id, "sold");
+
+  // Intercambio: el reloj que entrega el cliente entra al inventario (costo = valor reconocido)
+  const tradeBrand = text(f, "trade_brand");
+  if (tradeBrand) {
+    const tradeValue = money(f, "trade_value");
+    const trade = await createStockItem(
+      {
+        acquisition: "trade",
+        brand: tradeBrand,
+        model: text(f, "trade_model"),
+        reference: text(f, "trade_reference"),
+        serial: text(f, "trade_serial"),
+        comes_with: text(f, "trade_comes_with"),
+        supplier_customer_id: buyerId,
+        supplier_name: name,
+        purchase_date: saleDate,
+        cost: tradeValue,
+        trade_for_item_id: item.id,
+      },
+      user,
+      `Entrada por intercambio en la venta de ${item.sku}${tradeValue != null ? ` · valor ${usd(tradeValue)}` : ""}`
+    );
+    await logItem(id, "trade", `Recibido a cambio: ${tradeBrand} ${text(f, "trade_model") ?? ""} (${trade.sku})${tradeValue != null ? ` por ${usd(tradeValue)}` : ""}`.replace(/\s+/g, " "), user);
+  }
   if (isOwnerStock(item.acquisition)) await logItem(id, "owed", `Pendiente de pagar al dueño: ${usd(item.cost)}`, user);
   refresh();
   return { ok: true };

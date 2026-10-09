@@ -6,6 +6,7 @@ import { authClient, isAllowed, requireAdmin } from "@/lib/admin-auth";
 import { adminDb } from "@/lib/supabase";
 import { addEvent, normalizePhone, STAGES, STAGE_LABEL, upsertLead, type Stage } from "@/lib/crm";
 import { reactivateBot } from "@/lib/wa-bot";
+import { createStockItem, itemForRequest } from "@/lib/stock";
 
 // Acciones del CRM. Cada una comprueba primero que quien la ejecuta es un usuario autorizado.
 
@@ -122,19 +123,48 @@ export async function updateSellRequest(id: string, form: FormData) {
   const status = text(form, "status");
   const offer = text(form, "offer");
   const db = adminDb();
+  const { data: before } = await db.from("sell_requests").select("status").eq("id", id).single();
   const { data } = await db
     .from("sell_requests")
     .update({ ...(status && { status }), offer_amount: money(offer), notes: text(form, "notes"), updated_at: new Date().toISOString() })
     .eq("id", id)
-    .select("customer_id, brand, model")
+    .select("*")
     .single();
-  if (data?.customer_id && status) {
-    const body = `Solicitud ${data.brand} ${data.model ?? ""}: ${SELL_STATUS[status] ?? status}${offer ? ` · oferta ${offer}` : ""}`;
+  const changed = Boolean(status && before?.status !== status);
+  if (data?.customer_id && changed) {
+    const body = `Solicitud ${data.brand} ${data.model ?? ""}: ${SELL_STATUS[status!] ?? status}${offer ? ` · oferta ${offer}` : ""}`;
     await addEvent(data.customer_id, "sell_request", body.replace(/\s+/g, " "), { request: id }, user);
     // Trato cerrado: el cliente pasa a «ganado»
     if (status === "accepted" || status === "paid") {
       await db.from("customers").update({ stage: "won" }).eq("id", data.customer_id).neq("stage", "won");
     }
+  }
+
+  // Reloj recibido → entra solo al inventario (costo = la oferta; proveedor = el cliente)
+  if (data && changed && status === "received" && !(await itemForRequest(id))) {
+    const { data: c } = data.customer_id
+      ? await db.from("customers").select("name, phone, email").eq("id", data.customer_id).single()
+      : { data: null };
+    const acquisition = data.kind === "consign" ? "consignment" : data.kind === "trade" ? "trade" : "purchase";
+    const item = await createStockItem(
+      {
+        acquisition,
+        brand: data.brand,
+        model: data.model,
+        reference: data.reference,
+        description: data.message,
+        supplier_customer_id: data.customer_id,
+        supplier_name: c?.name ?? data.name,
+        supplier_location: null,
+        purchase_date: new Date().toISOString().slice(0, 10),
+        cost: data.offer_amount,
+        notes: (data.image_paths as string[])?.length ? `Fotos del cliente: ${(data.image_paths as string[]).join(" ")}` : null,
+        sell_request_id: id,
+      },
+      user,
+      `Entrada desde Compras (${SELL_STATUS.received})${data.offer_amount ? ` · costo $${Number(data.offer_amount).toLocaleString("en-US")}` : " · falta el costo"}`
+    );
+    if (data.customer_id) await addEvent(data.customer_id, "sell_request", `Su reloj entró al inventario (${item.sku})`, { item: item.id }, user);
   }
   refresh();
 }

@@ -113,3 +113,38 @@ export function summarize(items: Item[], now: number) {
     missingCost: available.filter((i) => num(i.cost) == null),
   };
 }
+
+// Alta en el inventario desde otro módulo (Compras, intercambio en una venta…). Si aún no existe
+// la columna sell_request_id (migración pendiente), se guarda sin ella.
+export async function createStockItem(fields: Record<string, unknown>, user: string, log: string) {
+  const db = adminDb();
+  let res = await db.from("inventory_items").insert(fields).select("id, sku").single();
+  if (res.error && "sell_request_id" in fields && /sell_request_id/.test(res.error.message)) {
+    const rest = { ...fields };
+    delete rest.sell_request_id;
+    res = await db.from("inventory_items").insert(rest).select("id, sku").single();
+  }
+  if (res.error) throw res.error;
+  await logItem(res.data.id as string, "entry", log, user);
+  return res.data as { id: string; sku: string };
+}
+
+// ¿Ya entró al inventario el reloj de esta solicitud de compra?
+export async function itemForRequest(requestId: string) {
+  const { data, error } = await adminDb().from("inventory_items").select("id, sku").eq("sell_request_id", requestId).maybeSingle();
+  return error ? null : (data as { id: string; sku: string } | null);
+}
+
+// Precio de la ficha web = precio previsto del inventario (solo si hay precio: vaciarlo en el
+// inventario no pone la web «a consultar» por accidente)
+export async function syncWebPrice(watchId: string | null, price: number | null) {
+  if (!watchId || price == null) return;
+  await adminDb().from("watches").update({ price, updated_at: new Date().toISOString() }).eq("id", watchId);
+  revalidateTag(INVENTORY_TAG, { expire: 0 });
+}
+
+export async function webPrice(watchId: string | null) {
+  if (!watchId) return null;
+  const { data } = await adminDb().from("watches").select("price").eq("id", watchId).maybeSingle();
+  return data?.price == null ? null : Number(data.price);
+}

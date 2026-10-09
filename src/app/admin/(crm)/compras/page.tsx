@@ -24,6 +24,11 @@ export default async function ComprasPage() {
   await requireAdmin();
   const { data } = await adminDb().from("sell_requests").select("*").order("created_at", { ascending: false }).limit(300);
   const rows = data ?? [];
+  // Relojes que ya entraron al inventario desde una solicitud (si falta la migración, queda vacío)
+  const { data: stocked } = rows.length
+    ? await adminDb().from("inventory_items").select("id, sku, sell_request_id").in("sell_request_id", rows.map((r) => r.id as string))
+    : { data: [] };
+  const stockOf = (id: string) => (stocked ?? []).find((s) => s.sell_request_id === id);
   const now = requestTime();
 
   return (
@@ -50,6 +55,14 @@ export default async function ComprasPage() {
                       )}{" "}
                       · {ago(r.created_at as string, now)}
                     </p>
+                    {stockOf(r.id as string) && (
+                      <Link href={`/admin/inventario/${stockOf(r.id as string)!.id}`} className="mt-2 inline-block text-xs text-emerald-200 hover:text-ivory">
+                        ✓ En inventario · {stockOf(r.id as string)!.sku} →
+                      </Link>
+                    )}
+                    {(r.status ?? "new") === "accepted" && !stockOf(r.id as string) && (
+                      <p className="mt-2 text-xs text-stone">Al marcarlo «Reloj recibido» entrará solo al inventario.</p>
+                    )}
                     {Boolean(r.message) && <p className="mt-2 line-clamp-4 whitespace-pre-wrap text-xs text-stone">{r.message as string}</p>}
                     {(r.image_paths as string[])?.length > 0 && (
                       <div className="mt-3 flex gap-1.5 overflow-x-auto">

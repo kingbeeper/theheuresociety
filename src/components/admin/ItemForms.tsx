@@ -113,6 +113,18 @@ export function SaleForm({ item, customers, today }: { item: Item; customers: Cu
           <label><span className={label}>Correo</span><input name="buyer_email" type="email" className={field} /></label>
         </div>
       )}
+      <details className="border border-line/70 p-4">
+        <summary className="cursor-pointer text-[0.66rem] tracking-[0.2em] uppercase text-stone">El cliente entrega un reloj a cambio (opcional)</summary>
+        <p className="mt-3 text-xs text-stone">Entrará solo al inventario como «Intercambio», con este valor como costo.</p>
+        <div className="mt-3 grid gap-4 sm:grid-cols-3">
+          <label><span className={label}>Marca</span><input name="trade_brand" className={field} /></label>
+          <label><span className={label}>Modelo</span><input name="trade_model" className={field} /></label>
+          <label><span className={label}>Ref #</span><input name="trade_reference" className={field} /></label>
+          <label><span className={label}>Serial #</span><input name="trade_serial" className={field} /></label>
+          <label><span className={label}>Valor reconocido (USD)</span><input name="trade_value" inputMode="decimal" className={field} /></label>
+          <label><span className={label}>Incluye</span><input name="trade_comes_with" placeholder="Caja, papeles…" className={field} /></label>
+        </div>
+      </details>
       <div className="flex items-center gap-4">
         <button disabled={pending} className={button}>{pending ? "Guardando…" : "Registrar venta"}</button>
         {state?.error && <p className="text-sm text-red-200/90">{state.error}</p>}
