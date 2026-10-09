@@ -51,7 +51,7 @@ async function SharedDocument({ params }: { params: Promise<{ token: string }> }
           <div className="flex items-center gap-4">
             <Image src="/brand/monogram-dark.png" alt="" width={44} height={57} priority />
             <div>
-              <p className="font-display text-2xl tracking-[0.18em] uppercase">{s.doc_company}</p>
+              <p className="font-display text-xl tracking-[0.14em] uppercase sm:text-2xl sm:tracking-[0.18em]">{s.doc_company}</p>
               <p className="mt-1 whitespace-pre-line text-xs leading-relaxed text-[#5d625e]">
                 {s.doc_address}
                 {"\n"}
@@ -60,9 +60,9 @@ async function SharedDocument({ params }: { params: Promise<{ token: string }> }
               </p>
             </div>
           </div>
-          <div className="text-right">
+          <div className="w-full sm:w-auto sm:text-right">
             <h1 className={`font-display font-light tracking-[0.06em] ${consign ? "text-[1.7rem] leading-tight" : "text-4xl"}`}>{t[d.kind]}</h1>
-            <dl className="mt-3 grid grid-cols-[auto_auto] justify-end gap-x-4 gap-y-1 text-xs">
+            <dl className="mt-3 grid grid-cols-[auto_auto] justify-start gap-x-4 gap-y-1 text-xs sm:justify-end">
               <dt className="text-[#5d625e]">{t.number}</dt><dd>{d.number}</dd>
               <dt className="text-[#5d625e]">{t.date}</dt><dd>{date(d.issue_date)}</dd>
               {d.due_date && (<><dt className="text-[#5d625e]">{t.due[d.kind]}</dt><dd>{date(d.due_date)}</dd></>)}
@@ -78,13 +78,28 @@ async function SharedDocument({ params }: { params: Promise<{ token: string }> }
           </p>
         </section>
 
-        <table className="w-full text-sm">
+        {/* Móvil: cada reloj en bloque (la tabla de cuatro columnas no cabe) */}
+        <div className="border-t border-[#d8d2c4] sm:hidden">
+          {d.items.map((l, i) => (
+            <div key={i} className="border-b border-[#ece7dc] py-4">
+              <p className="font-display text-lg leading-tight">{l.title}</p>
+              {l.details && <p className="mt-1 text-xs text-[#5d625e]">{l.details}</p>}
+              {d.show_serial && l.serial && <p className="mt-1 text-xs text-[#5d625e]">{t.serial}: {l.serial}</p>}
+              <p className="mt-2 flex justify-between text-sm tabular-nums">
+                <span className="text-[#5d625e]">{l.qty} × {usd(l.price)}</span>
+                <span>{usd(l.qty * l.price)}</span>
+              </p>
+            </div>
+          ))}
+        </div>
+
+        <table className="hidden w-full text-sm sm:table">
           <thead>
             <tr className="border-y border-[#d8d2c4] text-left text-[0.6rem] tracking-[0.2em] uppercase text-[#5d625e]">
               <th className="py-3 font-normal">{t.item}</th>
               <th className="py-3 text-center font-normal">{t.qty}</th>
-              <th className="py-3 text-right font-normal">{t.price}</th>
-              <th className="py-3 text-right font-normal">{consign ? t.net : t.amount}</th>
+              <th className="py-3 pl-4 text-right font-normal">{t.price}</th>
+              <th className="py-3 pl-4 text-right font-normal">{consign ? t.net : t.amount}</th>
             </tr>
           </thead>
           <tbody>
@@ -96,15 +111,15 @@ async function SharedDocument({ params }: { params: Promise<{ token: string }> }
                   {d.show_serial && l.serial && <p className="mt-1 text-xs text-[#5d625e]">{t.serial}: {l.serial}</p>}
                 </td>
                 <td className="py-4 text-center tabular-nums">{l.qty}</td>
-                <td className="py-4 text-right tabular-nums">{usd(l.price)}</td>
-                <td className="py-4 text-right tabular-nums">{usd(l.qty * l.price)}</td>
+                <td className="py-4 pl-4 text-right tabular-nums">{usd(l.price)}</td>
+                <td className="py-4 pl-4 text-right tabular-nums">{usd(l.qty * l.price)}</td>
               </tr>
             ))}
           </tbody>
         </table>
 
         <div className="mt-6 flex justify-end">
-          <dl className="grid w-full max-w-[300px] grid-cols-[1fr_auto] gap-y-2 text-sm">
+          <dl className="grid w-full grid-cols-[1fr_auto] gap-y-2 text-sm sm:max-w-[300px]">
             <dt className="text-[#5d625e]">{t.subtotal}</dt><dd className="text-right tabular-nums">{usd(totals.subtotal)}</dd>
             {totals.discount > 0 && (<><dt className="text-[#5d625e]">{t.discount}</dt><dd className="text-right tabular-nums">−{usd(totals.discount)}</dd></>)}
             {totals.tax > 0 && (<><dt className="text-[#5d625e]">{t.tax} ({Number(d.tax_rate)}%)</dt><dd className="text-right tabular-nums">{usd(totals.tax)}</dd></>)}
