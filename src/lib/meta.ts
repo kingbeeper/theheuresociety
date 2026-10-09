@@ -15,6 +15,7 @@ export const META_VERIFY_TOKEN = process.env.META_VERIFY_TOKEN ?? process.env.WH
 export const META_SCOPES = [
   "pages_show_list",
   "pages_read_engagement",
+  "pages_read_user_content",
   "pages_manage_metadata",
   "pages_messaging",
   "read_insights",

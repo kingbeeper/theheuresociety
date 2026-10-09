@@ -35,6 +35,8 @@ async function metricsFor(id: string, token: string, metrics: string[], params: 
     for (const d of data ?? []) {
       const v = d.total_value?.value ?? d.values?.[d.values.length - 1]?.value;
       if (typeof v === "number") out[d.name] = v;
+      // Métricas por tipo (p. ej. reacciones: { like: 3, love: 1 }): se suman
+      else if (v && typeof v === "object") out[d.name] = Object.values(v as Record<string, number>).reduce((a, b) => a + (Number(b) || 0), 0);
     }
   };
   try {
@@ -112,12 +114,14 @@ async function syncInstagram(s: SocialSettings, log: Log) {
   await inBatches(media, 5, async (m) => {
     const isReel = m.media_product_type === "REELS";
     let metrics: Record<string, number> = { likes: m.like_count ?? 0, comments: m.comments_count ?? 0 };
-    if (!m.timestamp || new Date(m.timestamp).getTime() >= recentCut) {
-      metrics = { ...metrics, ...(await metricsFor(m.id, token, isReel ? IG_REEL_METRICS : IG_POST_METRICS, {}, log)) };
+    // Recientes: se actualizan cada día. Antiguas: solo la primera vez (luego apenas cambian)
+    const { data: prev } = await adminDb().from("social_posts").select("metrics").eq("id", m.id).maybeSingle();
+    const known = (prev?.metrics as Record<string, number> | undefined) ?? {};
+    const recent = !m.timestamp || new Date(m.timestamp).getTime() >= recentCut;
+    if (recent || known.reach == null) {
+      metrics = { ...known, ...metrics, ...(await metricsFor(m.id, token, isReel ? IG_REEL_METRICS : IG_POST_METRICS, {}, log)) };
     } else {
-      // Publicación antigua: se conservan las métricas que ya teníamos
-      const { data: prev } = await adminDb().from("social_posts").select("metrics").eq("id", m.id).maybeSingle();
-      metrics = { ...((prev?.metrics as Record<string, number>) ?? {}), ...metrics };
+      metrics = { ...known, ...metrics };
     }
     await adminDb().from("social_posts").upsert(
       {
@@ -161,15 +165,21 @@ async function syncFacebook(s: SocialSettings, log: Log) {
     }
   }
 
-  const posts = await graphAll<FbPost>(`${page}/posts`, token, {
-    fields: "id,message,created_time,permalink_url,full_picture,shares,reactions.summary(total_count).limit(0),comments.summary(total_count).limit(0)",
-    limit: 25,
-  }, 60);
+  // Reacciones y comentarios como campos exigen el permiso pages_read_user_content: se piden aparte
+  // (si no está concedido, las reacciones salen de la métrica post_reactions_by_type_total)
+  const posts = await graphAll<FbPost>(`${page}/posts`, token, { fields: "id,message,created_time,permalink_url,full_picture,shares", limit: 25 }, 60);
   await inBatches(posts, 5, async (p) => {
-    const raw = await metricsFor(p.id, token, ["post_media_view", "post_total_media_view_unique", "post_clicks"], { period: "lifetime" }, log);
+    const raw = await metricsFor(p.id, token, ["post_media_view", "post_total_media_view_unique", "post_clicks", "post_reactions_by_type_total"], { period: "lifetime" }, log);
+    try {
+      const extra = await graph<FbPost>(p.id, token, { fields: "reactions.summary(total_count).limit(0),comments.summary(total_count).limit(0)" });
+      p.reactions = extra.reactions;
+      p.comments = extra.comments;
+    } catch {
+      // sin pages_read_user_content
+    }
     const metrics: Record<string, number> = {
-      reactions: p.reactions?.summary?.total_count ?? 0,
-      comments: p.comments?.summary?.total_count ?? 0,
+      reactions: p.reactions?.summary?.total_count ?? raw.post_reactions_by_type_total ?? 0,
+      ...(p.comments?.summary && { comments: p.comments.summary.total_count }),
       shares: p.shares?.count ?? 0,
       ...(raw.post_media_view != null && { views: raw.post_media_view }),
       ...(raw.post_total_media_view_unique != null && { reach: raw.post_total_media_view_unique }),
