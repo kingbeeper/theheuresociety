@@ -60,6 +60,8 @@ Para cambiar el recorte de un reloj ya publicado, envía una foto de frente con 
 /cotizacion — cotización
 /compra — reloj comprado fuera de la oficina (alta y web)
 /documentos — documentos abiertos
+/consignaciones — consignaciones activas (devolver o pagar al dueño)
+/memos — relojes en memo · /facturas — facturas por cobrar
 /pdf <i>número</i> — volver a enviar uno
 Puedes escribir la referencia o enviar fotos: si el reloj es nuevo, preparo la ficha y lo doy de alta.
 
@@ -571,6 +573,12 @@ async function handleCommand(chatId: number, text: string, user: string) {
   switch (command) {
     case "/documentos":
       return listOpenDocs(chatId);
+    case "/consignaciones":
+      return listOpenDocs(chatId, "consignment");
+    case "/memos":
+      return listOpenDocs(chatId, "memo");
+    case "/facturas":
+      return listOpenDocs(chatId, "invoice");
 
     case "/pdf":
       if (!arg) return sendMessage(chatId, "Indica el número. Ej.: <code>/pdf INV-2026-0003</code>");

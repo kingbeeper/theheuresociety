@@ -114,6 +114,18 @@ export function summarize(items: Item[], now: number) {
   };
 }
 
+// Devolución al dueño (consignación o memo de dealer): sale del inventario disponible y de la web
+export async function returnToOwner(item: Item, user: string, reason: string | null) {
+  await adminDb()
+    .from("inventory_items")
+    .update({ status: "returned", return_date: new Date().toISOString().slice(0, 10), return_reason: reason, updated_at: new Date().toISOString() })
+    .eq("id", item.id);
+  const to = item.acquisition === "consignment" ? "al consignatario" : item.acquisition === "memo" ? "al dealer" : "";
+  await logItem(item.id, "return", `Devuelto ${to}${reason ? `: ${reason}` : ""}`.trim(), user);
+  if (item.supplier_customer_id) await addEvent(item.supplier_customer_id, "return", `Se le devolvió ${item.brand} ${item.model ?? ""}`.trim(), { item: item.id }, user);
+  await syncWebStatus(item.watch_id, "draft");
+}
+
 // Alta en el inventario desde otro módulo (Compras, intercambio en una venta…). Si aún no existe
 // la columna sell_request_id (migración pendiente), se guarda sin ella.
 export async function createStockItem(fields: Record<string, unknown>, user: string, log: string) {

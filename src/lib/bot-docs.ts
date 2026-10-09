@@ -2,7 +2,7 @@ import "server-only";
 import { after } from "next/server";
 import { adminDb } from "./supabase";
 import { normalizePhone, upsertLead } from "./crm";
-import { createStockItem } from "./stock";
+import { createStockItem, returnToOwner, type Item } from "./stock";
 import { PAYMENT } from "./stock-labels";
 import { todayInMiami } from "./booking";
 import { closeReturned, consignorPaid, getDoc, getDocSettings, insertDoc, issueDoc, payInvoice, toInvoice } from "./documents";
@@ -460,9 +460,31 @@ export async function onCallback(chatId: number, cbId: string, messageId: number
   const clearButtons = () => tg("editMessageReplyMarkup", { chat_id: chatId, message_id: messageId, reply_markup: keyboard([]) }).catch(() => {});
 
   // Botones de un documento ya creado (no dependen del asistente)
-  if (["dpaid", "dpm", "dret", "dinv", "down"].includes(action)) {
+  // Consignación sin contrato: confirmar y devolver al dueño desde el inventario
+  if (action === "dirq" || action === "dirok") {
+    const { data: item } = await adminDb().from("inventory_items").select("*").eq("id", arg).maybeSingle();
+    if (!item || (item.status !== "in_stock" && item.status !== "reserved")) {
+      await answer("Ese reloj ya no está disponible.");
+      return clearButtons();
+    }
+    await answer();
+    if (action === "dirq") {
+      return sendMessage(chatId, `¿Devolver <b>${h(item.brand)} ${h(item.model ?? "")}</b> (${h(item.sku)}) a ${h(item.supplier_name ?? "su dueño")}?\nSale del inventario disponible y de la web.`, {
+        reply_markup: keyboard([[{ text: "↩️ Sí, devolver", callback_data: `dirok:${item.id}` }, { text: "No", callback_data: "dcan:0" }]]),
+      });
+    }
+    await clearButtons();
+    await returnToOwner(item as Item, user, "Devuelto al dueño (desde Telegram)");
+    return sendMessage(chatId, `↩️ ${h(item.sku)} devuelto a ${h(item.supplier_name ?? "su dueño")}. Ya no figura como disponible ni en la web.`);
+  }
+
+  if (["dpaid", "dpm", "dret", "dinv", "down", "dshow"].includes(action)) {
     const [docId, extra] = arg.split("|");
     const d = await getDoc(docId);
+    if (action === "dshow" && d) {
+      await answer();
+      return deliver(chatId, d);
+    }
     if (!d || d.status !== "sent") {
       await answer("Este documento ya está cerrado.");
       return clearButtons();
@@ -506,6 +528,10 @@ export async function onCallback(chatId: number, cbId: string, messageId: number
     });
   }
 
+  if (action === "dcan" && arg === "0") {
+    await answer("Cancelado");
+    return clearButtons();
+  }
   const flow = await getFlow(chatId);
   if (!flow) {
     await answer("Este asistente ya terminó.");
@@ -586,11 +612,41 @@ export async function resendDoc(chatId: number, number: string) {
   return deliver(chatId, data as Doc);
 }
 
-// /documentos: lo que está abierto (por cobrar, memos fuera, consignaciones activas)
-export async function listOpenDocs(chatId: number) {
-  const { data } = await adminDb().from("documents").select("kind, number, client_name, total, due_date").eq("status", "sent").order("created_at", { ascending: false }).limit(20);
-  if (!data?.length) return sendMessage(chatId, "No hay documentos abiertos.");
+// /documentos, /consignaciones, /memos, /facturas: lo abierto, con un botón por documento.
+// Al tocarlo llega el PDF con sus botones (devuelto, pagado, facturar…).
+const LIST_TITLE: Record<string, string> = {
+  all: "Documentos abiertos",
+  consignment: "Consignaciones activas",
+  memo: "Relojes en memo",
+  invoice: "Facturas por cobrar",
+  quote: "Cotizaciones abiertas",
+};
+
+export async function listOpenDocs(chatId: number, kind: DocKind | "all" = "all") {
+  let q = adminDb().from("documents").select("id, kind, number, client_name, total, due_date, items").eq("status", "sent").order("created_at", { ascending: false }).limit(30);
+  if (kind !== "all") q = q.eq("kind", kind);
+  const { data } = await q;
+  const docs = data ?? [];
   const today = todayInMiami();
-  const lines = data.map((d) => `${ICON[d.kind as DocKind]} <code>${h(d.number)}</code> · ${h(d.client_name ?? "")} · ${usd(Number(d.total))}${d.due_date && d.due_date < today && d.kind !== "quote" ? " · ⚠️ vencido" : ""}`);
-  return sendMessage(chatId, `<b>Documentos abiertos</b>\n\n${lines.join("\n")}\n\nPara reenviar uno: <code>/pdf NÚMERO</code>`);
+  const rows: InlineButton[][] = docs.map((d) => {
+    const late = d.due_date && d.due_date < today && d.kind !== "quote";
+    const watch = ((d.items as { title: string }[])[0]?.title ?? "").split(" ").slice(0, 3).join(" ");
+    return [{ text: `${late ? "⚠️" : ICON[d.kind as DocKind]} ${d.number} · ${d.client_name ?? ""} · ${watch}`.replace(/\s+/g, " ").slice(0, 62), callback_data: `dshow:${d.id}` }];
+  });
+
+  // Consignaciones del inventario que no tienen contrato (entraron por Compras o a mano)
+  let loose: { id: string; sku: string; brand: string; model: string | null; supplier_name: string | null }[] = [];
+  if (kind === "consignment") {
+    const inDocs = new Set(docs.flatMap((d) => (d.items as { item_id?: string }[]).map((l) => l.item_id).filter(Boolean)));
+    const { data: items } = await adminDb().from("inventory_items").select("id, sku, brand, model, supplier_name").eq("acquisition", "consignment").in("status", ["in_stock", "reserved"]).order("sku");
+    loose = (items ?? []).filter((i) => !inDocs.has(i.id));
+    for (const i of loose) rows.push([{ text: `📦 ${i.sku} · ${i.brand} ${i.model ?? ""} · ${i.supplier_name ?? "sin dueño"}`.replace(/\s+/g, " ").slice(0, 62), callback_data: `dirq:${i.id}` }]);
+  }
+
+  if (!rows.length) return sendMessage(chatId, kind === "all" ? "No hay documentos abiertos." : `No hay ${LIST_TITLE[kind].toLowerCase()}.`);
+  const help =
+    kind === "consignment"
+      ? `Toca una para ver el contrato con sus botones (<b>Devuelto al dueño</b> o <b>Pagado al dueño</b>).${loose.length ? "\n📦 = reloj en consignación sin contrato." : ""}`
+      : "Toca uno para recibir el PDF con sus botones.";
+  return sendMessage(chatId, `<b>${LIST_TITLE[kind]}</b> (${rows.length})\n⚠️ = plazo vencido\n\n${help}`, { reply_markup: keyboard(rows) });
 }
