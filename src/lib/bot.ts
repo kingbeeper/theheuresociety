@@ -9,6 +9,8 @@ import { reactivateBot } from "./wa-bot";
 import { addEvent, matchAlerts } from "./crm";
 import { downloadFile, escapeHtml as h, keyboard, sendMessage, sendPhoto, tg } from "./telegram";
 import { toSlug } from "./watches";
+import { MENU, WELCOME, mainKeyboard } from "./bot-keyboard";
+import { isMenuAction, onMenuCallback, onMenuText } from "./bot-menu";
 import { FLOW_COMMANDS, afterAnalysis, askCost, costCommand, onCostText, attachDraft, clearFlow, getFlow, demandSummary, listFollowUps, listOpenDocs, onCallback, onContact, onText, resendDoc, startFlow } from "./bot-docs";
 
 // ───────────────────────── Tipos de Telegram (solo lo que usamos) ─────────────────────────
@@ -42,41 +44,16 @@ type Draft = {
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://theheuresociety.vercel.app";
 const OPEN = ["collecting", "analyzing", "ready"];
 
-const HELP = `<b>The Heure Society · Publicar relojes</b>
+const HELP = `${WELCOME}
 
-1. Envíame las fotos del reloj (de 1 a 10).
-2. Escribe una nota con la referencia, el precio y los extras.
-   <i>Ej.: Rolex 126610LN, 14500, caja y papeles, excelente estado</i>
-3. Revisa la ficha que preparo y pulsa <b>Publicar</b>.
-4. Preparo el recorte para el estuche de la web y te lo enseño: pulsa <b>Agregar al estuche</b> si te gusta.
+<b>Atajos</b> (si prefieres escribir)
+/factura · /memo · /consignacion · /cotizacion · /compra
+/facturas · /memos · /consignaciones · /documentos · /pdf <i>número</i>
+/costo <i>THS-0004 9500</i> · /gasto <i>THS-0004 350 pulido</i>
+/vendido · /reservado · /disponible · /estuche <i>referencia</i>
+/lista · /seguimientos · /demanda · /vista · /cancelar
 
-<b>Estuche</b>
-Para cambiar el recorte de un reloj ya publicado, envía una foto de frente con el texto <code>estuche</code> y su referencia (ej. <code>estuche 126610LN</code>). Sale mejor sobre una mesa, sin mano.
-
-<b>Documentos</b> (te pregunto lo que falta y te doy el PDF)
-/factura — factura de venta
-/memo — memo (reloj prestado a un dealer o cliente)
-/consignacion — contrato con quien nos deja su reloj
-/cotizacion — cotización
-/compra — reloj comprado fuera de la oficina (alta y web)
-/documentos — documentos abiertos
-/consignaciones — consignaciones activas (devolver o pagar al dueño)
-/costo — relojes sin costo · <code>/costo THS-0004 9500</code> para ponerlo directo
-/gasto — sumar un gasto (servicio, pulido, envío…) · <code>/gasto THS-0004 350 pulido</code>
-/seguimientos — clientes a contactar hoy (reseñas, aniversarios, servicio…)
-/demanda — qué buscan los clientes frente a lo que hay en stock
-/memos — relojes en memo · /facturas — facturas por cobrar
-/pdf <i>número</i> — volver a enviar uno
-Puedes escribir la referencia o enviar fotos: si el reloj es nuevo, preparo la ficha y lo doy de alta.
-
-<b>Órdenes</b>
-/lista — últimos relojes publicados
-/vista — volver a ver la ficha del borrador actual
-/vendido <i>referencia</i> — marcar como vendido
-/reservado <i>referencia</i> — marcar como reservado
-/disponible <i>referencia</i> — volver a disponible
-/estuche <i>referencia</i> — repetir el recorte con sus fotos
-/cancelar — descartar el borrador o el documento en curso`;
+<b>Estuche</b>: para cambiar el recorte de un reloj publicado, envía una foto de frente con el texto <code>estuche</code> y su referencia (ej. <code>estuche 126610LN</code>).`;
 
 // ───────────────────────────── Borradores ─────────────────────────────
 async function openDraft(chatId: number): Promise<Draft | null> {
@@ -119,6 +96,7 @@ export async function handleMessage(msg: TgMessage) {
 
   const text = (msg.text ?? "").trim();
   if (text.startsWith("/")) return handleCommand(chatId, text, userLabel(msg.from));
+  if (text && (await onMenuText(chatId, text, userLabel(msg.from)))) return;
 
   // Asistente de documentos en curso: los textos y contactos son sus respuestas
   const flow = await getFlow(chatId);
@@ -138,7 +116,7 @@ export async function handleMessage(msg: TgMessage) {
     return sendPreview(chatId, draft.id);
   }
 
-  if (!draft) return sendMessage(chatId, "Primero envíame las fotos del reloj. Escribe /ayuda para ver cómo funciona.");
+  if (!draft) return sendMessage(chatId, `Elige una opción en los botones de abajo 👇\nPara publicar un reloj, toca <b>${MENU.publish}</b> o envíame directamente sus fotos.`, { reply_markup: mainKeyboard });
 
   const photos = await draftPhotos(draft.id);
   if (!photos.length) return sendMessage(chatId, "Aún no tengo fotos de este reloj. Envíamelas y después la nota.");
@@ -284,6 +262,11 @@ export async function handleCallback(cb: TgCallback) {
     await reactivateBot(draftId);
     await tg("answerCallbackQuery", { callback_query_id: cb.id, text: "El bot vuelve a responder en ese chat" });
     return tg("editMessageReplyMarkup", { chat_id: chatId, message_id: cb.message!.message_id, reply_markup: keyboard([]) }).catch(() => {});
+  }
+
+  // Submenús del teclado
+  if (isMenuAction(action)) {
+    return onMenuCallback(chatId, cb.id, cb.message!.message_id, action, (cb.data ?? "").slice(action.length + 1), userLabel(cb.from));
   }
 
   // Asistente de documentos y botones de un documento ya creado
@@ -571,6 +554,26 @@ async function handleCutoutButton(cb: TgCallback, chatId: number, action: string
   return sendMessage(chatId, `${h(data?.brand ?? "")} ${h(data?.model ?? "")} ya no sale en el estuche (sigue en la colección). Para volver a ponerlo, envía una foto con el texto <code>estuche</code> y su referencia.`);
 }
 
+// Cambia el estado de un reloj publicado; el inventario lo sigue (en una venta, el precio y el
+// comprador se completan después en el CRM o con una factura)
+export async function setWatchStatus(chatId: number, w: { id: string; brand: string; model: string; reference: string }, status: "sold" | "reserved" | "available") {
+  await adminDb().from("watches").update({ status, updated_at: new Date().toISOString() }).eq("id", w.id);
+  const { data: stockItem } = await adminDb().from("inventory_items").select("id, status").eq("watch_id", w.id).in("status", ["in_stock", "reserved", "sold"]).maybeSingle();
+  if (stockItem && stockItem.status !== "sold") {
+    const next = status === "sold" ? "sold" : status === "reserved" ? "reserved" : "in_stock";
+    await adminDb().from("inventory_items")
+      .update({ status: next, ...(next === "sold" && { sale_date: new Date().toISOString().slice(0, 10) }), updated_at: new Date().toISOString() })
+      .eq("id", stockItem.id);
+    await adminDb().from("inventory_events").insert({ item_id: stockItem.id, type: next === "sold" ? "sale" : "status", body: `Marcado como ${next === "sold" ? "vendido" : next === "reserved" ? "reservado" : "disponible"} desde Telegram`, created_by: "bot" });
+    if (next === "sold") {
+      await sendMessage(chatId, `Completa el precio de venta y el comprador en el CRM:\n${SITE_URL}/admin/inventario/${stockItem.id}\n<i>O mejor: haz la factura desde 🧾 Documentos.</i>`);
+    }
+  }
+  revalidateTag(INVENTORY_TAG, { expire: 0 });
+  const label = { sold: "vendido", reserved: "reservado", available: "disponible" }[status];
+  return sendMessage(chatId, `Hecho: ${h(w.brand)} ${h(w.model)} (${h(w.reference)}) ahora figura como <b>${label}</b>.`);
+}
+
 // ───────────────────────────── Órdenes ─────────────────────────────
 async function handleCommand(chatId: number, text: string, user: string) {
   const [cmd, ...rest] = text.split(/\s+/);
@@ -603,9 +606,11 @@ async function handleCommand(chatId: number, text: string, user: string) {
       return resendDoc(chatId, arg);
 
     case "/start":
+    case "/menu":
+      return sendMessage(chatId, WELCOME, { reply_markup: mainKeyboard });
     case "/ayuda":
     case "/help":
-      return sendMessage(chatId, HELP);
+      return sendMessage(chatId, HELP, { reply_markup: mainKeyboard });
 
     case "/vista": {
       // Reenvía la ficha ya preparada (sin volver a llamar a la IA)
@@ -641,26 +646,11 @@ async function handleCommand(chatId: number, text: string, user: string) {
     case "/vendido":
     case "/reservado":
     case "/disponible": {
-      const status = { "/vendido": "sold", "/reservado": "reserved", "/disponible": "available" }[command]!;
+      const status = ({ "/vendido": "sold", "/reservado": "reserved", "/disponible": "available" } as const)[command];
       if (!arg) return sendMessage(chatId, `Indica la referencia. Ej.: <code>${command} 126610LN</code>`);
       const found = await findPublished(arg);
       if (typeof found === "string") return sendMessage(chatId, found);
-      await adminDb().from("watches").update({ status, updated_at: new Date().toISOString() }).eq("id", found.id);
-      // El inventario sigue el mismo estado (en una venta, el precio y el comprador se completan en el CRM)
-      const { data: stockItem } = await adminDb().from("inventory_items").select("id, status").eq("watch_id", found.id).in("status", ["in_stock", "reserved", "sold"]).maybeSingle();
-      if (stockItem && stockItem.status !== "sold") {
-        const next = status === "sold" ? "sold" : status === "reserved" ? "reserved" : "in_stock";
-        await adminDb().from("inventory_items")
-          .update({ status: next, ...(next === "sold" && { sale_date: new Date().toISOString().slice(0, 10) }), updated_at: new Date().toISOString() })
-          .eq("id", stockItem.id);
-        await adminDb().from("inventory_events").insert({ item_id: stockItem.id, type: next === "sold" ? "sale" : "status", body: `${command} desde Telegram`, created_by: "bot" });
-        if (next === "sold") {
-          await sendMessage(chatId, `Completa el precio de venta y el comprador en el CRM:\n${SITE_URL}/admin/inventario/${stockItem.id}`);
-        }
-      }
-      revalidateTag(INVENTORY_TAG, { expire: 0 });
-      const label = { sold: "vendido", reserved: "reservado", available: "disponible" }[status];
-      return sendMessage(chatId, `Hecho: ${h(found.brand)} ${h(found.model)} (${h(found.reference)}) ahora figura como <b>${label}</b>.`);
+      return setWatchStatus(chatId, found, status);
     }
 
     case "/estuche": {

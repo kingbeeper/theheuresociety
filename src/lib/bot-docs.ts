@@ -681,7 +681,7 @@ async function getPending(chatId: number): Promise<Pending | null> {
 }
 const savePending = (chatId: number, p: Pending) =>
   adminDb().from("integration_settings").upsert({ key: costKey(chatId), value: JSON.stringify(p), updated_at: new Date().toISOString() }, { onConflict: "key" });
-const clearPendingCost = (chatId: number) => adminDb().from("integration_settings").delete().eq("key", costKey(chatId));
+export const clearPendingCost = (chatId: number) => adminDb().from("integration_settings").delete().eq("key", costKey(chatId));
 
 const itemName = (i: { sku: string; brand: string; model: string | null }) => `${i.sku} ${i.brand} ${i.model ?? ""}`.trim();
 
