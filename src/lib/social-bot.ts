@@ -285,7 +285,8 @@ async function handleComment(platform: Platform, c: Comment, s: SocialSettings) 
   const db = adminDb();
   // Comentarios de la propia cuenta (respuestas del negocio) no son leads
   if (!c.id || !c.text || c.fromId === s.ig_id || c.fromId === s.page_id) return;
-  const isLead = INTEREST.test(c.text);
+  const keywords = (s.comment_keywords ?? "").split(/[,\n]+/).map((k) => k.trim().toLowerCase()).filter(Boolean);
+  const isLead = INTEREST.test(c.text) || keywords.some((k) => c.text.toLowerCase().includes(k));
   const { data: inserted } = await db
     .from("social_comments")
     .upsert({ id: c.id, platform, post_id: c.postId, from_id: c.fromId, from_username: c.username, text: c.text, is_lead: isLead }, { onConflict: "id", ignoreDuplicates: true })

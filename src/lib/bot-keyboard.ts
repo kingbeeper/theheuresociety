@@ -7,13 +7,15 @@ export const MENU = {
   stock: "⌚ Inventario",
   clients: "👥 Clientes de hoy",
   help: "❓ Ayuda",
+  social: "📣 Redes",
 } as const;
 
 export const mainKeyboard = {
   keyboard: [
     [{ text: MENU.publish }, { text: MENU.docs }],
     [{ text: MENU.money }, { text: MENU.stock }],
-    [{ text: MENU.clients }, { text: MENU.help }],
+    [{ text: MENU.clients }, { text: MENU.social }],
+    [{ text: MENU.help }],
   ],
   resize_keyboard: true,
   is_persistent: true,
@@ -29,6 +31,7 @@ Usa los botones de abajo:
 💵 <b>Costos y gastos</b> — lo que costó cada reloj y sus gastos (para el margen)
 ⌚ <b>Inventario</b> — marcar vendido o reservado, ver lo publicado, el estuche…
 👥 <b>Clientes de hoy</b> — a quién escribir hoy, con el mensaje ya preparado
+📣 <b>Redes</b> — cómo van, ideas para publicar con el texto listo, comentarios y competencia
 ❓ <b>Ayuda</b> — esta explicación
 
 En cualquier momento puedes tocar <b>Cancelar</b> en los mensajes, o escribir /cancelar.`;

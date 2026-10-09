@@ -1,7 +1,7 @@
 import "server-only";
 import { after } from "next/server";
 import { adminDb } from "./supabase";
-import { escapeHtml as h, keyboard, sendMessage, tg, type InlineButton } from "./telegram";
+import { escapeHtml as h, escapeHtml, keyboard, sendMessage, tg, type InlineButton } from "./telegram";
 import { clearFlow, clearPendingCost, costCommand, demandSummary, listFollowUps, listOpenDocs, clearAppraise, startAppraisal, startFlow } from "./bot-docs";
 import { cutoutJob, setWatchStatus } from "./bot";
 
@@ -71,6 +71,17 @@ export async function onMenuText(chatId: number, text: string, user: string) {
       await listFollowUps(chatId);
       return true;
     }
+    case MENU.social:
+      await sendMessage(chatId, "📣 <b>Redes</b>", {
+        reply_markup: keyboard([
+          [{ text: "📈 ¿Cómo van las redes?", callback_data: "msoc:pulse" }],
+          [{ text: "💡 Ideas para publicar", callback_data: "msoc:plan" }],
+          [{ text: "📅 Lo que toca publicar", callback_data: "msoc:cal" }],
+          [{ text: "💬 Comentarios sin responder", callback_data: "msoc:comments" }],
+          [{ text: "🏁 Competencia", callback_data: "msoc:comp" }],
+        ]),
+      });
+      return true;
     case MENU.help:
       await showMenu(chatId);
       return true;
@@ -79,7 +90,7 @@ export async function onMenuText(chatId: number, text: string, user: string) {
   return false;
 }
 
-const MENU_ACTIONS = new Set(["mnew", "mopen", "mcost", "mlist", "mst", "mset", "mcase", "mdem", "mappr", "mdrop", "mvid"]);
+const MENU_ACTIONS = new Set(["mnew", "mopen", "mcost", "mlist", "mst", "mset", "mcase", "mdem", "mappr", "mdrop", "mvid", "msoc"]);
 export const isMenuAction = (action: string) => MENU_ACTIONS.has(action);
 
 type Watch = { id: string; brand: string; model: string; reference: string; status: string };
@@ -161,9 +172,78 @@ export async function onMenuCallback(chatId: number, cbId: string, messageId: nu
       return;
     }
 
+    case "msoc":
+      return socialMenu(chatId, arg, user);
+
     case "mcase":
       await clearButtons();
       after(() => cutoutJob(chatId, arg));
       return;
+  }
+}
+
+// ───────────────────────────── Redes ─────────────────────────────
+const SITE = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://theheuresociety.vercel.app").replace(/\/$/, "");
+const num = (v: number | null | undefined) => (v == null ? "—" : Math.round(v).toLocaleString("es-ES"));
+
+async function socialMenu(chatId: number, what: string, user: string) {
+  if (what === "pulse") {
+    const { socialPulse, socialInsights, bestSlot } = await import("./social-health");
+    const [p, i] = await Promise.all([socialPulse(), socialInsights()]);
+    const b = bestSlot(i);
+    const head = p.status === "ok" ? "✅ <b>Las redes van bien</b>" : p.status === "warn" ? "📉 <b>Las redes están flojas</b>" : "🚨 <b>Las redes están paradas</b>";
+    return sendMessage(chatId, [
+      head,
+      ...p.reasons.map((r) => `• ${escapeHtml(r)}`),
+      "",
+      `Alcance 7 días: <b>${num(p.week.reach)}</b> · interacciones: <b>${num(p.week.interactions)}</b>`,
+      `Seguidores: ${num(p.followers.now)}${p.followers.delta7 != null ? ` (${p.followers.delta7 >= 0 ? "+" : ""}${p.followers.delta7} en 7 días)` : ""}`,
+      "",
+      `🏆 Lo que mejor te funciona: <b>${b.format ?? "—"}</b>, los <b>${b.weekday ?? "—"}</b> por la <b>${b.slot ?? "—"}</b>.`,
+      `${SITE}/admin/redes/engagement`,
+    ].join("\n"), { reply_markup: keyboard([[{ text: "💡 Dame ideas para publicar", callback_data: "msoc:plan" }]]) });
+  }
+  if (what === "plan") {
+    await sendMessage(chatId, "💡 Preparando ideas con tu inventario, lo que buscan los clientes y lo que mejor te funciona… (alrededor de un minuto)");
+    after(async () => {
+      try {
+        const { generateContentPlan } = await import("./social-growth");
+        const { sendIdeas } = await import("./social-ideas");
+        await sendIdeas((await generateContentPlan(user)) as never, chatId);
+      } catch (e) {
+        await sendMessage(chatId, `⚠️ No pude preparar las ideas: ${escapeHtml((e as Error).message.slice(0, 200))}`);
+      }
+    });
+    return;
+  }
+  if (what === "cal") {
+    const { data } = await adminDb().from("content_ideas").select("*").eq("status", "approved").order("scheduled_for").limit(10);
+    if (!data?.length) return sendMessage(chatId, "No hay nada en el calendario. Pide ideas y aprueba las que te gusten.", { reply_markup: keyboard([[{ text: "💡 Ideas para publicar", callback_data: "msoc:plan" }]]) });
+    const { ideaMessage } = await import("./social-ideas");
+    for (const i of data) {
+      const m = await ideaMessage(i as never, "reminder");
+      await sendMessage(chatId, m.text, m.extra);
+    }
+    return;
+  }
+  if (what === "comments") {
+    const { unansweredComments } = await import("./social-growth");
+    const list = await unansweredComments(10);
+    if (!list.length) return sendMessage(chatId, "✅ No hay comentarios sin responder.");
+    return sendMessage(chatId, [
+      `<b>💬 Comentarios sin responder</b> (${list.length})`,
+      ...list.map((c) => `• @${escapeHtml(c.from_username ?? "alguien")}: «${escapeHtml((c.text as string).slice(0, 80))}»${c.suggested_reply ? `\n   ↳ <i>${escapeHtml(c.suggested_reply as string)}</i>` : ""}`),
+      "",
+      `Respóndelos con un toque en el CRM: ${SITE}/admin/redes/engagement`,
+    ].join("\n"));
+  }
+  if (what === "comp") {
+    const { competitorBoard } = await import("./social-growth");
+    const rows = await competitorBoard();
+    if (rows.length < 2) return sendMessage(chatId, `Añade las cuentas de la competencia en el CRM: ${SITE}/admin/redes/engagement`);
+    return sendMessage(chatId, [
+      "<b>🏁 Competencia</b> (posts/semana · ♥+💬 por post · % reels)",
+      ...rows.map((c) => c.error ? `• @${escapeHtml(c.username)}: ${escapeHtml(c.error)}` : `• ${c.mine ? "<b>" : ""}@${escapeHtml(c.username)}${c.mine ? " (tú)</b>" : ""}: ${num(c.followers)} seg. · ${c.postsPerWeek ?? "—"} · ${num(c.avgInteractions)} · ${c.reelsShare == null ? "—" : Math.round(c.reelsShare * 100) + "%"}`),
+    ].join("\n"));
   }
 }

@@ -496,6 +496,15 @@ export async function onCallback(chatId: number, cbId: string, messageId: number
   const clearButtons = () => tg("editMessageReplyMarkup", { chat_id: chatId, message_id: messageId, reply_markup: keyboard([]) }).catch(() => {});
 
   // Botones de un documento ya creado (no dependen del asistente)
+  if (action === "dcid") {
+    const [ideaId, what] = arg.split("|");
+    const { setIdeaStatus } = await import("./social-ideas");
+    const status = what === "ok" ? "approved" : what === "posted" ? "posted" : "dismissed";
+    await setIdeaStatus(ideaId, status);
+    await answer(status === "approved" ? "Aprobada: te la recuerdo el día que toca" : status === "posted" ? "¡Bien! Marcada como publicada" : "Descartada");
+    return clearButtons();
+  }
+
   if (action === "dprc") {
     await clearButtons();
     if (arg === "no") return answer("De acuerdo");

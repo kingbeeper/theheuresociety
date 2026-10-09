@@ -295,6 +295,8 @@ export async function saveSocialSettings(form: FormData) {
     bot_dm: form.get("bot_dm") === "on" ? "on" : "off",
     comment_reply: form.get("comment_reply") === "on" ? "on" : "off",
     comment_reply_text: text(form, "comment_reply_text"),
+    ...(form.has("comment_keywords") && { comment_keywords: text(form, "comment_keywords") }),
+    ...(form.has("competitors") && { competitors: text(form, "competitors") }),
   });
   refresh();
 }

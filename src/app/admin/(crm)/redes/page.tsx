@@ -70,7 +70,11 @@ export default async function RedesPage({ searchParams }: PageProps<"/admin/rede
 
   return (
     <>
-      <PageTitle eyebrow="CRM" title="Redes" action={connected ? <SyncButton /> : undefined} />
+      <PageTitle
+        eyebrow="CRM"
+        title="Redes"
+        action={connected ? <div className="flex flex-wrap gap-2"><Link href="/admin/redes/engagement" className="bg-ivory px-5 py-2.5 text-[0.68rem] tracking-[0.22em] uppercase text-ink hover:bg-brass">📣 Engagement</Link><SyncButton /></div> : undefined}
+      />
 
       {!connected ? (
         <Card title="Conectar Instagram y Facebook">

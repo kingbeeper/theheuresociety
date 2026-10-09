@@ -214,6 +214,21 @@ export async function syncSocial() {
   } catch (e) {
     log.push(`Facebook: ${(e as Error).message}`);
   }
+  // Engagement: comentarios de las publicaciones recientes, respuesta sugerida y competencia
+  if (s.ig_id) {
+    const g = await import("./social-growth");
+    try {
+      result.comments = await g.syncComments(s);
+      await g.suggestReplies();
+    } catch (e) {
+      log.push(`Comentarios: ${(e as Error).message}`);
+    }
+    try {
+      await g.snapshotCompetitors(s);
+    } catch (e) {
+      log.push(`Competencia: ${(e as Error).message}`);
+    }
+  }
   // Los avisos de métricas que Meta no devuelve (cuentas pequeñas, métricas en desarrollo) no son errores graves
   return { ok: true, ...result, warnings: log.slice(0, 20) };
 }

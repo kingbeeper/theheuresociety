@@ -38,6 +38,8 @@ export type SocialSettings = {
   bot_dm?: string; // "on" | "off": el bot responde los DM de Instagram y Messenger
   comment_reply?: string; // "on" | "off": respuesta privada automática a comentarios de interés
   comment_reply_text?: string;
+  comment_keywords?: string; // palabras de campaña («PRECIO»…): quien las comenta recibe la respuesta privada
+  competitors?: string; // cuentas de Instagram de la competencia (separadas por comas)
 };
 
 export async function getSettings(): Promise<SocialSettings> {

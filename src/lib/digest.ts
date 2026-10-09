@@ -112,6 +112,14 @@ export async function buildDigest(now = Date.now()) {
     for (const s of late.slice(0, 5)) lines.push(`• ${h(s.item?.sku ?? "")} ${h(s.item?.brand ?? "")} ${h(s.item?.model ?? "")} · ${h(s.provider)} desde ${s.sent_at}`);
   }
 
+  // Pulso de redes
+  const { socialPulse } = await import("./social-health");
+  const pulse = await socialPulse(now).catch(() => null);
+  if (pulse && pulse.status !== "ok") {
+    lines.push("", `${pulse.status === "alert" ? "🚨" : "📉"} <b>Redes ${pulse.status === "alert" ? "paradas" : "flojas"}</b>`);
+    for (const r of pulse.reasons.slice(0, 3)) lines.push(`• ${h(r)}`);
+  }
+
   // Instagram ayer
   const y = igY.data?.data as Record<string, number> | undefined;
   if (y) {
@@ -127,6 +135,27 @@ export async function buildDigest(now = Date.now()) {
 export async function sendDigest() {
   const text = await buildDigest();
   await notifyAdmins(text);
+  // Redes: recordatorio de lo que toca publicar hoy y, si están flojas, ideas nuevas (una vez por semana)
+  try {
+    const { remindToday } = await import("./social-ideas");
+    await remindToday();
+    const { socialPulse } = await import("./social-health");
+    const pulse = await socialPulse();
+    if (pulse.status !== "ok") {
+      const { adminDb } = await import("./supabase");
+      const { count } = await adminDb().from("content_ideas").select("id", { count: "exact", head: true }).gte("created_at", new Date(Date.now() - 6 * 86_400_000).toISOString());
+      if (!count) {
+        const { generateContentPlan } = await import("./social-growth");
+        const { sendIdeas } = await import("./social-ideas");
+        const ideas = await generateContentPlan("resumen diario");
+        await notifyAdmins(`💡 <b>Ideas para reactivar las redes</b>: ${ideas.length} propuestas con texto y hora recomendada. Aprueba las que quieras y te recuerdo el día que toca.`);
+        await sendIdeas(ideas as never);
+      }
+    }
+  } catch (e) {
+    console.error("Redes en el resumen:", e);
+  }
+
   // Relojes estancados: propuesta de rebaja con botón para aplicarla
   const { notifyDrops } = await import("./pricing");
   await notifyDrops().catch((e) => console.error("Rebajas sugeridas:", e));
