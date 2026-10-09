@@ -138,17 +138,31 @@ export async function addWatchAlert(customerId: string, query: string) {
   await addEvent(customerId, "alert", `Busca: ${q}`);
 }
 
-// Al publicar un reloj: compradores cuya búsqueda encaja (todas las palabras de la búsqueda
-// aparecen en marca, modelo o referencia; se ignoran palabras cortas como «de» o «el»)
+// Al publicar un reloj: compradores cuya búsqueda encaja. Coincide si la búsqueda contiene la
+// referencia, o alguna palabra propia del modelo (Daytona, GMT, Nautilus…) sin nombrar otra marca.
+// Los detalles que el cliente añade («Pepsi», «esfera blanca», «2022») no impiden el aviso.
+const BRANDS = ["rolex", "audemars", "piguet", "patek", "philippe", "cartier", "richard", "mille", "omega", "vacheron", "constantin", "tudor", "breitling", "hublot", "panerai", "iwc", "jaeger", "lecoultre", "lange"];
+const GENERIC = new Set(["oyster", "perpetual", "chronograph", "cosmograph", "automatic", "date", "the", "and", "con", "del", "los", "las", "steel", "acero", "gold", "oro", "white", "black", "blue", "watch", "reloj"]);
+const words = (s: string) =>
+  s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").split(/[^a-z0-9]+/).filter((w) => w.length > 2);
+const compact = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+export function alertMatches(query: string, watch: { brand: string; model: string; reference: string }) {
+  const q = words(query);
+  const brand = words(watch.brand);
+  if (watch.reference && compact(query).includes(compact(watch.reference))) return true;
+  if (q.some((w) => BRANDS.includes(w) && !brand.includes(w))) return false; // pide otra marca
+  // Solo la marca («Rolex», «un Patek»): le interesa cualquier pieza de esa marca
+  if (q.some((w) => brand.includes(w)) && q.every((w) => brand.includes(w) || GENERIC.has(w) || ["any", "cualquier", "uno", "una", "busco"].includes(w))) return true;
+  const modelWords = words(watch.model).filter((w) => !GENERIC.has(w) && !brand.includes(w));
+  return modelWords.some((w) => q.includes(w));
+}
+
 export async function matchAlerts(watch: { brand: string; model: string; reference: string }) {
-  const haystack = `${watch.brand} ${watch.model} ${watch.reference}`.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
   const { data } = await adminDb()
     .from("watch_alerts")
     .select("id, query, customer:customers(id, name, phone, wa_id)")
     .eq("active", true);
   type Row = { id: string; query: string; customer: { id: string; name: string | null; phone: string | null; wa_id: string | null } | null };
-  return ((data ?? []) as unknown as Row[]).filter((a) => {
-    const words = a.query.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").split(/[^a-z0-9]+/).filter((w) => w.length > 2);
-    return words.length > 0 && words.every((w) => haystack.includes(w));
-  });
+  return ((data ?? []) as unknown as Row[]).filter((a) => alertMatches(a.query, watch));
 }

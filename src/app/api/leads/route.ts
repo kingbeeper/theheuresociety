@@ -98,7 +98,6 @@ export async function POST(request: Request) {
       source: "web_alert",
       intent: "buy",
       interests: lead.budget ? `${lead.query} (presupuesto: ${lead.budget})` : lead.query,
-      event: { type: "alert", body: `Pide aviso: ${lead.query}${lead.budget ? ` · presupuesto ${lead.budget}` : ""}` },
     });
     await addWatchAlert(customer.id, lead.query);
     return Response.json({ ok: true });
