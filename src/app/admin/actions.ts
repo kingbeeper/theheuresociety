@@ -49,8 +49,9 @@ export async function createLead(form: FormData) {
 export async function updateLead(id: string, _: unknown, form: FormData) {
   const user = await requireAdmin();
   const db = adminDb();
-  const { data: before } = await db.from("customers").select("stage").eq("id", id).single();
+  const { data: before } = await db.from("customers").select("*").eq("id", id).single();
   const stage = text(form, "stage") as Stage | null;
+  const followAt = text(form, "follow_up_at");
   const patch = {
     name: text(form, "name"),
     phone: normalizePhone(text(form, "phone")),
@@ -63,7 +64,17 @@ export async function updateLead(id: string, _: unknown, form: FormData) {
     ...(stage && STAGES.includes(stage) && { stage }),
     updated_at: new Date().toISOString(),
   };
-  const { error } = await db.from("customers").update(patch).eq("id", id);
+  // Seguimiento (ganado o perdido lo cierra). Si falta la migración de seguimientos, se guarda lo demás.
+  const closed = stage === "won" || stage === "lost";
+  const follow = {
+    follow_up_at: closed ? null : followAt && /^\d{4}-\d{2}-\d{2}$/.test(followAt) ? followAt : null,
+    follow_up_note: closed ? null : text(form, "follow_up_note"),
+  };
+  let { error } = await db.from("customers").update({ ...patch, ...(before && "follow_up_at" in before && follow) }).eq("id", id);
+  if (error && /follow_up/.test(error.message)) ({ error } = await db.from("customers").update(patch).eq("id", id));
+  if (!error && before && "follow_up_at" in before && follow.follow_up_at && follow.follow_up_at !== before.follow_up_at) {
+    await addEvent(id, "follow_up", `Seguimiento para el ${follow.follow_up_at}${follow.follow_up_note ? `: ${follow.follow_up_note}` : ""}`, {}, user);
+  }
   if (error) return { error: error.code === "23505" ? "Ese teléfono o correo ya pertenece a otro cliente." : error.message };
   if (stage && before?.stage !== stage) await addEvent(id, "stage", `Etapa: ${STAGE_LABEL[stage]}`, { from: before?.stage, to: stage }, user);
   refresh();
@@ -87,6 +98,17 @@ export async function addNote(id: string, form: FormData) {
   if (!body) return;
   await addEvent(id, "note", body, {}, user);
   await adminDb().from("customers").update({ last_activity_at: new Date().toISOString() }).eq("id", id);
+  refresh();
+}
+
+// Seguimiento hecho: se borra la fecha y queda en el historial (con lo que se hizo, si se escribe)
+export async function completeFollowUp(id: string, form: FormData) {
+  const user = await requireAdmin();
+  const db = adminDb();
+  const { data: c } = await db.from("customers").select("follow_up_note").eq("id", id).single();
+  const done = text(form, "done");
+  await db.from("customers").update({ follow_up_at: null, follow_up_note: null, last_activity_at: new Date().toISOString() }).eq("id", id);
+  await addEvent(id, "follow_up", `Seguimiento hecho${c?.follow_up_note ? ` (${c.follow_up_note})` : ""}${done ? `: ${done}` : ""}`, {}, user);
   refresh();
 }
 

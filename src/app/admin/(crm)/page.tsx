@@ -2,8 +2,10 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { adminDb } from "@/lib/supabase";
 import { requireAdmin } from "@/lib/admin-auth";
-import { SOURCE_LABEL, STAGES, STAGE_LABEL, type Customer } from "@/lib/crm";
-import { ago, Card, fmtDateTime, PageTitle, SourceTag, StageBadge, requestTime } from "@/components/admin/ui";
+import { followUpsDue, SOURCE_LABEL, STAGES, STAGE_LABEL, type Customer } from "@/lib/crm";
+import { salesByChannel, type Item } from "@/lib/stock";
+import { todayInMiami } from "@/lib/booking";
+import { ago, Card, fmtDateTime, money, PageTitle, SourceTag, StageBadge, requestTime } from "@/components/admin/ui";
 
 export const metadata = { title: "Panel" };
 
@@ -24,6 +26,11 @@ export default async function Dashboard() {
     db.from("wa_contacts").select("wa_id, name, customer_id, human_until").eq("mode", "human").gt("human_until", nowIso),
     db.from("watch_alerts").select("id", { count: "exact", head: true }).eq("active", true),
   ]);
+  const [follow, stock] = await Promise.all([
+    followUpsDue(now, todayInMiami(new Date(now))),
+    db.from("inventory_items").select("*").eq("status", "sold"),
+  ]);
+  const channels = await salesByChannel((stock.data ?? []) as Item[], now - 365 * 86_400_000);
 
   const all = (customers.data ?? []) as Pick<Customer, "stage" | "source" | "created_at">[];
   const week = all.filter((c) => c.created_at >= weekAgo);
@@ -31,12 +38,11 @@ export default async function Dashboard() {
     week.reduce<Record<string, number>>((acc, c) => ({ ...acc, [c.source]: (acc[c.source] ?? 0) + 1 }), {})
   ).sort((a, b) => b[1] - a[1]);
   const byStage = STAGES.map((s) => [s, all.filter((c) => c.stage === s).length] as const);
-  const open = all.filter((c) => c.stage !== "won" && c.stage !== "lost").length;
   const won = all.filter((c) => c.stage === "won").length;
 
   const kpis = [
     { label: "Leads nuevos · 7 días", value: week.length, href: "/admin/leads?stage=new" },
-    { label: "Leads abiertos", value: open, href: "/admin/leads" },
+    { label: "Seguimientos para hoy", value: follow.length, href: "/admin/leads?follow=1" },
     { label: "Citas próximas", value: appointments.data?.length ?? 0, href: "/admin/citas" },
     { label: "Compras por responder", value: sells.data?.length ?? 0, href: "/admin/compras" },
     { label: "Chats esperando a una persona", value: waiting.data?.length ?? 0, href: "/admin/leads?bot=off" },
@@ -112,6 +118,49 @@ export default async function Dashboard() {
             </ul>
           ) : (
             <p className="text-sm text-stone">No hay citas próximas.</p>
+          )}
+        </Card>
+
+        <Card title="Seguimientos para hoy" href="/admin/leads?follow=1">
+          {follow.length ? (
+            <ul className="space-y-3 text-sm">
+              {follow.slice(0, 8).map((f) => (
+                <li key={f.id} className="border-b border-line/60 pb-3">
+                  <Link href={`/admin/leads/${f.id}`} className="hover:text-brass">{f.scheduled ? "⏰" : "💤"} {f.name ?? "Sin nombre"}</Link>
+                  <p className="text-xs text-stone">{f.reason}</p>
+                </li>
+              ))}
+              {follow.length > 8 && <li className="text-xs text-stone">…y {follow.length - 8} más</li>}
+            </ul>
+          ) : (
+            <p className="text-sm text-stone">Todo al día.</p>
+          )}
+        </Card>
+
+        <Card title="Ventas por canal · 12 meses" href="/admin/inventario?status=sold" className="xl:col-span-2">
+          {channels.length ? (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-[0.6rem] tracking-[0.16em] uppercase text-stone">
+                  <th className="pb-2 font-normal">Canal del comprador</th>
+                  <th className="pb-2 text-right font-normal">Ventas</th>
+                  <th className="pb-2 text-right font-normal">Facturado</th>
+                  <th className="pb-2 text-right font-normal">Ganancia</th>
+                </tr>
+              </thead>
+              <tbody>
+                {channels.map((r) => (
+                  <tr key={r.source} className="border-t border-line/60">
+                    <td className="py-2">{r.source === "unknown" ? "Sin comprador en el CRM" : SOURCE_LABEL[r.source] ?? r.source}</td>
+                    <td className="py-2 text-right tabular-nums">{r.count}</td>
+                    <td className="py-2 text-right tabular-nums">{money(r.revenue)}</td>
+                    <td className="py-2 text-right tabular-nums">{money(r.profit)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <p className="text-sm text-stone">Aún no hay ventas registradas en el inventario. Al registrar una venta, el canal sale del origen del comprador.</p>
           )}
         </Card>
 

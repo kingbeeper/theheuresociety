@@ -35,6 +35,10 @@ export function LeadForm({ c }: { c: Customer }) {
       </div>
       <label><span className={label}>Qué busca</span><textarea name="interests" defaultValue={c.interests ?? ""} rows={2} className={field} /></label>
       <label><span className={label}>Etiquetas (separadas por comas)</span><input name="tags" defaultValue={c.tags.join(", ")} placeholder="VIP, coleccionista, Rolex" className={field} /></label>
+      <div className="grid gap-4 sm:grid-cols-[180px_1fr]">
+        <label><span className={label}>Próximo seguimiento</span><input name="follow_up_at" type="date" defaultValue={c.follow_up_at ?? ""} className={field} /></label>
+        <label><span className={label}>Para qué</span><input name="follow_up_note" defaultValue={c.follow_up_note ?? ""} placeholder="Llamar para ver si decidió, enviarle el Daytona…" className={field} /></label>
+      </div>
       <label><span className={label}>Notas internas</span><textarea name="notes" defaultValue={c.notes ?? ""} rows={3} className={field} /></label>
       <div className="flex items-center gap-4">
         <button disabled={pending} className="bg-ivory px-5 py-2.5 text-[0.68rem] tracking-[0.22em] uppercase text-ink hover:bg-brass disabled:opacity-60">

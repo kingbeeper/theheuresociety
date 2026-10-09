@@ -4,14 +4,15 @@ import { connection } from "next/server";
 import { adminDb } from "@/lib/supabase";
 import { requireAdmin } from "@/lib/admin-auth";
 import type { Customer } from "@/lib/crm";
-import { ago, Card, fmtDateTime, ghostButtonClass, money, SourceTag, StageBadge, requestTime } from "@/components/admin/ui";
+import { ago, Card, fmtDate, fmtDateTime, ghostButtonClass, money, SourceTag, StageBadge, requestTime } from "@/components/admin/ui";
 import { LeadForm } from "@/components/admin/LeadForm";
-import { addNote, setBot, setSocialBot, toggleAlert } from "../../../actions";
+import { addNote, completeFollowUp, setBot, setSocialBot, toggleAlert } from "../../../actions";
+import { todayInMiami } from "@/lib/booking";
 
 export const metadata = { title: "Cliente" };
 
 const EVENT_ICON: Record<string, string> = {
-  lead: "✦", note: "✎", stage: "→", appointment: "📅", sell_request: "⌚", alert: "🔔", match: "✨", handoff: "👤",
+  lead: "✦", note: "✎", stage: "→", appointment: "📅", sell_request: "⌚", alert: "🔔", match: "✨", handoff: "👤", follow_up: "⏰", price_drop: "📉", purchase: "💰", return: "↩",
 };
 const SELL_LABEL: Record<string, string> = { new: "Nueva", offered: "Ofertada", accepted: "Aceptada", received: "Recibido", paid: "Pagada", rejected: "Rechazada" };
 
@@ -90,6 +91,18 @@ export default async function LeadPage({ params }: PageProps<"/admin/leads/[id]"
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
         <div className="space-y-6">
+          {c.follow_up_at && (
+            <div className={`border p-4 ${c.follow_up_at <= todayInMiami(new Date(now)) ? "border-amber-300/50 bg-amber-300/5" : "border-line bg-forest/60"}`}>
+              <p className="text-sm">
+                ⏰ <b>Seguimiento {c.follow_up_at <= todayInMiami(new Date(now)) ? "pendiente" : "programado"}</b> · {fmtDate(`${c.follow_up_at}T12:00:00`)}
+                {c.follow_up_note && <span className="text-stone"> · {c.follow_up_note}</span>}
+              </p>
+              <form action={completeFollowUp.bind(null, c.id)} className="mt-3 flex gap-2">
+                <input name="done" placeholder="Qué se hizo (opcional)" className="w-full border border-line bg-ink/60 px-3 py-2 text-sm outline-none focus:border-brass/70" />
+                <button className="whitespace-nowrap border border-line px-4 text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">✓ Hecho</button>
+              </form>
+            </div>
+          )}
           <Card title="Datos del cliente"><LeadForm c={c} /></Card>
 
           {c.wa_id && wa.data && (

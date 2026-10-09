@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { ACQUISITION, CONDITIONS, PAYMENT } from "@/lib/stock-labels";
+import { SOURCE_LABEL } from "@/lib/crm-labels";
 import { returnItem, saveItem, sellItem } from "@/app/admin/inventory-actions";
 import type { Item } from "@/lib/stock";
 
@@ -107,10 +108,16 @@ export function SaleForm({ item, customers, today }: { item: Item; customers: Cu
         </select>
       </label>
       {!buyer && (
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2">
           <label><span className={label}>Nombre</span><input name="buyer_name" className={field} /></label>
           <label><span className={label}>Teléfono</span><input name="buyer_phone" className={field} /></label>
           <label><span className={label}>Correo</span><input name="buyer_email" type="email" className={field} /></label>
+          <label>
+            <span className={label}>¿Cómo nos conoció?</span>
+            <select name="buyer_source" defaultValue="walk_in" className={field}>
+              {Object.entries(SOURCE_LABEL).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+            </select>
+          </label>
         </div>
       )}
       <details className="border border-line/70 p-4">

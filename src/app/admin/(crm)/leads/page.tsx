@@ -2,10 +2,11 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { adminDb } from "@/lib/supabase";
 import { requireAdmin } from "@/lib/admin-auth";
-import { INTENT_LABEL, SOURCE_LABEL, STAGES, STAGE_LABEL, type Customer, type Stage } from "@/lib/crm";
+import { followUpsDue, INTENT_LABEL, SOURCE_LABEL, STAGES, STAGE_LABEL, type Customer, type Stage } from "@/lib/crm";
 import { ago, buttonClass, fieldClass, labelClass, PageTitle, SourceTag, requestTime } from "@/components/admin/ui";
 import { StageSelect } from "@/components/admin/StageSelect";
 import { createLead } from "../../actions";
+import { todayInMiami } from "@/lib/booking";
 
 export const metadata = { title: "Leads" };
 
@@ -20,6 +21,7 @@ export default async function LeadsPage({ searchParams }: PageProps<"/admin/lead
   const q = one(sp.q).trim();
   const botOff = one(sp.bot) === "off";
   const withAlerts = one(sp.alerts) === "1";
+  const followOnly = one(sp.follow) === "1";
 
   const db = adminDb();
   let query = db.from("customers").select("*").order("last_activity_at", { ascending: false }).limit(300);
@@ -37,6 +39,10 @@ export default async function LeadsPage({ searchParams }: PageProps<"/admin/lead
   if (withAlerts) {
     const { data } = await db.from("watch_alerts").select("customer_id").eq("active", true);
     query = query.in("id", [...new Set((data ?? []).map((r) => r.customer_id as string))]);
+  }
+  if (followOnly) {
+    const due = await followUpsDue(requestTime(), todayInMiami(new Date(requestTime())));
+    query = query.in("id", due.map((f) => f.id));
   }
   const [{ data: rows }, { data: counts }] = await Promise.all([query, db.from("customers").select("stage")]);
   const leads = (rows ?? []) as Customer[];
@@ -106,7 +112,7 @@ export default async function LeadsPage({ searchParams }: PageProps<"/admin/lead
           {Object.entries(SOURCE_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
         </select>
         <button className="border border-line px-4 text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">Filtrar</button>
-        {(q || source || botOff || withAlerts) && (
+        {(q || source || botOff || withAlerts || followOnly) && (
           <Link href="/admin/leads" className="self-center text-xs text-stone underline hover:text-ivory">Quitar filtros</Link>
         )}
       </form>

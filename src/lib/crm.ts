@@ -25,6 +25,8 @@ export type Customer = {
   interests: string | null;
   budget: number | null;
   notes: string | null;
+  follow_up_at?: string | null;
+  follow_up_note?: string | null;
   last_activity_at: string;
   created_at: string;
 };
@@ -187,4 +189,85 @@ export async function matchAlerts(watch: { brand: string; model: string; referen
     .eq("active", true);
   type Row = { id: string; query: string; customer: { id: string; name: string | null; phone: string | null; wa_id: string | null } | null };
   return ((data ?? []) as unknown as Row[]).filter((a) => alertMatches(a.query, watch));
+}
+
+// ───────────────────────────── Bajadas de precio ─────────────────────────────
+// Clientes a los que les puede interesar un reloj: búsquedas activas que encajan, quienes ya
+// recibieron el aviso de esta pieza y leads abiertos cuyo «qué busca» la menciona.
+export async function interestedIn(watch: { brand: string; model: string; reference: string; slug?: string | null }) {
+  const db = adminDb();
+  const [alerts, open, matched] = await Promise.all([
+    matchAlerts(watch),
+    db.from("customers").select("id, name, phone, wa_id, interests").not("stage", "in", "(won,lost)").not("interests", "is", null),
+    watch.slug ? db.from("customer_events").select("customer_id").eq("type", "match").contains("meta", { slug: watch.slug }) : Promise.resolve({ data: [] }),
+  ]);
+  type C = { id: string; name: string | null; phone: string | null; wa_id: string | null };
+  const out = new Map<string, C & { why: string }>();
+  for (const a of alerts) if (a.customer) out.set(a.customer.id, { ...a.customer, why: `busca «${a.query}»` });
+  for (const c of open.data ?? []) {
+    if (out.has(c.id)) continue;
+    const line = String(c.interests).split("\n").find((l) => alertMatches(l, watch));
+    if (line) out.set(c.id, { ...(c as C), why: `le interesa «${line.slice(0, 80)}»` });
+  }
+  const ids = [...new Set((matched.data ?? []).map((r) => r.customer_id as string))].filter((id) => !out.has(id));
+  if (ids.length) {
+    const { data } = await db.from("customers").select("id, name, phone, wa_id").in("id", ids).not("stage", "eq", "won");
+    for (const c of data ?? []) out.set(c.id, { ...(c as C), why: "ya se le avisó de esta pieza" });
+  }
+  return [...out.values()];
+}
+
+export async function notifyPriceDrop(
+  watch: { brand: string; model: string; reference: string; slug: string },
+  from: number,
+  to: number,
+  siteUrl: string
+) {
+  const people = await interestedIn(watch);
+  if (!people.length) return 0;
+  const usd = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
+  const lines = people.slice(0, 15).map((c) => {
+    const wa = c.wa_id ?? c.phone?.replace(/\D/g, "");
+    return [`• <b>${h(c.name ?? "Cliente")}</b>${c.phone ? ` · ${c.phone}` : ""}`, `  ${h(c.why)}`, wa ? `  https://wa.me/${wa}` : ""].filter(Boolean).join("\n");
+  });
+  await notifyAdmins(
+    [
+      `📉 <b>Bajó de precio: ${h(watch.brand)} ${h(watch.model)}</b>`,
+      `${usd(from)} → <b>${usd(to)}</b> (−${Math.round((1 - to / from) * 100)}%)`,
+      `${siteUrl}/es/watches/${watch.slug}`,
+      "",
+      `${people.length} cliente(s) que pueden estar interesados:`,
+      lines.join("\n\n"),
+      people.length > 15 ? `…y ${people.length - 15} más en el CRM` : "",
+    ].filter(Boolean).join("\n")
+  );
+  for (const c of people) {
+    await addEvent(c.id, "price_drop", `Bajó de precio una pieza que le interesa: ${watch.brand} ${watch.model} (${usd(from)} → ${usd(to)})`, { slug: watch.slug });
+  }
+  return people.length;
+}
+
+// ───────────────────────────── Seguimientos ─────────────────────────────
+// Programados (fecha puesta a mano) y automáticos: leads abiertos que se han quedado quietos.
+// Días sin actividad tras los que un lead pide seguimiento, según su etapa
+export const STALE_AFTER: Partial<Record<Stage, number>> = { new: 2, contacted: 5, qualified: 5, appointment: 3, negotiating: 3 };
+
+export type FollowUp = { id: string; name: string | null; stage: Stage; reason: string; due: string; scheduled: boolean };
+
+export async function followUpsDue(now: number, today: string) {
+  const db = adminDb();
+  const out: FollowUp[] = [];
+  // Si aún no existe la columna (migración pendiente), solo salen los automáticos
+  const { data: scheduled } = await db.from("customers").select("id, name, stage, follow_up_at, follow_up_note").lte("follow_up_at", today).order("follow_up_at");
+  for (const c of scheduled ?? []) {
+    out.push({ id: c.id, name: c.name, stage: c.stage, reason: c.follow_up_note || "Seguimiento programado", due: c.follow_up_at, scheduled: true });
+  }
+  const { data: open } = await db.from("customers").select("id, name, stage, last_activity_at").in("stage", Object.keys(STALE_AFTER)).order("last_activity_at");
+  for (const c of open ?? []) {
+    if (out.some((f) => f.id === c.id)) continue;
+    const days = Math.floor((now - new Date(c.last_activity_at).getTime()) / 86_400_000);
+    const limit = STALE_AFTER[c.stage as Stage]!;
+    if (days >= limit) out.push({ id: c.id, name: c.name, stage: c.stage, reason: `${days} días sin actividad en «${STAGE_LABEL[c.stage as Stage]}»`, due: c.last_activity_at, scheduled: false });
+  }
+  return out;
 }

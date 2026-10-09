@@ -2,6 +2,7 @@ import "server-only";
 import { adminDb } from "./supabase";
 import { escapeHtml as h, notifyAdmins } from "./telegram";
 import { SOURCE_LABEL } from "./crm-labels";
+import { followUpsDue } from "./crm";
 import { summarize, type Item } from "./stock";
 import { miamiToUtc, TIME_ZONE, todayInMiami } from "./booking";
 import { SITE_URL } from "./seo";
@@ -24,7 +25,7 @@ export async function buildDigest(now = Date.now()) {
 
   const [leads, stale, appts, sells, waWaiting, socialWaiting, stock, igY, igPrev] = await Promise.all([
     db.from("customers").select("name, source, interests").gte("created_at", since).order("created_at", { ascending: false }),
-    db.from("customers").select("id", { count: "exact", head: true }).eq("stage", "new").lt("created_at", new Date(now - 2 * DAY).toISOString()),
+    followUpsDue(now, todayInMiami(new Date(now))),
     db.from("appointments").select("kind, starts_at, name, status").in("status", ["requested", "confirmed"]).gte("starts_at", dayStart).lt("starts_at", dayEnd).order("starts_at"),
     db.from("sell_requests").select("status"),
     db.from("wa_contacts").select("wa_id", { count: "exact", head: true }).eq("mode", "human").gt("human_until", nowIso),
@@ -42,7 +43,13 @@ export async function buildDigest(now = Date.now()) {
   for (const l of newLeads.slice(0, 6)) {
     lines.push(`• ${h(l.name ?? "Sin nombre")} · ${h(SOURCE_LABEL[l.source as string] ?? l.source)}${l.interests ? ` · ${h(String(l.interests).split("\n")[0].slice(0, 60))}` : ""}`);
   }
-  if ((stale.count ?? 0) > 0) lines.push(`⚠️ ${stale.count} lead(s) en «Nuevo» desde hace más de 2 días sin contactar`);
+
+  // Seguimientos: programados y leads que se han quedado quietos
+  if (stale.length) {
+    lines.push("", `⏰ <b>Seguimientos para hoy: ${stale.length}</b>`);
+    for (const f of stale.slice(0, 8)) lines.push(`• ${h(f.name ?? "Sin nombre")} · ${h(f.reason)}`);
+    if (stale.length > 8) lines.push(`…y ${stale.length - 8} más: ${SITE_URL}/admin/leads?follow=1`);
+  }
 
   // Citas de hoy
   const todayAppts = appts.data ?? [];

@@ -148,3 +148,21 @@ export async function webPrice(watchId: string | null) {
   const { data } = await adminDb().from("watches").select("price").eq("id", watchId).maybeSingle();
   return data?.price == null ? null : Number(data.price);
 }
+
+// Ventas por canal: de dónde llegó el comprador (origen de su ficha en el CRM)
+export async function salesByChannel(items: Item[], since: number) {
+  const sold = items.filter((i) => i.status === "sold" && i.sale_date && new Date(i.sale_date).getTime() >= since);
+  const ids = [...new Set(sold.map((i) => i.buyer_customer_id).filter(Boolean))] as string[];
+  const { data } = ids.length ? await adminDb().from("customers").select("id, source").in("id", ids) : { data: [] };
+  const sourceOf = new Map((data ?? []).map((c) => [c.id as string, c.source as string]));
+  const rows = new Map<string, { source: string; count: number; revenue: number; profit: number }>();
+  for (const i of sold) {
+    const source = (i.buyer_customer_id && sourceOf.get(i.buyer_customer_id)) || "unknown";
+    const r = rows.get(source) ?? { source, count: 0, revenue: 0, profit: 0 };
+    r.count++;
+    r.revenue += num(i.sale_price) ?? 0;
+    r.profit += margin(i)?.amount ?? 0;
+    rows.set(source, r);
+  }
+  return [...rows.values()].sort((a, b) => b.revenue - a.revenue);
+}

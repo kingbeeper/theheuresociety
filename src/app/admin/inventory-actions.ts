@@ -4,9 +4,11 @@ import { redirect } from "next/navigation";
 import { refresh } from "next/cache";
 import { requireAdmin } from "@/lib/admin-auth";
 import { adminDb } from "@/lib/supabase";
-import { addEvent, upsertLead } from "@/lib/crm";
+import { addEvent, notifyPriceDrop, upsertLead } from "@/lib/crm";
+import { SITE_URL } from "@/lib/seo";
 import { createStockItem, logItem, recordPurchase, syncWebPrice, syncWebStatus, webPrice, type Item } from "@/lib/stock";
 import { ACQUISITION, ITEM_STATUS, isOwnerStock } from "@/lib/stock-labels";
+import { SOURCE_LABEL } from "@/lib/crm-labels";
 
 // Acciones del inventario. Todas comprueban la sesión y dejan rastro en el historial del reloj.
 
@@ -82,6 +84,15 @@ export async function saveItem(id: string | null, _: unknown, f: FormData) {
     await logItem(id, "price", `Precio: ${usd(before.asking_price)} → ${usd(fields.asking_price)}${fields.watch_id && fields.asking_price != null ? " (actualizado en la web)" : ""}`, user);
   }
   if (priceChanged || before.watch_id !== fields.watch_id) await syncWebPrice(fields.watch_id, fields.asking_price);
+  // Bajada de precio de un reloj publicado → aviso con los clientes interesados
+  const from = Number(before.asking_price), to = Number(fields.asking_price);
+  if (priceChanged && fields.watch_id && before.asking_price != null && fields.asking_price != null && to < from) {
+    const { data: w } = await db.from("watches").select("brand, model, reference, slug, status").eq("id", fields.watch_id).maybeSingle();
+    if (w && (w.status === "available" || w.status === "reserved")) {
+      const n = await notifyPriceDrop(w, from, to, SITE_URL).catch((e) => (console.error("Bajada de precio:", e), 0));
+      if (n) await logItem(id, "price", `Aviso de bajada enviado: ${n} cliente(s) interesado(s)`, user);
+    }
+  }
   if (Number(before.cost ?? NaN) !== Number(fields.cost ?? NaN) && fields.cost != null) await logItem(id, "cost", `Costo: ${usd(before.cost)} → ${usd(fields.cost)}`, user);
   if (Number(before.extra_costs) !== Number(fields.extra_costs)) await logItem(id, "cost", `Gastos: ${usd(before.extra_costs)} → ${usd(fields.extra_costs)}`, user);
   refresh();
@@ -109,7 +120,9 @@ export async function sellItem(id: string, _: unknown, f: FormData) {
   let buyerId = text(f, "buyer_customer_id");
   const buyerName = text(f, "buyer_name");
   if (!buyerId && (buyerName || text(f, "buyer_phone") || text(f, "buyer_email"))) {
-    const c = await upsertLead({ name: buyerName, phone: text(f, "buyer_phone"), email: text(f, "buyer_email"), source: "walk_in", intent: "buy", notify: false });
+    // El origen del comprador es el canal al que se atribuye la venta
+    const source = text(f, "buyer_source");
+    const c = await upsertLead({ name: buyerName, phone: text(f, "buyer_phone"), email: text(f, "buyer_email"), source: source && source in SOURCE_LABEL ? source : "walk_in", intent: "buy", notify: false });
     buyerId = c.id;
   }
   let name = buyerName;
