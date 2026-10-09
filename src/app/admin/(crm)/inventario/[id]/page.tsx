@@ -53,6 +53,7 @@ export default async function ItemPage({ params }: PageProps<"/admin/inventario/
         action={
           <div className="flex flex-wrap gap-2">
             {web.data?.slug && <a href={`/es/watches/${web.data.slug}`} target="_blank" rel="noreferrer" className={ghostButtonClass}>Ver en la web</a>}
+            <a href={`/api/certificate/${item.id}`} target="_blank" rel="noreferrer" className={ghostButtonClass}>Certificado</a>
             {available && (
               <form action={setReserved.bind(null, item.id, item.status !== "reserved")}>
                 <button className={ghostButtonClass}>{item.status === "reserved" ? "Quitar reserva" : "Reservar"}</button>

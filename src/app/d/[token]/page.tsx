@@ -36,7 +36,12 @@ async function SharedDocument({ params }: { params: Promise<{ token: string }> }
   return (
     <main className="mx-auto max-w-[860px] px-4 py-8 print:max-w-none print:p-0">
       <div className="mb-4 flex justify-end print:hidden">
-        <div className="flex gap-2">
+        <div className="flex flex-wrap justify-end gap-2">
+          {d.kind === "invoice" && d.items.some((l) => l.item_id) && (
+            <a href={`/d/${d.token}/certificate`} target="_blank" rel="noreferrer" className="border border-[#1b1f1c] px-5 py-2.5 text-[0.68rem] tracking-[0.22em] uppercase hover:bg-[#1b1f1c] hover:text-white">
+              {d.lang === "es" ? "Certificado" : "Certificate"}
+            </a>
+          )}
           <a href={`/d/${d.token}/pdf`} download className="border border-[#1b1f1c] px-5 py-2.5 text-[0.68rem] tracking-[0.22em] uppercase hover:bg-[#1b1f1c] hover:text-white">PDF</a>
           <PrintButton label={t.print} />
         </div>

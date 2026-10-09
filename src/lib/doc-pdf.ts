@@ -10,7 +10,7 @@ import { PRINT, docTotals, maskedId, usd, type Doc, type DocSettings } from "./d
 
 const ASSETS = join(process.cwd(), "src/lib/pdf-assets");
 let assets: Promise<Record<"display" | "sans" | "light" | "logo", Uint8Array>> | null = null;
-const loadAssets = () =>
+export const loadAssets = () =>
   (assets ??= Promise.all(["cormorant.ttf", "montserrat.ttf", "montserrat-light.ttf", "monogram.png"].map((f) => readFile(join(ASSETS, f)))).then(
     ([display, sans, light, logo]) => ({ display, sans, light, logo })
   ));
@@ -30,7 +30,7 @@ export async function renderDocPdf(d: Doc, s: Required<DocSettings>) {
   const pdf = await PDFDocument.create();
   pdf.registerFontkit(fontkit);
   // Cormorant pierde letras si se recorta (fallo conocido de fontkit): se incrusta completa
-  const display = await pdf.embedFont(a.display);
+  const display = await pdf.embedFont(a.display, { features: { liga: false, dlig: false } }); // sin ligaduras: «fi» saldría con hueco
   const sans = await pdf.embedFont(a.sans, { subset: true });
   const light = await pdf.embedFont(a.light, { subset: true });
   const logo = await pdf.embedPng(a.logo);

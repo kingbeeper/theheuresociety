@@ -530,7 +530,17 @@ export async function onCallback(chatId: number, cbId: string, messageId: number
       await clearButtons();
       const method = PAYMENT[extra as keyof typeof PAYMENT] ?? null;
       await payInvoice(d, method, todayInMiami(), user);
-      return sendMessage(chatId, `✅ <b>${h(d.number)} pagada</b> (${h(method ?? "")}). El reloj queda vendido en el inventario y fuera de la web.`);
+      await sendMessage(chatId, `✅ <b>${h(d.number)} pagada</b> (${h(method ?? "")}). El reloj queda vendido en el inventario y fuera de la web.`);
+      // Certificado de autenticidad para entregar al cliente
+      const ids = d.items.map((l) => l.item_id).filter(Boolean) as string[];
+      if (ids.length) {
+        later(chatId, async () => {
+          const { certItems, renderCertificates } = await import("./certificate");
+          const bytes = await renderCertificates(await certItems(ids, d.client_name), d.lang, await getDocSettings());
+          await sendDocumentFile(chatId, bytes, `Certificate ${d.number}.pdf`, `📜 Certificado de autenticidad · ${h(d.number)}\nEnlace para el cliente:\n${SITE_URL}/d/${d.token}/certificate`);
+        });
+      }
+      return;
     }
     if (action === "dret") {
       await answer("Hecho");

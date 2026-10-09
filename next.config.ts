@@ -6,6 +6,8 @@ const nextConfig: NextConfig = {
   // Fuentes y logo de los PDF de documentos (se leen del disco en el servidor)
   outputFileTracingIncludes: {
     "/d/\\[token\\]/pdf": ["src/lib/pdf-assets/**/*"],
+    "/d/\\[token\\]/certificate": ["src/lib/pdf-assets/**/*"],
+    "/api/certificate/\\[id\\]": ["src/lib/pdf-assets/**/*"],
     "/api/telegram": ["src/lib/pdf-assets/**/*"],
   },
   partialPrefetching: true,
