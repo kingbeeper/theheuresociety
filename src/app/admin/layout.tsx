@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Cormorant_Garamond, Montserrat } from "next/font/google";
 import "../globals.css";
 
@@ -9,7 +9,13 @@ const montserrat = Montserrat({ variable: "--font-montserrat", subsets: ["latin"
 export const metadata: Metadata = {
   title: { default: "CRM — The Heure Society", template: "%s · CRM The Heure Society" },
   robots: { index: false, follow: false },
+  // App en el móvil: icono en la pantalla de inicio y pantalla completa
+  manifest: "/admin/manifest.webmanifest",
+  appleWebApp: { capable: true, title: "THS CRM", statusBarStyle: "black-translucent" },
+  icons: { apple: "/admin-app/apple-touch-icon.png" },
 };
+
+export const viewport: Viewport = { themeColor: "#0f1a14" };
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
