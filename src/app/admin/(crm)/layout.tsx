@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
+import { CircleUser, LogOut } from "lucide-react";
 import { requireUser } from "@/lib/admin-auth";
 import { ALL_SECTIONS, can, ROLE_LABEL } from "@/lib/crm-perms";
 import { AdminNav } from "@/components/admin/AdminNav";
@@ -26,18 +27,27 @@ async function Guard({ children }: { children: React.ReactNode }) {
             <p className="text-[0.62rem] tracking-[0.3em] uppercase text-brass">Society · CRM</p>
           </div>
           <div className="flex items-center gap-4 md:hidden">
-            <Link href="/admin/cuenta" className="text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">Cuenta</Link>
+            <Link href="/admin/cuenta" aria-label="Mi cuenta" className="flex items-center gap-1.5 text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">
+              <CircleUser aria-hidden className="h-4 w-4 text-brass" strokeWidth={1.5} /> Cuenta
+            </Link>
             <form action={signOut}>
-              <button className="text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">Salir</button>
+              <button className="flex items-center gap-1.5 text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">
+                <LogOut aria-hidden className="h-3.5 w-3.5" strokeWidth={1.5} /> Salir
+              </button>
             </form>
           </div>
         </div>
         <AdminNav allowed={allowed} />
         <div className="hidden px-6 py-8 md:absolute md:bottom-0 md:block">
-          <Link href="/admin/cuenta" className="block truncate text-xs text-stone hover:text-ivory">{user.name ?? user.email}</Link>
-          <p className="text-[0.6rem] tracking-[0.16em] uppercase text-stone/70">{ROLE_LABEL[user.role]}</p>
+          <Link href="/admin/cuenta" className="flex items-center gap-2 truncate text-xs text-stone hover:text-ivory">
+            <CircleUser aria-hidden className="h-4 w-4 shrink-0 text-brass" strokeWidth={1.5} />
+            <span className="truncate">{user.name ?? user.email}</span>
+          </Link>
+          <p className="pl-6 text-[0.6rem] tracking-[0.16em] uppercase text-stone/70">{ROLE_LABEL[user.role]}</p>
           <form action={signOut} className="mt-2">
-            <button className="text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">Cerrar sesión</button>
+            <button className="flex items-center gap-2 text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">
+              <LogOut aria-hidden className="h-3.5 w-3.5" strokeWidth={1.5} /> Cerrar sesión
+            </button>
           </form>
         </div>
       </aside>
