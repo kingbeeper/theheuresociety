@@ -168,17 +168,17 @@ export async function onMenuCallback(chatId: number, cbId: string, messageId: nu
       const { promoConfigured } = await import("./promo-video");
       if (!promoConfigured()) return sendMessage(chatId, "El video promocional aún no está activado: falta la clave de la API de Higgsfield (HF_API_KEY_ID y HF_API_KEY_SECRET).");
       if (arg === "no") return;
-      const [watchId, scenario] = arg.split("|");
-      // Sin escenario: se muestran para elegir; con escenario: se genera
+      const [watchId, opening, scenario] = arg.split("|");
+      // Paso 1: apertura · paso 2: cierre · con las dos: se genera
       if (!scenario) {
-        const { SCENARIOS, scenarioButtons } = await import("./promo-video");
+        const { openingButtons, closingButtons, label } = await import("./promo-video");
         const { data: w } = await adminDb().from("watches").select("brand, model").eq("id", watchId).maybeSingle();
         if (!w) return sendMessage(chatId, "Ese reloj ya no está publicado.");
-        return sendMessage(chatId, `🎬 <b>Video promocional</b> · ${h(w.brand)} ${h(w.model)}
-Abre con un macro del bisel y la corona; elige la escena de cierre (≈ $0,45 · ${Object.keys(SCENARIOS).length} escenarios):`, { reply_markup: keyboard(scenarioButtons(watchId)) });
+        if (!opening) return sendMessage(chatId, `🎬 <b>Video promocional</b> · ${h(w.brand)} ${h(w.model)} (≈ $0,45)\n\n<b>1/2 · Primeros 5 s:</b> ¿cómo se presenta el reloj?\nO pulsa 🎲 y elijo yo las dos tomas.`, { reply_markup: keyboard(openingButtons(watchId)) });
+        return sendMessage(chatId, `Apertura: ${label(opening)}\n\n<b>2/2 · Cierre con la marca:</b> ¿en qué escena?`, { reply_markup: keyboard(closingButtons(watchId, opening)) });
       }
       const { promoJob } = await import("./bot");
-      after(() => promoJob(chatId, watchId, scenario));
+      after(() => promoJob(chatId, watchId, opening, scenario));
       return;
     }
 
