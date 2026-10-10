@@ -57,6 +57,7 @@ type State = {
   source: string;
   images: Job[];
   videos: Job[];
+  scenario?: string;
 };
 
 const priceText = (w: Watch) => (w.price == null ? "Price on request" : `${w.currency === "USD" ? "$" : `${w.currency} `}${Number(w.price).toLocaleString("en-US")}`);
@@ -66,15 +67,69 @@ const WATCH_COLS = "id, slug, brand, model, reference, price, currency, images, 
 // El reloj de la foto tiene que salir idéntico (esfera, logotipo, agujas, brazalete)
 const SAME =
   "Use the exact watch from the reference image, identical in every detail: dial color and texture, logo and dial text, hands, indices, bezel, case and strap or bracelet. Photorealistic, high-end luxury watch commercial, cinematic color grading.";
-export const scenes = (w: Watch) => [
+type Shot = { image: string; motion: string };
+const STILL = "The watch keeps its exact shape and dial text.";
+
+// Escenarios para la segunda toma (se eligen en Telegram). Todos abren con el mismo macro del bisel
+export const SCENARIOS: Record<string, { label: string; shot: (w: Watch) => Shot }> = {
+  focos: {
+    label: "💡 Focos de estudio",
+    shot: (w) => ({
+      image: `Hero product shot of the ${w.brand} ${w.model} standing upright on a glossy black reflective surface in a dark luxury studio, warm theatrical spotlights from above create pools of golden light on the watch and a soft mirror reflection below. The watch sits in the upper-middle of the frame; the lower third is empty dark space. ${SAME}`,
+      motion: `In darkness, spotlights switch on one after another and illuminate the watch, light glints travel across the polished case and crystal, very slow push-in, camera steady. ${STILL}`,
+    }),
+  },
+  terciopelo: {
+    label: "🟢 Terciopelo verde y latón",
+    shot: (w) => ({
+      image: `The ${w.brand} ${w.model} resting on deep emerald green velvet with polished brass details, in a refined jewelry-boutique setting, soft warm directional light, rich shadows, elegant and quiet luxury. The watch sits in the upper-middle of the frame; the lower third is dark velvet. ${SAME}`,
+      motion: `A soft beam of warm light slowly travels across the velvet and onto the watch, gentle slow orbit and push-in, dust particles glinting in the light. ${STILL}`,
+    }),
+  },
+  marmol: {
+    label: "🥃 Mármol, whisky y puro",
+    shot: (w) => ({
+      image: `Luxury still life: the ${w.brand} ${w.model} lying on a black marble table next to a crystal glass of whisky with a large ice cube, a cigar on a brass ashtray and a leather notebook, warm low-key lighting of a private members' lounge, shallow depth of field, the watch in sharp focus in the upper-middle of the frame, darker space below. ${SAME}`,
+      motion: `Very slow cinematic dolly-in towards the watch, a thin ribbon of cigar smoke drifts through the warm light, ice gently shifts in the glass. ${STILL}`,
+    }),
+  },
+  traje: {
+    label: "🕴️ Traje y ciudad de noche",
+    shot: (w) => ({
+      image: `Close-up of a man in a tailored dark navy suit and crisp white shirt adjusting his cuff, revealing the ${w.brand} ${w.model} on his wrist, standing by a floor-to-ceiling window of a penthouse with the Miami skyline glittering at night behind, moody cinematic lighting. ${SAME}`,
+      motion: `The man slowly adjusts his shirt cuff to reveal the watch, the camera gently pushes in, city lights shimmer in soft bokeh behind. ${STILL}`,
+    }),
+  },
+  miami: {
+    label: "🌴 Al volante en Miami Beach",
+    shot: (w) => ({
+      image: `First-person view from the driver's seat of a luxury convertible sports car cruising along Ocean Drive in Miami Beach at golden hour: a man's tanned left wrist wearing the ${w.brand} ${w.model} rests on the steering wheel, pastel Art Deco hotels, palm trees and the turquoise ocean softly out of focus behind, warm sunset light catching the watch. No visible car brand logos. ${SAME}`,
+      motion: `The car cruises slowly along the beach road while the camera gently pushes in towards the watch on the wrist; palm trees and the ocean drift by in the soft-focus background, warm golden sunlight flickers on the dial. ${STILL}`,
+    }),
+  },
+  yate: {
+    label: "⛵ Yate al atardecer",
+    shot: (w) => ({
+      image: `A man's tanned wrist wearing the ${w.brand} ${w.model} resting on the polished teak and chrome railing of a luxury yacht in Biscayne Bay at sunset, the Miami skyline and calm golden water softly out of focus behind, linen shirt sleeve rolled up, warm cinematic light. ${SAME}`,
+      motion: `The yacht glides gently over the water, the camera slowly pushes in to the watch on the wrist, golden reflections ripple on the water and sparkle on the case. ${STILL}`,
+    }),
+  },
+  agua: {
+    label: "💧 Agua y salpicaduras",
+    shot: (w) => ({
+      image: `The ${w.brand} ${w.model} in dramatic slow motion with crystal-clear water splashing around it and droplets on the crystal and case, dark background with cool rim lighting, high-speed commercial photography. The watch sits in the upper-middle of the frame. ${SAME}`,
+      motion: `Super slow motion: water splashes and droplets burst around the watch and fall away, light glints on the wet case, camera steady with a slight push-in. ${STILL}`,
+    }),
+  },
+};
+export const DEFAULT_SCENARIO = "focos";
+
+export const scenes = (w: Watch, scenario = DEFAULT_SCENARIO): Shot[] => [
   {
     image: `Extreme macro close-up of the ${w.brand} ${w.model}: the bezel, crown and edge of the case fill the frame, dramatic studio lighting with glints on polished steel, deep black background, very shallow depth of field. ${SAME}`,
-    motion: "Very slow macro camera glide along the bezel and crown, a soft light sweep travels across the polished metal. Smooth, elegant, no cuts. The watch keeps its exact shape and dial text.",
+    motion: `Very slow macro camera glide along the bezel and crown, a soft light sweep travels across the polished metal. Smooth, elegant, no cuts. ${STILL}`,
   },
-  {
-    image: `Hero product shot of the ${w.brand} ${w.model} standing upright on a glossy black reflective surface in a dark luxury studio, warm theatrical spotlights from above create pools of golden light on the watch and a soft mirror reflection below. The watch sits in the upper-middle of the frame; the lower third is empty dark space. ${SAME}`,
-    motion: "In darkness, spotlights switch on one after another and illuminate the watch, light glints travel across the polished case and crystal, very slow push-in, camera steady. The watch keeps its exact shape and dial text.",
-  },
+  (SCENARIOS[scenario] ?? SCENARIOS[DEFAULT_SCENARIO]).shot(w),
 ];
 
 const stateKey = (id: string) => `promo:${id}`;
@@ -118,7 +173,7 @@ async function sourceImage(w: Watch) {
   return src;
 }
 
-export async function startPromoVideo(watchId: string, chatId: number | null) {
+export async function startPromoVideo(watchId: string, chatId: number | null, scenario = DEFAULT_SCENARIO) {
   const db = adminDb();
   const { data } = await db.from("watches").select(WATCH_COLS).eq("id", watchId).single();
   const w = data as Watch;
@@ -127,7 +182,7 @@ export async function startPromoVideo(watchId: string, chatId: number | null) {
   if (error) throw error;
   try {
     const images = await Promise.all(
-      scenes(w).map(async (sc, i) => ({
+      scenes(w, scenario).map(async (sc, i) => ({
         url: await submit(
           IMAGE_MODEL,
           {
@@ -141,7 +196,7 @@ export async function startPromoVideo(watchId: string, chatId: number | null) {
         ),
       })),
     );
-    await saveState(row.id, { stage: "images", source, images, videos: [] });
+    await saveState(row.id, { stage: "images", source, images, videos: [], scenario });
     await db
       .from("promo_videos")
       .update({
@@ -217,7 +272,7 @@ export async function pollPromoVideo(id: string, budgetMs: number, hop = 0) {
     if (st.stage === "images" && (await check(st.images))) {
       // Las tomas se animan desde los fotogramas; si alguno falló, desde la foto original
       const { data: wd } = await db.from("watches").select(WATCH_COLS).eq("id", row.watch_id).single();
-      const sc = scenes(wd as Watch);
+      const sc = scenes(wd as Watch, st.scenario);
       try {
         st.videos = await Promise.all(
           st.images.map(async (img, i) => ({
@@ -248,7 +303,7 @@ export async function pollPromoVideo(id: string, budgetMs: number, hop = 0) {
         .eq("id", id);
       // El montaje necesita su propia invocación con tiempo de sobra
       if (deadline - Date.now() < 150_000) return handOff(id, hop + 1);
-      return finishPromoVideo(row, clips);
+      return finishPromoVideo(row, clips, st.scenario);
     } else {
       await saveState(id, st);
     }
@@ -306,7 +361,7 @@ export async function renderPromo(w: Watch, clips: string[], dir: string) {
   return { final: await readFile(out), length };
 }
 
-async function finishPromoVideo(row: Row, clips: string[]) {
+async function finishPromoVideo(row: Row, clips: string[], scenario = DEFAULT_SCENARIO) {
   const db = adminDb();
   const { data: locked } = await db.from("promo_videos").update({ status: "rendering" }).eq("id", row.id).eq("status", "queued").select("id").maybeSingle();
   if (!locked) return; // otra invocación ya lo está montando
@@ -339,7 +394,7 @@ async function finishPromoVideo(row: Row, clips: string[]) {
         `${w.slug}.mp4`,
         `🎬 <b>Video promocional</b> · ${h(w.brand)} ${h(w.model)}\n${Math.round(length)} s vertical para Reels, Stories y anuncios. Va sin sonido: ponle una canción de tendencia al subirlo a Instagram.`,
         {
-          reply_markup: keyboard([[{ text: "🔁 Otra versión", callback_data: `mvid:${w.id}` }]]),
+          reply_markup: keyboard([[{ text: "🔁 Otra versión igual", callback_data: `mvid:${w.id}|${scenario}` }], [{ text: "🎭 Otro escenario", callback_data: `mvid:${w.id}` }]]),
         },
       );
     }
@@ -353,3 +408,9 @@ async function finishPromoVideo(row: Row, clips: string[]) {
     await rm(dir, { recursive: true, force: true }).catch(() => {});
   }
 }
+
+// Botones para elegir el escenario del video de un reloj
+export const scenarioButtons = (watchId: string) => [
+  ...Object.entries(SCENARIOS).map(([key, sc]) => [{ text: sc.label, callback_data: `mvid:${watchId}|${key}` }]),
+  [{ text: "✖️ Ahora no", callback_data: "mvid:no" }],
+];

@@ -551,7 +551,10 @@ async function handleCutoutButton(cb: TgCallback, chatId: number, action: string
     // Reloj nuevo en el estuche → video promocional para redes (si está activado)
     if (result.ok) {
       const { promoConfigured } = await import("./promo-video");
-      if (promoConfigured() && (await promoAuto())) after(() => promoJob(chatId, watchId));
+      if (promoConfigured() && (await promoAuto())) {
+        const { scenarioButtons } = await import("./promo-video");
+        await sendMessage(chatId, "🎬 ¿Hacemos su <b>video promocional</b>? Elige el escenario (≈ $0,45):", { reply_markup: keyboard(scenarioButtons(watchId)) });
+      }
     }
     return;
   }
@@ -599,11 +602,12 @@ export async function promoAuto() {
   return data?.value !== "off";
 }
 
-export async function promoJob(chatId: number, watchId: string) {
-  const { startPromoVideo, pollPromoVideo } = await import("./promo-video");
+export async function promoJob(chatId: number, watchId: string, scenario?: string) {
+  const { startPromoVideo, pollPromoVideo, SCENARIOS } = await import("./promo-video");
   try {
-    await sendMessage(chatId, "🎬 Preparando el video promocional para redes… Tarda unos minutos; te lo envío aquí cuando esté.");
-    const id = await startPromoVideo(watchId, chatId);
+    const label = SCENARIOS[scenario ?? ""]?.label;
+    await sendMessage(chatId, `🎬 Preparando el video promocional${label ? ` · ${label}` : ""}… Tarda unos minutos; te lo envío aquí cuando esté.`);
+    const id = await startPromoVideo(watchId, chatId, scenario);
     await pollPromoVideo(id, 90_000);
   } catch (e) {
     await sendMessage(chatId, `⚠️ No se pudo empezar el video: ${h((e as Error).message.slice(0, 200))}`);

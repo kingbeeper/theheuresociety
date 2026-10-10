@@ -167,8 +167,18 @@ export async function onMenuCallback(chatId: number, cbId: string, messageId: nu
       await clearButtons();
       const { promoConfigured } = await import("./promo-video");
       if (!promoConfigured()) return sendMessage(chatId, "El video promocional aún no está activado: falta la clave de la API de Higgsfield (HF_API_KEY_ID y HF_API_KEY_SECRET).");
+      if (arg === "no") return;
+      const [watchId, scenario] = arg.split("|");
+      // Sin escenario: se muestran para elegir; con escenario: se genera
+      if (!scenario) {
+        const { SCENARIOS, scenarioButtons } = await import("./promo-video");
+        const { data: w } = await adminDb().from("watches").select("brand, model").eq("id", watchId).maybeSingle();
+        if (!w) return sendMessage(chatId, "Ese reloj ya no está publicado.");
+        return sendMessage(chatId, `🎬 <b>Video promocional</b> · ${h(w.brand)} ${h(w.model)}
+Abre con un macro del bisel y la corona; elige la escena de cierre (≈ $0,45 · ${Object.keys(SCENARIOS).length} escenarios):`, { reply_markup: keyboard(scenarioButtons(watchId)) });
+      }
       const { promoJob } = await import("./bot");
-      after(() => promoJob(chatId, arg));
+      after(() => promoJob(chatId, watchId, scenario));
       return;
     }
 
