@@ -113,3 +113,10 @@ export async function notifyAdmins(text: string, extra: Record<string, unknown> 
     }
   }
 }
+
+// Video (por URL pública) a todo el equipo, p. ej. el reel listo para publicar
+export async function notifyAdminsVideo(video: string, caption: string) {
+  for (const id of adminIds()) {
+    await tg("sendVideo", { chat_id: Number(id), video, caption, parse_mode: "HTML", supports_streaming: true }).catch((e) => console.error("No se pudo enviar el video", id, e));
+  }
+}

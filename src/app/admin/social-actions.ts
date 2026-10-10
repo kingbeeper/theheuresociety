@@ -1,6 +1,7 @@
 "use server";
 
 import { refresh } from "next/cache";
+import { after } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 
 // Engagement en redes: ideas, comentarios y competencia (permiso «redes»)
@@ -16,6 +17,16 @@ export async function ideaStatusAction(id: string, status: "approved" | "dismiss
   await requireAdmin("redes");
   const { setIdeaStatus } = await import("@/lib/social-ideas");
   await setIdeaStatus(id, status);
+  refresh();
+}
+
+// Video promocional desde una idea: se genera en segundo plano (3-4 min) y aparece en su vista previa
+export async function ideaVideoAction(watchId: string, f: FormData) {
+  await requireAdmin("redes");
+  const { promoConfigured, startPromoVideo, pollPromoVideo } = await import("@/lib/promo-video");
+  if (!promoConfigured()) throw new Error("Falta la clave de la API de Higgsfield");
+  const id = await startPromoVideo(watchId, null, String(f.get("opening") ?? "auto"), String(f.get("closing") ?? "auto"));
+  after(() => pollPromoVideo(id, 30_000));
   refresh();
 }
 

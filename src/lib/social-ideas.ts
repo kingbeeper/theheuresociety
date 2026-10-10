@@ -1,6 +1,6 @@
 import "server-only";
 import { adminDb } from "./supabase";
-import { escapeHtml as h, keyboard, notifyAdmins, sendMessage } from "./telegram";
+import { escapeHtml as h, keyboard, notifyAdmins, notifyAdminsVideo, sendMessage } from "./telegram";
 import type { Idea } from "./social-growth";
 import { TIME_ZONE } from "./booking";
 
@@ -50,6 +50,11 @@ export async function remindToday(now = Date.now()) {
   const end = new Date(now + 24 * 3_600_000).toISOString();
   const { data } = await db.from("content_ideas").select("*").eq("status", "approved").is("reminded_at", null).lte("scheduled_for", end).order("scheduled_for");
   for (const i of (data ?? []) as Idea[]) {
+    // Si el reloj ya tiene su video promocional, llega primero, listo para guardar y subir
+    if (i.watch_id && i.format === "reel") {
+      const { data: v } = await db.from("promo_videos").select("final_url").eq("watch_id", i.watch_id).eq("status", "done").order("created_at", { ascending: false }).limit(1).maybeSingle();
+      if (v?.final_url) await notifyAdminsVideo(v.final_url, `🎬 <b>${h(i.title)}</b> · el reel de hoy`);
+    }
     const m = await ideaMessage(i, "reminder");
     await notifyAdmins(m.text, m.extra).catch(() => {});
     await db.from("content_ideas").update({ reminded_at: new Date().toISOString() }).eq("id", i.id);
