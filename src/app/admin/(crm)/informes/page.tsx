@@ -26,6 +26,7 @@ export default async function ReportsPage({ searchParams }: PageProps<"/admin/in
     ["Pagado a dueños", money(t.ownerPaid)],
     ["Relojero", money(t.repairs)],
     ["Impuesto cobrado", money(t.taxCollected)],
+    ["Anticipos retenidos (pasivo)", money(t.depositsHeld)],
   ];
 
   return (

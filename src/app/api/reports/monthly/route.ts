@@ -33,6 +33,8 @@ export async function GET(request: Request) {
     { k: "Ventas con impuesto (base imponible)", v: t.taxableSales },
     { k: "Ventas exentas (facturas sin impuesto)", v: t.exemptSales },
     { k: "Impuesto de ventas cobrado", v: t.taxCollected },
+    { k: "Anticipos de encargos recibidos en el mes (no son ventas)", v: t.depositsReceived },
+    { k: "Anticipos retenidos hoy (pasivo: se devuelven si no se consigue)", v: t.depositsHeld },
   ]);
   summary.insertRow(1, [`The Heure Society · Informe de ${month}`]);
   summary.getRow(1).font = { bold: true, size: 14 };
@@ -42,6 +44,8 @@ export async function GET(request: Request) {
   sheet("Pagos a dueños", [["Fecha", "date", 12], ["SKU", "sku", 11], ["Reloj", "watch", 36], ["Dueño", "owner", 28], ["Importe", "amount", 14, true]], r.owners);
   sheet("Impuesto de ventas", [["Fecha de pago", "date", 14], ["Factura", "number", 16], ["Cliente", "client", 28], ["Base", "taxable", 14, true], ["%", "rate", 6], ["Impuesto", "tax", 14, true], ["Total", "total", 14, true]], r.taxes);
   sheet("Relojero", [["Fecha", "date", 12], ["SKU", "sku", 11], ["Reloj", "watch", 34], ["Relojero", "provider", 24], ["Trabajo", "work", 24], ["Costo", "cost", 14, true]], r.repairs);
+
+  sheet("Anticipos (pasivo)", [["Fecha", "date", 12], ["Encargo", "number", 14], ["Cliente", "client", 26], ["Reloj buscado", "watch", 36], ["Pago", "method", 14], ["Anticipo", "amount", 14, true], ["Estado", "state", 22]], r.deposits);
 
   const commissions = await monthlyCommissions(month);
   sheet(

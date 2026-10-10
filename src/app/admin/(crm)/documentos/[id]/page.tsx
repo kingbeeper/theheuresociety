@@ -4,12 +4,12 @@ import { connection } from "next/server";
 import { adminDb } from "@/lib/supabase";
 import { requireAdmin } from "@/lib/admin-auth";
 import { formOptions, getDoc, getDocSettings } from "@/lib/documents";
-import { KIND_LABEL, PRINT, STATUS_LABEL, STATUS_STYLE, usd } from "@/lib/doc-labels";
+import { KIND_LABEL, PRINT, STATUS_LABEL, STATUS_STYLE, balanceDue, usd } from "@/lib/doc-labels";
 import { todayInMiami } from "@/lib/booking";
 import { SITE_URL } from "@/lib/seo";
 import { Card, fmtDate, ghostButtonClass, PageTitle, requestTime } from "@/components/admin/ui";
-import { DocumentForm, PaidForm } from "@/components/admin/DocumentForm";
-import { convertToInvoice, deleteDocument, markConsignorPaid, returnMemo, sendDocument, setQuoteResult, voidDocument } from "../../../document-actions";
+import { DepositForm, DocumentForm, PaidForm, SourcedForm } from "@/components/admin/DocumentForm";
+import { convertToInvoice, deleteDocument, markConsignorPaid, refundSourcing, returnMemo, sendDocument, setQuoteResult, voidDocument } from "../../../document-actions";
 
 export const metadata = { title: "Documento" };
 
@@ -29,7 +29,9 @@ export default async function DocumentPage({ params }: PageProps<"/admin/documen
   const t = PRINT[d.lang];
   const editable = d.status === "draft" || d.status === "sent";
   const late = d.status === "sent" && d.kind !== "quote" && d.due_date && d.due_date < today;
-  const lateLabel = d.kind === "memo" ? "Memo vencido" : d.kind === "consignment" ? "Plazo cumplido" : "Vencida";
+  const lateLabel = d.kind === "memo" ? "Memo vencido" : d.kind === "consignment" || d.kind === "sourcing" ? "Plazo cumplido" : "Vencida";
+  const sourcing = d.kind === "sourcing";
+  const deposit = Number(d.deposit ?? 0);
 
   // Mensaje listo para enviar el enlace por WhatsApp o correo
   const first = (d.client_name ?? "").split(" ")[0];
@@ -61,9 +63,11 @@ export default async function DocumentPage({ params }: PageProps<"/admin/documen
       <div className="grid grid-cols-2 gap-px border border-line bg-line md:grid-cols-4">
         {[
           ["Estado", late ? lateLabel : STATUS_LABEL[d.kind][d.status] ?? d.status],
-          [d.kind === "consignment" ? "Neto al dueño" : d.kind === "purchase" ? "Pagado al vendedor" : "Total", usd(d.total)],
-          ["Fecha", fmtDate(`${d.issue_date}T12:00:00`)],
-          [d.kind === "quote" ? "Válida hasta" : d.kind === "memo" ? "Devolver antes de" : d.kind === "consignment" ? (d.status === "paid" ? "Pagada al dueño el" : "Vigente hasta") : d.status === "paid" ? "Pagada el" : "Vence", d.status === "paid" && d.paid_at ? fmtDate(`${d.paid_at}T12:00:00`) : d.due_date ? fmtDate(`${d.due_date}T12:00:00`) : "—"],
+          [d.kind === "consignment" ? "Neto al dueño" : d.kind === "purchase" ? "Pagado al vendedor" : sourcing ? "Precio hasta" : d.kind === "invoice" && deposit ? `Total · saldo ${usd(balanceDue(d))}` : "Total", usd(d.total)],
+          sourcing
+            ? [d.refunded_at && d.deposit_paid_at ? "Anticipo devuelto" : d.deposit_paid_at ? `Anticipo recibido ${fmtDate(`${d.deposit_paid_at}T12:00:00`)}` : "Anticipo pendiente", usd(deposit)]
+            : ["Fecha", fmtDate(`${d.issue_date}T12:00:00`)],
+          [sourcing ? "Plazo de búsqueda hasta" : d.kind === "quote" ? "Válida hasta" : d.kind === "memo" ? "Devolver antes de" : d.kind === "consignment" ? (d.status === "paid" ? "Pagada al dueño el" : "Vigente hasta") : d.status === "paid" ? "Pagada el" : "Vence", d.status === "paid" && d.paid_at ? fmtDate(`${d.paid_at}T12:00:00`) : d.due_date ? fmtDate(`${d.due_date}T12:00:00`) : "—"],
         ].map(([l, v]) => (
           <div key={l} className="bg-forest px-5 py-4">
             <p className={`font-display text-2xl font-light ${l === "Estado" ? (late ? "text-red-200" : STATUS_STYLE[d.status]) : ""}`}>{v}</p>
@@ -84,7 +88,7 @@ export default async function DocumentPage({ params }: PageProps<"/admin/documen
         <div className="flex flex-wrap items-center gap-2">
           {d.status === "draft" && (
             <form action={sendDocument.bind(null, d.id)}>
-              <button className={button}>{d.kind === "memo" ? "Marcar como entregado" : d.kind === "invoice" ? "Emitir factura" : (d.kind === "consignment" || d.kind === "purchase") ? "Marcar como firmado" : "Marcar como enviada"}</button>
+              <button className={button}>{d.kind === "memo" ? "Marcar como entregado" : d.kind === "invoice" ? "Emitir factura" : (d.kind === "consignment" || d.kind === "purchase" || sourcing) ? "Marcar como firmado" : "Marcar como enviada"}</button>
             </form>
           )}
           {d.kind === "quote" && d.status === "sent" && (
@@ -105,7 +109,10 @@ export default async function DocumentPage({ params }: PageProps<"/admin/documen
               <form action={returnMemo.bind(null, d.id)}><button className={ghostButtonClass}>Devuelto al dueño</button></form>
             </>
           )}
-          {d.status !== "void" && d.status !== "paid" && d.status !== "converted" && (
+          {sourcing && d.status === "sent" && (
+            <form action={refundSourcing.bind(null, d.id)}><button className={ghostButtonClass}>{d.deposit_paid_at ? "No se consiguió: anticipo devuelto" : "Cerrar sin conseguir"}</button></form>
+          )}
+          {d.status !== "void" && d.status !== "paid" && d.status !== "converted" && d.status !== "returned" && (
             <form action={voidDocument.bind(null, d.id)}><button className={ghostButtonClass}>Anular</button></form>
           )}
           {d.status === "draft" && (
@@ -116,6 +123,18 @@ export default async function DocumentPage({ params }: PageProps<"/admin/documen
           <div className="mt-5 border-t border-line pt-5">
             <PaidForm id={d.id} today={today} method={d.payment_method} />
             <p className="mt-2 text-xs text-stone">Al marcarla pagada, los relojes del inventario quedan vendidos (también en la web) y el cliente pasa a «Ganado».</p>
+          </div>
+        )}
+        {sourcing && (d.status === "draft" || d.status === "sent") && !d.deposit_paid_at && (
+          <div className="mt-5 border-t border-line pt-5">
+            <DepositForm id={d.id} today={today} />
+          </div>
+        )}
+        {sourcing && d.deposit_paid_at && <p className="mt-3 text-sm text-emerald-200">💵 Anticipo de {usd(deposit)} recibido el {fmtDate(`${d.deposit_paid_at}T12:00:00`)}{d.deposit_method ? ` · ${d.deposit_method}` : ""}{d.refunded_at ? ` · devuelto el ${fmtDate(`${d.refunded_at}T12:00:00`)}` : ""}</p>}
+        {sourcing && d.status === "sent" && (
+          <div className="mt-5 border-t border-line pt-5">
+            <SourcedForm id={d.id} stock={stock} price={Number(d.total)} />
+            <p className="mt-2 text-xs text-stone">Se crea la factura con el reloj y {d.deposit_paid_at ? `el anticipo de ${usd(deposit)} descontado del saldo` : "sin anticipo (no consta como pagado)"}. Si el reloj ya está en el inventario, elígelo: quedará reservado al emitirla y vendido al pagarla.</p>
           </div>
         )}
         {d.kind === "consignment" && d.status === "sent" && (
@@ -143,7 +162,7 @@ export default async function DocumentPage({ params }: PageProps<"/admin/documen
             kind={d.kind}
             customers={customers}
             stock={[...stock, ...d.items.filter((l) => l.item_id && !stock.some((x) => x.id === l.item_id)).map((l) => ({ id: l.item_id!, sku: l.sku ?? "", title: l.title, details: l.details ?? "", serial: l.serial ?? null, price: l.price }))]}
-            terms={{ quote: s.doc_terms_quote, memo: s.doc_terms_memo, invoice: s.doc_terms_invoice, consignment: s.doc_terms_consignment, purchase: s.doc_terms_purchase }}
+            terms={{ quote: s.doc_terms_quote, memo: s.doc_terms_memo, invoice: s.doc_terms_invoice, consignment: s.doc_terms_consignment, purchase: s.doc_terms_purchase, sourcing: s.doc_terms_sourcing }}
             taxRate={Number(s.doc_tax_rate) || 0}
             today={today}
           />

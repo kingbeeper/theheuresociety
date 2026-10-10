@@ -8,6 +8,7 @@ import { todayInMiami } from "./booking";
 import { closeReturned, consignorPaid, getDoc, getDocSettings, insertDoc, issueDoc, payInvoice, toInvoice } from "./documents";
 import { pdfName, renderDocPdf } from "./doc-pdf";
 import { KIND_LABEL, docTotals, termsFor, usd, type Doc, type DocKind } from "./doc-labels";
+import { SOURCING_ACTIONS, onSourcingCallback, sourcingButtons } from "./bot-sourcing";
 import { escapeHtml as h, keyboard, sendDocumentFile, sendMessage, tg, type InlineButton } from "./telegram";
 import { analyze, cutoutJob, draftWatch, notifyAlertMatches, parsePrice, publish, updateDraft } from "./bot";
 import type { WatchDraft } from "./watch-ai";
@@ -52,8 +53,8 @@ export const FLOW_COMMANDS: Record<string, FlowKind> = {
   "/compra": "purchase",
 };
 const NAME: Record<FlowKind, string> = { ...KIND_LABEL, purchase: "Compra" };
-const ICON: Record<FlowKind, string> = { invoice: "🧾", memo: "📋", consignment: "🤝", quote: "💬", purchase: "🛒" };
-const DUE_DAYS: Record<DocKind, number> = { quote: 7, memo: 14, invoice: 0, consignment: 90, purchase: 0 };
+const ICON: Record<FlowKind, string> = { invoice: "🧾", memo: "📋", consignment: "🤝", quote: "💬", purchase: "🛒", sourcing: "🔎" };
+const DUE_DAYS: Record<DocKind, number> = { quote: 7, memo: 14, invoice: 0, consignment: 90, purchase: 0, sourcing: 60 };
 
 // ───────────────────────────── Estado (uno por chat) ─────────────────────────────
 const key = (chatId: number) => `tgdoc:${chatId}`;
@@ -298,6 +299,7 @@ function askPrice(chatId: number, flow: DocFlow) {
     memo: "💵 ¿Valor del reloj en el memo?",
     consignment: "💵 ¿Cuánto le pagarás al dueño cuando se venda? (neto al consignante)",
     purchase: "💵 ¿Cuánto pagaste por el reloj?",
+    sourcing: "💵 ¿Precio máximo acordado?",
   }[flow.kind];
   const s = suggested(flow);
   return sendMessage(chatId, q, s ? { reply_markup: keyboard([[{ text: `Usar ${usd(s)}`, callback_data: `dprice:${s}` }]]) } : {});
@@ -462,7 +464,7 @@ export async function finish(chatId: number, flow: DocFlow) {
 export async function deliver(chatId: number, d: Doc) {
   const link = `${SITE_URL}/d/${d.token}`;
   const first = (d.client_name ?? "").split(" ")[0];
-  const label = d.lang === "es" ? KIND_LABEL[d.kind].toLowerCase() : { quote: "quotation", memo: "memorandum", invoice: "invoice", consignment: "consignment agreement", purchase: "bill of sale" }[d.kind];
+  const label = d.lang === "es" ? KIND_LABEL[d.kind].toLowerCase() : { quote: "quotation", memo: "memorandum", invoice: "invoice", consignment: "consignment agreement", purchase: "bill of sale", sourcing: "sourcing agreement" }[d.kind];
   const msg = d.lang === "es"
     ? `Hola ${first}, le comparto su ${label} ${d.number} de The Heure Society: ${link}`
     : `Hi ${first}, here is your ${label} ${d.number} from The Heure Society: ${link}`;
@@ -476,12 +478,15 @@ export async function deliver(chatId: number, d: Doc) {
     if (d.kind === "memo") rows.push([{ text: "↩️ Devuelto", callback_data: `dret:${d.id}` }, { text: "🧾 Se lo queda: facturar", callback_data: `dinv:${d.id}` }]);
     if (d.kind === "consignment") rows.push([{ text: "💵 Vendido: pagado al dueño", callback_data: `down:${d.id}` }, { text: "↩️ Devuelto al dueño", callback_data: `dret:${d.id}` }]);
     if (d.kind === "quote") rows.push([{ text: "🧾 Convertir en factura", callback_data: `dinv:${d.id}` }]);
+    if (d.kind === "sourcing") rows.push(...sourcingButtons(d));
   }
   rows.push([{ text: "Abrir en el CRM", url: `${SITE_URL}/admin/documentos/${d.id}` }]);
 
   const caption = [
     `📄 <b>${KIND_LABEL[d.kind]} ${h(d.number)}</b>`,
-    `${h(d.client_name ?? "")} · <b>${usd(d.total)}</b>${d.kind === "consignment" ? " neto al dueño" : ""}`,
+    d.kind === "sourcing"
+      ? `${h(d.client_name ?? "")} · busca ${h(d.items[0]?.title ?? "")} hasta <b>${usd(d.total)}</b>\n💵 Anticipo ${usd(d.deposit ?? 0)}${d.deposit_paid_at ? " · recibido" : " · pendiente"}`
+      : `${h(d.client_name ?? "")} · <b>${usd(d.total)}</b>${d.kind === "consignment" ? " neto al dueño" : ""}`,
     "",
     `Enlace para el cliente${d.status === "sent" && !d.signed_at ? " (puede firmarlo ahí con el dedo)" : ""}:\n${link}`,
     phone ? "" : "\n<i>Sin teléfono: reenvía este PDF o el enlace.</i>",
@@ -494,6 +499,9 @@ export async function deliver(chatId: number, d: Doc) {
 export async function onCallback(chatId: number, cbId: string, messageId: number, action: string, arg: string, user: string) {
   const answer = (text?: string) => tg("answerCallbackQuery", { callback_query_id: cbId, ...(text && { text }) }).catch(() => {});
   const clearButtons = () => tg("editMessageReplyMarkup", { chat_id: chatId, message_id: messageId, reply_markup: keyboard([]) }).catch(() => {});
+
+  // Encargos con anticipo: su propio asistente y sus botones
+  if (SOURCING_ACTIONS.has(action)) return onSourcingCallback(chatId, cbId, messageId, action, arg, user);
 
   // Botones de un documento ya creado (no dependen del asistente)
   if (action === "dcid") {
@@ -999,6 +1007,7 @@ const LIST_TITLE: Record<string, string> = {
   memo: "Relojes en memo",
   invoice: "Facturas por cobrar",
   quote: "Cotizaciones abiertas",
+  sourcing: "Encargos buscando",
 };
 
 export async function listOpenDocs(chatId: number, kind: DocKind | "all" = "all") {

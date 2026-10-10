@@ -24,6 +24,7 @@ export async function onMenuText(chatId: number, text: string, user: string) {
       await clearFlow(chatId);
       await clearPendingCost(chatId);
       await clearAppraise(chatId);
+      await (await import("./bot-sourcing")).clearSourcing(chatId);
       await sendMessage(chatId, "📸 <b>Publicar un reloj</b>\n\n1. Envíame las fotos (de 1 a 10).\n2. Después escríbeme la referencia, el precio y los extras.\n<i>Ej.: Rolex 126610LN, 14500, caja y papeles</i>\n\nPrepararé la ficha y te la enseño antes de publicarla.");
       return true;
     case MENU.docs:
@@ -36,6 +37,7 @@ export async function onMenuText(chatId: number, text: string, user: string) {
             { text: "💬 Cotización", callback_data: "mnew:quote" },
           ]),
           [{ text: "🛒 Compré un reloj", callback_data: "mnew:purchase" }],
+          [{ text: "🔎 Encargo con anticipo", callback_data: "mnew:sourcing" }],
           [{ text: "📂 Ver documentos abiertos", callback_data: "mopen:menu" }],
         ]),
       });
@@ -103,6 +105,11 @@ export async function onMenuCallback(chatId: number, cbId: string, messageId: nu
   switch (action) {
     case "mnew":
       await clearButtons();
+      if (arg === "sourcing") {
+        await clearFlow(chatId);
+        const { startSourcing } = await import("./bot-sourcing");
+        return startSourcing(chatId, user);
+      }
       return startFlow(chatId, arg as Parameters<typeof startFlow>[1], "", user);
 
     case "mopen":
@@ -113,6 +120,7 @@ export async function onMenuCallback(chatId: number, cbId: string, messageId: nu
               { text: "💰 Facturas por cobrar", callback_data: "mopen:invoice" },
               { text: "🤝 Consignaciones", callback_data: "mopen:consignment" },
               { text: "📋 Memos", callback_data: "mopen:memo" },
+              { text: "🔎 Encargos", callback_data: "mopen:sourcing" },
               { text: "📂 Todos", callback_data: "mopen:all" },
             ])
           ),

@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { adminDb } from "@/lib/supabase";
 import { getDocSettings } from "@/lib/documents";
-import { PRINT, SIGNABLE, docTotals, maskedId, usd, type Doc } from "@/lib/doc-labels";
+import { PRINT, SIGNABLE, balanceDue, docTotals, maskedId, usd, type Doc } from "@/lib/doc-labels";
 import { PrintButton } from "./PrintButton";
 import { SignaturePad } from "./SignaturePad";
 import { downloadPrivate } from "@/lib/private-files";
@@ -33,6 +33,9 @@ async function SharedDocument({ params, searchParams }: { params: Promise<{ toke
     iso ? new Intl.DateTimeFormat(d.lang === "es" ? "es-ES" : "en-US", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${iso}T12:00:00Z`)) : "—";
   const consign = d.kind === "consignment";
   const purchase = d.kind === "purchase";
+  const sourcing = d.kind === "sourcing";
+  const deposit = Number(d.deposit ?? 0);
+  const twoParty = consign || purchase || sourcing;
   const sellerId = purchase ? maskedId(d) : null;
   // Firma del cliente (imagen privada, se incrusta en la página)
   const sigBytes = d.signature_path ? await downloadPrivate(d.signature_path) : null;
@@ -49,7 +52,7 @@ async function SharedDocument({ params, searchParams }: { params: Promise<{ toke
           {d.lang === "es" ? "Pago recibido. En unos minutos la factura aparecerá como pagada." : "Payment received. The invoice will show as paid in a few minutes."}
         </p>
       )}
-      {d.kind === "invoice" && d.status === "sent" && stripeConfigured() && (
+      {d.kind === "invoice" && d.status === "sent" && balanceDue(d) > 0 && stripeConfigured() && (
         <div className="mb-4 flex justify-end print:hidden">
           <a href={`/api/pay?t=${d.token}`} className="bg-[#8a7a52] px-6 py-3 text-[0.7rem] tracking-[0.22em] uppercase text-white hover:bg-[#6f6241]">
             {d.lang === "es" ? "Pagar con tarjeta" : "Pay by card"}
@@ -89,7 +92,7 @@ async function SharedDocument({ params, searchParams }: { params: Promise<{ toke
             </div>
           </div>
           <div className="w-full sm:w-auto sm:text-right">
-            <h1 className={`font-display font-light tracking-[0.06em] ${consign ? "text-[1.7rem] leading-tight" : "text-4xl"}`}>{t[d.kind]}</h1>
+            <h1 className={`font-display font-light tracking-[0.06em] ${consign || sourcing ? "text-[1.7rem] leading-tight" : "text-4xl"}`}>{t[d.kind]}</h1>
             <dl className="mt-3 grid grid-cols-[auto_auto] justify-start gap-x-4 gap-y-1 text-xs sm:justify-end">
               <dt className="text-[#5d625e]">{t.number}</dt><dd>{d.number}</dd>
               <dt className="text-[#5d625e]">{t.date}</dt><dd>{date(d.issue_date)}</dd>
@@ -124,7 +127,7 @@ async function SharedDocument({ params, searchParams }: { params: Promise<{ toke
         <table className="hidden w-full text-sm sm:table">
           <thead>
             <tr className="border-y border-[#d8d2c4] text-left text-[0.6rem] tracking-[0.2em] uppercase text-[#5d625e]">
-              <th className="py-3 font-normal">{t.item}</th>
+              <th className="py-3 font-normal">{sourcing ? t.sought : t.item}</th>
               <th className="py-3 text-center font-normal">{t.qty}</th>
               <th className="py-3 pl-4 text-right font-normal">{t.price}</th>
               <th className="py-3 pl-4 text-right font-normal">{consign ? t.net : t.amount}</th>
@@ -152,8 +155,20 @@ async function SharedDocument({ params, searchParams }: { params: Promise<{ toke
             {totals.discount > 0 && (<><dt className="text-[#5d625e]">{t.discount}</dt><dd className="text-right tabular-nums">−{usd(totals.discount)}</dd></>)}
             {totals.tax > 0 && (<><dt className="text-[#5d625e]">{t.tax} ({Number(d.tax_rate)}%)</dt><dd className="text-right tabular-nums">{usd(totals.tax)}</dd></>)}
             {totals.shipping > 0 && (<><dt className="text-[#5d625e]">{t.shipping}</dt><dd className="text-right tabular-nums">{usd(totals.shipping)}</dd></>)}
-            <dt className="mt-2 border-t border-[#1b1f1c] pt-3 font-display text-xl">{consign ? t.netTotal : purchase ? t.paidTotal : t.total}</dt>
+            <dt className="mt-2 border-t border-[#1b1f1c] pt-3 font-display text-xl">{consign ? t.netTotal : purchase ? t.paidTotal : sourcing ? t.upTo : t.total}</dt>
             <dd className="mt-2 border-t border-[#1b1f1c] pt-3 text-right font-display text-xl tabular-nums">{usd(totals.total)}</dd>
+            {sourcing && deposit > 0 && (
+              <>
+                <dt className="text-[#5d625e]">{d.refunded_at && d.deposit_paid_at ? t.depositRefunded : d.deposit_paid_at ? t.depositPaid : t.depositDue}</dt>
+                <dd className="text-right tabular-nums">{usd(deposit)}</dd>
+              </>
+            )}
+            {d.kind === "invoice" && deposit > 0 && (
+              <>
+                <dt className="text-[#5d625e]">{t.lessDeposit}</dt><dd className="text-right tabular-nums">−{usd(deposit)}</dd>
+                <dt className="font-display text-lg">{t.balance}</dt><dd className="text-right font-display text-lg tabular-nums">{usd(balanceDue(d))}</dd>
+              </>
+            )}
           </dl>
         </div>
 
@@ -176,9 +191,9 @@ async function SharedDocument({ params, searchParams }: { params: Promise<{ toke
               <p className="border-t border-[#1b1f1c] pt-2">{t.date}</p>
             </div>
           )}
-          {(consign || purchase) && (
+          {twoParty && (
             <div className="mt-8 grid gap-10 sm:grid-cols-2">
-              {(purchase ? t.purchaseSign : t.consignSign).map((who) => (
+              {(purchase ? t.purchaseSign : sourcing ? t.sourcingSign : t.consignSign).map((who) => (
                 <div key={who}>
                   <p className="border-t border-[#1b1f1c] pt-2">{who}</p>
                   <p className="mt-6 border-t border-[#1b1f1c] pt-2">{t.date}</p>
@@ -191,7 +206,7 @@ async function SharedDocument({ params, searchParams }: { params: Promise<{ toke
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={signature} alt="" className="h-20 w-auto" />
               <p className="mt-1 text-[0.7rem] text-[#5d625e]">
-                {consign || purchase || d.kind === "memo" ? t.signedBy : t.acceptedBy} <b>{d.signer_name}</b> · {signedOn} (Miami)
+                {twoParty || d.kind === "memo" ? t.signedBy : t.acceptedBy} <b>{d.signer_name}</b> · {signedOn} (Miami)
               </p>
             </div>
           )}

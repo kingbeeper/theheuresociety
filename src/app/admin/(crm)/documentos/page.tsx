@@ -2,7 +2,7 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { adminDb } from "@/lib/supabase";
 import { requireAdmin } from "@/lib/admin-auth";
-import { KIND_LABEL, KIND_PLURAL, STATUS_LABEL, STATUS_STYLE, usd, type Doc, type DocKind } from "@/lib/doc-labels";
+import { KIND_LABEL, KIND_PLURAL, STATUS_LABEL, STATUS_STYLE, balanceDue, usd, type Doc, type DocKind } from "@/lib/doc-labels";
 import { todayInMiami } from "@/lib/booking";
 import { buttonClass, fmtDate, ghostButtonClass, money, PageTitle, requestTime } from "@/components/admin/ui";
 
@@ -23,11 +23,15 @@ export default async function DocumentsPage({ searchParams }: PageProps<"/admin/
   const memosOut = docs.filter((d) => d.kind === "memo" && d.status === "sent");
   const quotesOpen = docs.filter((d) => d.kind === "quote" && (d.status === "sent" || d.status === "accepted"));
   const sum = (ds: Doc[]) => ds.reduce((a, d) => a + Number(d.total), 0);
+  // Anticipos de encargos abiertos: dinero del cliente que se devuelve si no se consigue el reloj (pasivo)
+  const sourcingOpen = docs.filter((d) => d.kind === "sourcing" && d.status === "sent");
+  const held = sourcingOpen.filter((d) => d.deposit_paid_at && !d.refunded_at);
   const kpis = [
-    { label: "Por cobrar", value: money(sum(unpaid)), sub: `${unpaid.length} factura(s)`, href: "?tipo=invoice" },
-    { label: "Vencidas", value: money(sum(overdue)), sub: `${overdue.length} factura(s)`, href: "?tipo=invoice" },
+    { label: "Por cobrar", value: money(unpaid.reduce((a, d) => a + balanceDue(d), 0)), sub: `${unpaid.length} factura(s)`, href: "?tipo=invoice" },
+    { label: "Vencidas", value: money(overdue.reduce((a, d) => a + balanceDue(d), 0)), sub: `${overdue.length} factura(s)`, href: "?tipo=invoice" },
     { label: "Relojes en memo", value: String(memosOut.length), sub: money(sum(memosOut)), href: "?tipo=memo" },
     { label: "Cotizaciones abiertas", value: String(quotesOpen.length), sub: money(sum(quotesOpen)), href: "?tipo=quote" },
+    { label: "Anticipos de encargos", value: money(held.reduce((a, d) => a + Number(d.deposit ?? 0), 0)), sub: `${sourcingOpen.length} encargo(s) buscando`, href: "?tipo=sourcing" },
   ];
 
   return (
@@ -42,13 +46,14 @@ export default async function DocumentsPage({ searchParams }: PageProps<"/admin/
             <Link href="/admin/documentos/nuevo?tipo=memo" className={ghostButtonClass}>+ Memo</Link>
             <Link href="/admin/documentos/nuevo?tipo=consignment" className={ghostButtonClass}>+ Consignación</Link>
             <Link href="/admin/documentos/nuevo?tipo=purchase" className={ghostButtonClass}>+ Compra</Link>
+            <Link href="/admin/documentos/nuevo?tipo=sourcing" className={ghostButtonClass}>+ Encargo</Link>
             <Link href="/admin/documentos/nuevo?tipo=invoice" className={buttonClass}>+ Factura</Link>
           </div>
         }
       />
       {error && <p className="mb-6 border border-amber-300/40 bg-amber-300/5 p-4 text-sm">Falta ejecutar la migración <code>2026-10-14-documents.sql</code> en Supabase.</p>}
 
-      <div className="grid grid-cols-2 gap-px border border-line bg-line lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-px border border-line bg-line lg:grid-cols-5">
         {kpis.map((k) => (
           <Link key={k.label} href={`/admin/documentos${k.href}`} className="bg-forest px-5 py-5 hover:bg-moss">
             <p className="break-words font-display text-2xl font-light sm:text-3xl">{k.value}</p>
@@ -59,7 +64,7 @@ export default async function DocumentsPage({ searchParams }: PageProps<"/admin/
       </div>
 
       <div className="mt-6 flex gap-1 overflow-x-auto">
-        {(["all", "quote", "memo", "invoice", "consignment", "purchase"] as const).map((k) => (
+        {(["all", "quote", "memo", "invoice", "consignment", "purchase", "sourcing"] as const).map((k) => (
           <Link
             key={k}
             href={k === "all" ? "/admin/documentos" : `/admin/documentos?tipo=${k}`}
@@ -83,7 +88,7 @@ export default async function DocumentsPage({ searchParams }: PageProps<"/admin/
                   </div>
                   <p className="mt-0.5 truncate text-sm text-stone">{d.client_name ?? "—"} · {d.items.map((l) => l.title).join(", ")}</p>
                   <p className={`mt-1 text-[0.62rem] tracking-[0.14em] uppercase ${late ? "text-red-200" : STATUS_STYLE[d.status]}`}>
-                    {late ? (d.kind === "memo" ? "Memo vencido" : d.kind === "consignment" ? "Plazo cumplido" : "Vencida") : STATUS_LABEL[d.kind][d.status]} · {fmtDate(`${d.issue_date}T12:00:00`)}
+                    {late ? (d.kind === "memo" ? "Memo vencido" : d.kind === "consignment" || d.kind === "sourcing" ? "Plazo cumplido" : "Vencida") : STATUS_LABEL[d.kind][d.status]} · {fmtDate(`${d.issue_date}T12:00:00`)}
                   </p>
                 </Link>
               </li>
@@ -116,7 +121,7 @@ export default async function DocumentsPage({ searchParams }: PageProps<"/admin/
                     <td className="px-4 py-3 text-stone">{fmtDate(`${d.issue_date}T12:00:00`)}</td>
                     <td className="px-4 py-3 text-right tabular-nums">{usd(d.total)}</td>
                     <td className={`px-4 py-3 text-[0.66rem] tracking-[0.14em] uppercase ${late ? "text-red-200" : STATUS_STYLE[d.status]}`}>
-                      {late ? (d.kind === "memo" ? "Memo vencido" : d.kind === "consignment" ? "Plazo cumplido" : "Vencida") : STATUS_LABEL[d.kind][d.status]}
+                      {late ? (d.kind === "memo" ? "Memo vencido" : d.kind === "consignment" || d.kind === "sourcing" ? "Plazo cumplido" : "Vencida") : STATUS_LABEL[d.kind][d.status]}
                     </td>
                   </tr>
                 );

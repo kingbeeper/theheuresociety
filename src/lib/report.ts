@@ -19,12 +19,13 @@ const monthRange = (month: string) => {
 export async function monthlyReport(month: string) {
   const { start, end } = monthRange(month);
   const db = adminDb();
-  const [sold, entered, ownerPaid, invoices, services] = await Promise.all([
+  const [sold, entered, ownerPaid, invoices, services, sourcing] = await Promise.all([
     db.from("inventory_items").select("*").eq("status", "sold").gte("sale_date", start).lt("sale_date", end).order("sale_date"),
     db.from("inventory_items").select("*").gte("purchase_date", start).lt("purchase_date", end).order("purchase_date"),
     db.from("inventory_items").select("*").gte("owner_paid_at", start).lt("owner_paid_at", end).order("owner_paid_at"),
     db.from("documents").select("*").eq("kind", "invoice").eq("status", "paid").gte("paid_at", start).lt("paid_at", end).order("paid_at"),
     db.from("item_services").select("*, item:inventory_items(sku, brand, model)").gte("returned_at", start).lt("returned_at", end).order("returned_at"),
+    db.from("documents").select("*").eq("kind", "sourcing").not("deposit_paid_at", "is", null).lt("deposit_paid_at", end).order("deposit_paid_at"),
   ]);
 
   const sales = ((sold.data ?? []) as Item[]).map((i) => {
@@ -53,6 +54,16 @@ export async function monthlyReport(month: string) {
     date: s.returned_at, sku: s.item?.sku ?? "", watch: [s.item?.brand, s.item?.model].filter(Boolean).join(" "), provider: s.provider, work: s.work, cost: Number(s.cost ?? 0),
   }));
 
+  // Anticipos de encargos: dinero del cliente que se devuelve si no se consigue el reloj. Es un pasivo,
+  // no una venta: pasa a ser venta cuando se paga la factura (que lo descuenta del saldo).
+  const deposits = ((sourcing.data ?? []) as Doc[])
+    .filter((d) => d.deposit_paid_at! >= start || (d.status === "sent" && !d.refunded_at) || (d.refunded_at && d.refunded_at >= start && d.refunded_at < end))
+    .map((d) => ({
+      date: d.deposit_paid_at!, number: d.number, client: d.client_name, watch: d.items.map((l) => l.title).join(", "), method: d.deposit_method, amount: Number(d.deposit ?? 0),
+      state: d.refunded_at ? `Devuelto ${d.refunded_at}` : d.status === "converted" ? "Aplicado a factura" : d.status === "sent" ? "Retenido (pasivo)" : d.status,
+      held: d.status === "sent" && !d.refunded_at,
+    }));
+
   const sum = <T,>(rows: T[], f: (r: T) => number | null) => rows.reduce((a, r) => a + (f(r) ?? 0), 0);
   return {
     month,
@@ -61,6 +72,7 @@ export async function monthlyReport(month: string) {
     owners,
     taxes,
     repairs,
+    deposits,
     totals: {
       revenue: sum(sales, (s) => s.price),
       cogs: sum((sold.data ?? []) as Item[], (i) => totalCost(i)),
@@ -71,6 +83,8 @@ export async function monthlyReport(month: string) {
       taxableSales: sum(taxes, (t) => (t.tax > 0 ? t.taxable : 0)),
       exemptSales: sum(taxes, (t) => (t.tax > 0 ? 0 : t.taxable)),
       repairs: sum(repairs, (r) => r.cost),
+      depositsReceived: sum(deposits, (d) => (d.date >= start ? d.amount : 0)),
+      depositsHeld: sum(deposits, (d) => (d.held ? d.amount : 0)),
     },
   };
 }

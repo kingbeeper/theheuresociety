@@ -33,6 +33,8 @@ export function DocSettingsForm({ s }: { s: Required<DocSettings> }) {
       <label><span className={label}>Términos de las cotizaciones</span><textarea name="doc_terms_quote" rows={3} defaultValue={s.doc_terms_quote} className={field} /></label>
       <label><span className={label}>Términos de los memos</span><textarea name="doc_terms_memo" rows={4} defaultValue={s.doc_terms_memo} className={field} /></label>
       <label><span className={label}>Términos de los contratos de consignación</span><textarea name="doc_terms_consignment" rows={4} defaultValue={s.doc_terms_consignment} className={field} /></label>
+      <label><span className={label}>Términos de los contratos de compra</span><textarea name="doc_terms_purchase" rows={4} defaultValue={s.doc_terms_purchase} className={field} /></label>
+      <label><span className={label}>Términos de los encargos (anticipo reembolsable)</span><textarea name="doc_terms_sourcing" rows={5} defaultValue={s.doc_terms_sourcing} className={field} /></label>
       <label><span className={label}>Términos de las facturas</span><textarea name="doc_terms_invoice" rows={3} defaultValue={s.doc_terms_invoice} className={field} /></label>
       <p className="text-xs text-stone">Los términos son un punto de partida: conviene que los revise tu abogado o contador.</p>
       <div className="flex items-center gap-4">

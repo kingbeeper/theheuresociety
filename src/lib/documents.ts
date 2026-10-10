@@ -145,7 +145,11 @@ const isoToday = () => new Date().toISOString().slice(0, 10);
 // Enviado / entregado / firmado
 export async function issueDoc(d: Doc, user: string) {
   await touch(d.id, { status: "sent" });
-  if (d.kind === "purchase") {
+  if (d.kind === "sourcing") {
+    await docEvent(d, `encargo firmado: busca ${d.items.map((l) => l.title).join(", ")} hasta ${usd(d.total)} · anticipo ${usd(d.deposit ?? 0)}`, user);
+    await advanceStage(d.customer_id, "negotiating", user);
+    await sourcingAlert(d, true);
+  } else if (d.kind === "purchase") {
     await docEvent(d, `contrato de compra firmado (${usd(d.total)})`, user);
   } else if (d.kind === "consignment") {
     await docEvent(d, `contrato firmado (neto al dueño ${usd(d.total)})`, user);
@@ -218,8 +222,63 @@ export async function payInvoice(d: Doc, method: string | null, paidAt: string, 
 
 export async function voidDoc(d: Doc, user: string) {
   await touch(d.id, { status: "void" });
+  if (d.kind === "sourcing") await sourcingAlert(d, false);
   if (d.status === "sent" && (d.kind === "memo" || d.kind === "invoice")) await releaseStock(d, user, "documento anulado");
   await docEvent(d, "anulada", user);
+}
+
+// ───────────────────── Encargos con anticipo ─────────────────────
+// El reloj buscado queda como búsqueda «avísenme» del cliente: así sale en Demanda y avisa cuando
+// entra al inventario una pieza que encaja. Se desactiva al cerrar el encargo.
+async function sourcingAlert(d: Doc, active: boolean) {
+  if (!d.customer_id) return;
+  const db = adminDb();
+  for (const l of d.items) {
+    const query = l.title.slice(0, 120);
+    const { data: found } = await db.from("watch_alerts").select("id").eq("customer_id", d.customer_id).eq("query", query).limit(1).maybeSingle();
+    if (found) await db.from("watch_alerts").update({ active }).eq("id", found.id);
+    else if (active) await db.from("watch_alerts").insert({ customer_id: d.customer_id, query });
+  }
+}
+
+export async function depositReceived(d: Doc, method: string | null, paidAt: string, user: string) {
+  await touch(d.id, { deposit_paid_at: paidAt, deposit_method: method });
+  await docEvent(d, `anticipo recibido: ${usd(d.deposit ?? 0)}${method ? ` · ${method}` : ""}`, user);
+  await notifyAdmins(`💵 <b>Anticipo recibido · ${h(d.number)}</b>\n${h(d.client_name ?? "Cliente")} · <b>${usd(d.deposit ?? 0)}</b>${method ? ` · ${h(method)}` : ""}\nBusca: ${h(d.items.map((l) => l.title).join(", "))}`).catch(() => {});
+}
+
+// No se consiguió (o el cliente cancela): se le devuelve el anticipo íntegro
+export async function refundDeposit(d: Doc, user: string) {
+  await touch(d.id, { status: "returned", refunded_at: isoToday() });
+  await sourcingAlert(d, false);
+  await docEvent(d, d.deposit_paid_at ? `anticipo devuelto (${usd(d.deposit ?? 0)})` : "encargo cerrado sin anticipo", user);
+}
+
+// Conseguido: factura con el reloj (del inventario o descrito a mano) y el anticipo descontado del saldo
+export async function sourcingToInvoice(d: Doc, line: Doc["items"][number], user: string) {
+  const settings = await getDocSettings();
+  const deposit = d.deposit_paid_at ? Number(d.deposit ?? 0) : 0;
+  const invoice = await insertDoc({
+    kind: "invoice",
+    customer_id: d.customer_id,
+    client_name: d.client_name, client_company: d.client_company, client_email: d.client_email, client_phone: d.client_phone, client_address: d.client_address,
+    lang: d.lang,
+    issue_date: isoToday(),
+    due_date: isoToday(),
+    items: [line],
+    tax_rate: Number(settings.doc_tax_rate) || 0,
+    show_serial: true,
+    deposit,
+    notes: deposit ? (d.lang === "es" ? `Anticipo del encargo ${d.number} descontado.` : `Deposit from sourcing agreement ${d.number} applied.`) : null,
+    terms: termsFor("invoice", d.lang, settings),
+    payment_method: d.payment_method,
+    source_id: d.id,
+    created_by: user,
+  });
+  await touch(d.id, { status: "converted" });
+  await sourcingAlert(d, false);
+  await docEvent(d, `conseguido: factura ${invoice.number}${deposit ? ` con el anticipo de ${usd(deposit)} descontado` : ""}`, user);
+  return invoice;
 }
 
 // Opciones del formulario: clientes del CRM y relojes disponibles del inventario

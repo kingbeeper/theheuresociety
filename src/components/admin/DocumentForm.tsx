@@ -1,8 +1,8 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { markPaid, saveDocument } from "@/app/admin/document-actions";
-import { ID_TYPES, KIND_LABEL, docTotals, usd, type Doc, type DocKind, type DocLine } from "@/lib/doc-labels";
+import { convertSourcing, markDepositReceived, markPaid, saveDocument } from "@/app/admin/document-actions";
+import { ID_TYPES, KIND_LABEL, depositPct, docTotals, suggestedDeposit, usd, type Doc, type DocKind, type DocLine } from "@/lib/doc-labels";
 import { PAYMENT } from "@/lib/stock-labels";
 
 const field =
@@ -15,8 +15,8 @@ export type CustomerOption = { id: string; label: string; name: string | null; e
 export type StockOption = { id: string; sku: string; title: string; details: string; serial: string | null; price: number | null; cost?: number | null };
 
 const addDays = (iso: string, n: number) => new Date(new Date(`${iso}T12:00:00Z`).getTime() + n * 86_400_000).toISOString().slice(0, 10);
-const DUE_DAYS: Record<DocKind, number> = { quote: 7, memo: 14, invoice: 0, consignment: 90, purchase: 0 };
-const noTax = (k: DocKind) => k === "memo" || k === "consignment" || k === "purchase";
+const DUE_DAYS: Record<DocKind, number> = { quote: 7, memo: 14, invoice: 0, consignment: 90, purchase: 0, sourcing: 60 };
+const noTax = (k: DocKind) => k === "memo" || k === "consignment" || k === "purchase" || k === "sourcing";
 
 export function DocumentForm({
   doc, kind: initialKind, customers, stock, terms, taxRate, today, presetCustomer, presetItem,
@@ -43,7 +43,10 @@ export function DocumentForm({
   // En consignación, el importe de la línea es el neto al dueño (el «costo» del inventario)
   const fromStock = (s: StockOption, k: DocKind = kind): DocLine => ({ item_id: s.id, sku: s.sku, title: s.title, details: s.details, serial: s.serial, qty: 1, price: (k === "consignment" || k === "purchase" ? s.cost : s.price) ?? 0 });
   const presetLine = stock.find((s) => s.id === presetItem);
-  const [lines, setLines] = useState<DocLine[]>(doc?.items ?? (presetLine ? [fromStock(presetLine, initialKind)] : []));
+  const blank: DocLine = { title: "", qty: 1, price: 0 };
+  const [lines, setLines] = useState<DocLine[]>(doc?.items ?? (presetLine ? [fromStock(presetLine, initialKind)] : initialKind === "sourcing" ? [blank] : []));
+  // Encargo: anticipo sugerido según el precio (se puede cambiar)
+  const [deposit, setDeposit] = useState(doc?.deposit ? String(doc.deposit) : "");
   const [discount, setDiscount] = useState(String(doc?.discount ?? 0));
   const [tax, setTax] = useState(String(doc?.tax_rate ?? (noTax(initialKind) ? 0 : taxRate)));
   const [shipping, setShipping] = useState(String(doc?.shipping ?? 0));
@@ -64,7 +67,10 @@ export function DocumentForm({
     setTermsText(terms[k]);
     setDue(addDays(today, DUE_DAYS[k]));
     setTax(String(noTax(k) ? 0 : taxRate));
+    if (k === "sourcing" && !lines.length) setLines([blank]);
   };
+  const sourcing = kind === "sourcing";
+  const suggested = suggestedDeposit(totals.total);
 
   return (
     <form action={action} className="grid gap-7">
@@ -81,7 +87,7 @@ export function DocumentForm({
         <label><span className={label}>Fecha</span><input name="issue_date" type="date" defaultValue={doc?.issue_date ?? today} className={field} /></label>
         {kind !== "purchase" ? (
           <label>
-            <span className={label}>{kind === "quote" ? "Válida hasta" : kind === "memo" ? "Devolver antes de" : kind === "consignment" ? "Vigente hasta" : "Vence"}</span>
+            <span className={label}>{kind === "quote" ? "Válida hasta" : kind === "memo" ? "Devolver antes de" : kind === "consignment" ? "Vigente hasta" : sourcing ? "Plazo de búsqueda hasta" : "Vence"}</span>
             <input name="due_date" type="date" value={due} onChange={(e) => setDue(e.target.value)} className={field} />
           </label>
         ) : (
@@ -115,7 +121,8 @@ export function DocumentForm({
       </div>
 
       <div className="grid gap-3">
-        <p className={section}>Relojes y conceptos</p>
+        <p className={section}>{sourcing ? "Reloj que busca el cliente" : "Relojes y conceptos"}</p>
+        {sourcing && <p className="text-xs text-stone">Describe el reloj (marca, modelo y referencia) y en el detalle la esfera, el año mínimo, si tiene que traer caja y papeles y el estado. El precio es el <b>máximo acordado</b> con el cliente.</p>}
         {kind === "purchase" && (
           <div className="grid gap-4 sm:grid-cols-3">
             <label>
@@ -144,7 +151,7 @@ export function DocumentForm({
             <button type="button" onClick={() => setLines(lines.filter((_, j) => j !== i))} className="px-2 py-2 text-xs text-stone hover:text-red-200" aria-label="Quitar">✕</button>
           </div>
         ))}
-        <div className="flex flex-wrap gap-2">
+        <div className={`flex flex-wrap gap-2 ${sourcing ? "hidden" : ""}`}>
           <select
             value=""
             onChange={(e) => {
@@ -177,6 +184,21 @@ export function DocumentForm({
           <label><span className={label}>Notas (salen en el documento)</span><textarea name="notes" rows={2} defaultValue={doc?.notes ?? ""} className={field} /></label>
           <label><span className={label}>Términos</span><textarea name="terms" rows={4} value={termsText} onChange={(e) => setTermsText(e.target.value)} className={field} /></label>
         </div>
+        {sourcing ? (
+          <div className="grid content-start gap-3 border border-line/70 p-4 text-sm">
+            <input type="hidden" name="discount" value="0" />
+            <input type="hidden" name="tax_rate" value="0" />
+            <input type="hidden" name="shipping" value="0" />
+            <p className="flex justify-between font-display text-xl"><span>Precio hasta</span><span className="tabular-nums">{usd(totals.total)}</span></p>
+            <label className="flex items-center justify-between gap-3"><span className="text-stone">Anticipo $</span><input name="deposit" value={deposit} onChange={(e) => setDeposit(e.target.value)} placeholder={String(suggested || "")} inputMode="decimal" className={`${small} w-32 text-right`} /></label>
+            {suggested > 0 && (
+              <button type="button" onClick={() => setDeposit(String(suggested))} className="text-left text-xs text-brass hover:text-ivory">
+                Sugerido: {usd(suggested)} ({depositPct(totals.total)} % del precio) · usar
+              </button>
+            )}
+            <p className="text-[0.7rem] text-stone/80">Hasta $15k: 20 % · hasta $50k: 15 % · hasta $150k: 10 % · más: 8 %. El anticipo se descuenta de la factura al conseguir el reloj y se devuelve íntegro si no se consigue.</p>
+          </div>
+        ) : (
         <div className="grid content-start gap-3 border border-line/70 p-4 text-sm">
           <p className="flex justify-between"><span className="text-stone">Subtotal</span><span className="tabular-nums">{usd(totals.subtotal)}</span></p>
           <label className="flex items-center justify-between gap-3"><span className="text-stone">Descuento $</span><input name="discount" value={discount} onChange={(e) => setDiscount(e.target.value)} inputMode="decimal" className={`${small} w-28 text-right`} /></label>
@@ -186,6 +208,7 @@ export function DocumentForm({
           <p className="mt-1 flex justify-between border-t border-line pt-3 font-display text-2xl"><span>Total</span><span className="tabular-nums">{usd(totals.total)}</span></p>
           <p className="text-[0.7rem] text-stone/80">Impuesto 0 si el cliente es dealer con certificado de reventa o el envío es fuera de Florida.</p>
         </div>
+        )}
       </div>
 
       <div className="flex items-center gap-4">
@@ -214,6 +237,48 @@ export function PaidForm({ id, today, method }: { id: string; today: string; met
         {pending ? "Guardando…" : "Marcar pagada"}
       </button>
       {state && "error" in state && <p className="text-sm text-red-200/90">{state.error}</p>}
+    </form>
+  );
+}
+
+// Encargo: anticipo recibido a mano (efectivo, transferencia, Zelle…)
+export function DepositForm({ id, today }: { id: string; today: string }) {
+  const [state, action, pending] = useActionState(markDepositReceived.bind(null, id), null);
+  return (
+    <form action={action} className="flex flex-wrap items-end gap-3">
+      <label><span className={label}>Fecha</span><input name="paid_at" type="date" defaultValue={today} className={field} /></label>
+      <label>
+        <span className={label}>Forma de pago</span>
+        <select name="payment_method" defaultValue="Transferencia" className={field}>
+          {Object.values(PAYMENT).map((p) => <option key={p} value={p}>{p}</option>)}
+        </select>
+      </label>
+      <button disabled={pending} className="bg-ivory px-5 py-2.5 text-[0.68rem] tracking-[0.22em] uppercase text-ink hover:bg-brass disabled:opacity-60">
+        {pending ? "Guardando…" : "Anticipo recibido"}
+      </button>
+      {state && "error" in state && <p className="text-sm text-red-200/90">{state.error}</p>}
+    </form>
+  );
+}
+
+// Encargo conseguido: el reloj (del inventario o el descrito) y el precio final → factura
+export function SourcedForm({ id, stock, price }: { id: string; stock: StockOption[]; price: number }) {
+  const [state, action, pending] = useActionState(convertSourcing.bind(null, id), null);
+  const [final, setFinal] = useState(String(price || ""));
+  return (
+    <form action={action} className="grid gap-3 sm:grid-cols-[1fr_160px_auto] sm:items-end">
+      <label>
+        <span className={label}>Reloj conseguido</span>
+        <select name="item_id" defaultValue="" onChange={(e) => { const s = stock.find((x) => x.id === e.target.value); if (s?.price) setFinal(String(s.price)); }} className={field}>
+          <option value="">— El descrito en el encargo (aún no está en el inventario) —</option>
+          {stock.map((s) => <option key={s.id} value={s.id}>{s.sku} · {s.title}{s.price ? ` · ${usd(s.price)}` : ""}</option>)}
+        </select>
+      </label>
+      <label><span className={label}>Precio final $</span><input name="price" value={final} onChange={(e) => setFinal(e.target.value)} inputMode="decimal" className={field} /></label>
+      <button disabled={pending} className="bg-ivory px-5 py-2.5 text-[0.68rem] tracking-[0.22em] uppercase text-ink hover:bg-brass disabled:opacity-60">
+        {pending ? "Creando…" : "Conseguido: facturar"}
+      </button>
+      {state && "error" in state && <p className="text-sm text-red-200/90 sm:col-span-3">{state.error}</p>}
     </form>
   );
 }

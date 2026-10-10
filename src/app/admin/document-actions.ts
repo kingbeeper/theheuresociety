@@ -5,7 +5,7 @@ import { refresh } from "next/cache";
 import { requireAdmin } from "@/lib/admin-auth";
 import { adminDb } from "@/lib/supabase";
 import { upsertLead } from "@/lib/crm";
-import { closeReturned, consignorPaid, docEvent, getDoc, insertDoc, issueDoc, payInvoice, reserveStock, saveDocSettings, toInvoice, voidDoc } from "@/lib/documents";
+import { closeReturned, consignorPaid, depositReceived, docEvent, getDoc, insertDoc, issueDoc, payInvoice, refundDeposit, reserveStock, saveDocSettings, sourcingToInvoice, toInvoice, voidDoc } from "@/lib/documents";
 import { DOC_SETTING_KEYS, KIND_LABEL, docTotals, usd, type DocKind, type DocLine } from "@/lib/doc-labels";
 
 // Acciones de cotizaciones, memos y facturas. Todas comprueban la sesión.
@@ -69,6 +69,7 @@ export async function saveDocument(id: string | null, _: unknown, f: FormData) {
     lang: text(f, "lang") === "es" ? ("es" as const) : ("en" as const),
     issue_date: date(f, "issue_date") ?? today(),
     due_date: kind === "purchase" ? null : date(f, "due_date"),
+    ...(kind === "sourcing" && { deposit: Math.max(0, num(f, "deposit")) }),
     ...(kind === "purchase" && {
       seller_id_type: text(f, "seller_id_type"),
       seller_id_number: text(f, "seller_id_number"),
@@ -140,7 +141,7 @@ export async function markConsignorPaid(id: string) {
 export async function convertToInvoice(id: string) {
   const user = await requireAdmin("documentos");
   const d = await getDoc(id);
-  if (!d || d.kind === "invoice" || d.kind === "consignment" || d.kind === "purchase") return;
+  if (!d || d.kind === "invoice" || d.kind === "consignment" || d.kind === "purchase" || d.kind === "sourcing") return;
   const invoice = await toInvoice(d, user);
   redirect(`/admin/documentos/${invoice.id}`);
 }
@@ -152,6 +153,46 @@ export async function markPaid(id: string, _: unknown, f: FormData) {
   await payInvoice(d, text(f, "payment_method"), date(f, "paid_at") ?? today(), user);
   refresh();
   return { ok: true };
+}
+
+// ───────────────────── Encargos ─────────────────────
+export async function markDepositReceived(id: string, _: unknown, f: FormData) {
+  const user = await requireAdmin("documentos");
+  const d = await getDoc(id);
+  if (!d || d.kind !== "sourcing" || d.deposit_paid_at || !["draft", "sent"].includes(d.status)) return { error: "Este anticipo ya está registrado." };
+  await depositReceived(d, text(f, "payment_method"), date(f, "paid_at") ?? today(), user);
+  refresh();
+  return { ok: true };
+}
+
+export async function refundSourcing(id: string) {
+  const user = await requireAdmin("documentos");
+  const d = await getDoc(id);
+  if (!d || d.kind !== "sourcing" || d.status !== "sent") return;
+  await refundDeposit(d, user);
+  refresh();
+}
+
+// Conseguido: reloj del inventario (o descrito a mano) y precio final → factura con el anticipo descontado
+export async function convertSourcing(id: string, _: unknown, f: FormData) {
+  const user = await requireAdmin("documentos");
+  const d = await getDoc(id);
+  if (!d || d.kind !== "sourcing" || d.status !== "sent") return { error: "Este encargo ya está cerrado." };
+  const price = num(f, "price");
+  if (price <= 0) return { error: "Indica el precio final del reloj." };
+  const itemId = text(f, "item_id");
+  let line: DocLine = { title: d.items[0]?.title ?? "Timepiece", details: d.items[0]?.details ?? null, qty: 1, price };
+  if (itemId) {
+    const { data: i } = await adminDb().from("inventory_items").select("id, sku, brand, model, reference, serial, condition, comes_with, papers_date").eq("id", itemId).maybeSingle();
+    if (!i) return { error: "Ese reloj ya no está en el inventario." };
+    line = {
+      item_id: i.id, sku: i.sku, serial: i.serial, qty: 1, price,
+      title: [i.brand, i.model, i.reference].filter(Boolean).join(" "),
+      details: [i.condition, i.papers_date ? `Papers ${String(i.papers_date).slice(0, 7)}` : null, i.comes_with].filter(Boolean).join(" · ") || null,
+    };
+  }
+  const invoice = await sourcingToInvoice(d, line, user);
+  redirect(`/admin/documentos/${invoice.id}`);
 }
 
 export async function voidDocument(id: string) {

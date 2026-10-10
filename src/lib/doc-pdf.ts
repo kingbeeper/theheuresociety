@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { PDFDocument, degrees, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import fontkit from "@pdf-lib/fontkit";
-import { PRINT, docTotals, maskedId, usd, type Doc, type DocSettings } from "./doc-labels";
+import { PRINT, balanceDue, docTotals, maskedId, usd, type Doc, type DocSettings } from "./doc-labels";
 import { downloadPrivate } from "./private-files";
 
 // PDF de cotizaciones, memos, facturas y consignaciones, con el mismo diseño que la página del
@@ -38,6 +38,8 @@ export async function renderDocPdf(d: Doc, s: Required<DocSettings>) {
   const t = PRINT[d.lang];
   const consign = d.kind === "consignment";
   const purchase = d.kind === "purchase";
+  const sourcing = d.kind === "sourcing";
+  const deposit = Number(d.deposit ?? 0);
   const sellerId = purchase ? maskedId(d) : null;
   const totals = docTotals(d);
   pdf.setTitle(`${t[d.kind]} ${d.number} · ${s.doc_company}`);
@@ -95,7 +97,7 @@ export async function renderDocPdf(d: Doc, s: Required<DocSettings>) {
   contact.forEach((l, i) => text(l, cx, y - 28 - i * 11, { font: light, size: 8, color: GRAY }));
 
   const title = t[d.kind];
-  text(title, W - M, y - 20, { font: display, size: consign ? 21 : 26, align: "right", track: 0.6 });
+  text(title, W - M, y - 20, { font: display, size: consign || sourcing ? 21 : 26, align: "right", track: 0.6 });
   const date = (iso: string | null) =>
     iso ? new Intl.DateTimeFormat(d.lang === "es" ? "es-ES" : "en-US", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${iso}T12:00:00Z`)) : "-";
   const meta: [string, string][] = [[t.number, d.number], [t.date, date(d.issue_date)], ...(d.due_date && t.due[d.kind] ? [[t.due[d.kind], date(d.due_date)] as [string, string]] : [])];
@@ -131,7 +133,7 @@ export async function renderDocPdf(d: Doc, s: Required<DocSettings>) {
   const descW = colQty - M - 30;
   y -= 26;
   rule(y + 12);
-  label(t.item, M, y);
+  label(sourcing ? t.sought : t.item, M, y);
   label(t.qty, colQty, y, { align: "center" });
   label(t.price, colPrice, y, { align: "right" });
   label(consign ? t.net : t.amount, right, y, { align: "right" });
@@ -172,8 +174,17 @@ export async function renderDocPdf(d: Doc, s: Required<DocSettings>) {
   }
   rule(y + 6, tx, right, INK, 0.9);
   y -= 12;
-  text(consign ? t.netTotal : purchase ? t.paidTotal : t.total, tx, y, { font: display, size: 14 });
+  text(consign ? t.netTotal : purchase ? t.paidTotal : sourcing ? t.upTo : t.total, tx, y, { font: display, size: 14 });
   text(usd(totals.total), right, y, { font: display, size: 14, align: "right" });
+  // Anticipo del encargo, o el anticipo descontado en la factura y el saldo
+  const after: [string, string, boolean][] = [];
+  if (sourcing && deposit > 0) after.push([d.refunded_at && d.deposit_paid_at ? t.depositRefunded : d.deposit_paid_at ? t.depositPaid : t.depositDue, usd(deposit), false]);
+  if (d.kind === "invoice" && deposit > 0) after.push([t.lessDeposit, `-${usd(deposit)}`, false], [t.balance, usd(balanceDue(d)), true]);
+  for (const [k, v, big] of after) {
+    y -= big ? 20 : 16;
+    text(k, tx, y, big ? { font: display, size: 13 } : { font: light, size: 9, color: GRAY });
+    text(v, right, y, big ? { font: display, size: 13, align: "right" } : { size: 9, align: "right" });
+  }
 
   // ── notas, pago, términos ──
   y -= 26;
@@ -222,8 +233,8 @@ export async function renderDocPdf(d: Doc, s: Required<DocSettings>) {
     sign(M + half + 30, y, t.date);
     if (sigImage) text(signedOn, M + half + 34, y + 4, { size: 8.5 });
   }
-  if (consign || purchase) {
-    const who = purchase ? t.purchaseSign : t.consignSign;
+  if (consign || purchase || sourcing) {
+    const who = purchase ? t.purchaseSign : sourcing ? t.sourcingSign : t.consignSign;
     ensure(110);
     y -= 50;
     sign(M, y, who[0], true);

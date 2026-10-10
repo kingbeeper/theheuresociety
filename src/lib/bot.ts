@@ -109,6 +109,9 @@ export async function handleMessage(msg: TgMessage) {
   if (flow && msg.contact) return onContact(chatId, msg.contact, flow);
   if (!text) return;
   if (flow) return onText(chatId, text, flow);
+  // Encargo con anticipo a medias
+  const { onSourcingText } = await import("./bot-sourcing");
+  if (await onSourcingText(chatId, text)) return;
   // Respuesta a «¿cuánto te costó?»
   if (await onCostText(chatId, text, await userLabel(msg.from))) return;
 
@@ -404,10 +407,19 @@ export async function publish(draft: Draft) {
 export async function notifyAlertMatches(chatId: number, w: WatchDraft, slug: string) {
   const matches = await matchAlerts({ brand: w.brand, model: w.model, reference: w.reference });
   if (!matches.length) return;
+  // Clientes con un encargo abierto: tienen prioridad (dejaron anticipo)
+  const ids = matches.map((a) => a.customer?.id).filter(Boolean) as string[];
+  const { data: orders } = await adminDb().from("documents").select("id, number, customer_id, total, deposit, deposit_paid_at").eq("kind", "sourcing").eq("status", "sent").in("customer_id", ids);
   const lines = matches.map((a) => {
     const c = a.customer;
     const wa = c?.wa_id ?? c?.phone?.replace(/\D/g, "");
-    return [`• <b>${h(c?.name ?? "Cliente")}</b>${c?.phone ? ` · ${c.phone}` : ""}`, `  Busca: «${h(a.query)}»`, wa ? `  https://wa.me/${wa}` : ""]
+    const order = (orders ?? []).find((o) => o.customer_id === c?.id);
+    return [
+      `• <b>${h(c?.name ?? "Cliente")}</b>${c?.phone ? ` · ${c.phone}` : ""}`,
+      `  Busca: «${h(a.query)}»`,
+      order ? `  🔎 <b>Encargo ${h(order.number)}</b> · hasta $${Number(order.total).toLocaleString("en-US")}${order.deposit_paid_at ? ` · anticipo de $${Number(order.deposit).toLocaleString("en-US")} pagado` : ""}\n  ${SITE_URL}/admin/documentos/${order.id}` : "",
+      wa ? `  https://wa.me/${wa}` : "",
+    ]
       .filter(Boolean)
       .join("\n");
   });
@@ -622,6 +634,12 @@ async function handleCommand(chatId: number, text: string, user: string) {
   if (FLOW_COMMANDS[command]) return startFlow(chatId, FLOW_COMMANDS[command], arg, user);
 
   switch (command) {
+    case "/encargo": {
+      const { startSourcing } = await import("./bot-sourcing");
+      return startSourcing(chatId, user);
+    }
+    case "/encargos":
+      return listOpenDocs(chatId, "sourcing");
     case "/documentos":
       return listOpenDocs(chatId);
     case "/tasar":
@@ -667,7 +685,9 @@ async function handleCommand(chatId: number, text: string, user: string) {
       if (draft) await updateDraft(draft.id, { status: "cancelled", awaiting: null });
       if (flow) await clearFlow(chatId);
       await clearAppraise(chatId);
-      return sendMessage(chatId, draft || flow ? "Cancelado." : "No hay nada en curso.");
+      const { clearSourcing } = await import("./bot-sourcing");
+      await clearSourcing(chatId);
+      return sendMessage(chatId, draft || flow ? "Cancelado." : "Listo: no queda nada en curso.");
     }
 
     case "/lista": {
