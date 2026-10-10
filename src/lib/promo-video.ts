@@ -6,16 +6,15 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
-import sharp from "sharp";
 import { adminDb, PHOTO_BUCKET } from "./supabase";
 import { promoOverlay } from "./promo-overlay";
 import { escapeHtml as h, keyboard, sendMessage, sendVideoFile } from "./telegram";
 
-// Video promocional vertical (~13 s) para Reels, Stories y anuncios, al estilo de un spot de lujo:
+// Video promocional vertical (~11 s) para Reels, Stories y anuncios, al estilo de un spot de lujo:
 // 1. Higgsfield Marketing Studio crea dos fotogramas con el reloj: un macro del bisel/corona en estudio
-//    y un plano «al volante por Miami Beach al atardecer» (≈ $0,01)
+//    y el reloj sobre superficie negra bajo focos (≈ $0,01)
 // 2. Kling 2.5 Turbo anima cada uno 5 s (≈ $0,21 cada uno; sin sonido: la música se pone en Instagram)
-// 3. ffmpeg une las tomas y cierra con el recorte real del reloj y el texto de la marca (gratis)
+// 3. ffmpeg los une y, con los focos ya encendidos, hace aparecer el texto de la marca (gratis)
 // 4. llega por Telegram. Total ≈ $0,45 por video.
 // Se activa con HF_API_KEY_ID y HF_API_KEY_SECRET (API de Higgsfield).
 
@@ -26,7 +25,7 @@ const VIDEO_MODEL = "kling-video/v2.5-turbo/standard/image-to-video";
 const W = 720;
 const H = 1280;
 const CLIP = 5; // segundos por toma
-const END = 4; // segundos del cierre con el texto
+const HOLD = 1.5; // la última imagen se queda quieta para leer el texto
 
 export const promoConfigured = () => Boolean(process.env.HF_API_KEY_ID && process.env.HF_API_KEY_SECRET);
 const auth = () => ({
@@ -67,15 +66,14 @@ const WATCH_COLS = "id, slug, brand, model, reference, price, currency, images, 
 // El reloj de la foto tiene que salir idéntico (esfera, logotipo, agujas, brazalete)
 const SAME =
   "Use the exact watch from the reference image, identical in every detail: dial color and texture, logo and dial text, hands, indices, bezel, case and strap or bracelet. Photorealistic, high-end luxury watch commercial, cinematic color grading.";
-const scenes = (w: Watch) => [
+export const scenes = (w: Watch) => [
   {
     image: `Extreme macro close-up of the ${w.brand} ${w.model}: the bezel, crown and edge of the case fill the frame, dramatic studio lighting with glints on polished steel, deep black background, very shallow depth of field. ${SAME}`,
     motion: "Very slow macro camera glide along the bezel and crown, a soft light sweep travels across the polished metal. Smooth, elegant, no cuts. The watch keeps its exact shape and dial text.",
   },
   {
-    image: `First-person view from the driver's seat of a luxury convertible sports car cruising along Ocean Drive in Miami Beach at golden hour: a man's tanned left wrist wearing the ${w.brand} ${w.model} rests on the steering wheel, pastel Art Deco hotels, palm trees and the turquoise ocean softly out of focus behind, warm sunset light catching the watch. No visible car brand logos. ${SAME}`,
-    motion:
-      "The car cruises slowly along the beach road while the camera gently pushes in towards the watch on the wrist; palm trees and the ocean drift by in the soft-focus background, warm golden sunlight flickers on the dial. The watch keeps its exact shape and dial text.",
+    image: `Hero product shot of the ${w.brand} ${w.model} standing upright on a glossy black reflective surface in a dark luxury studio, warm theatrical spotlights from above create pools of golden light on the watch and a soft mirror reflection below. The watch sits in the upper-middle of the frame; the lower third is empty dark space. ${SAME}`,
+    motion: "In darkness, spotlights switch on one after another and illuminate the watch, light glints travel across the polished case and crystal, very slow push-in, camera steady. The watch keeps its exact shape and dial text.",
   },
 ];
 
@@ -266,66 +264,7 @@ async function ffmpegPath() {
   return (await import("ffmpeg-static")).default as unknown as string;
 }
 
-// Cierre: el recorte real del reloj con su reflejo sobre fondo oscuro cálido y el texto de la marca
-export async function endCard(w: Watch) {
-  const S = 2; // se dibuja al doble para que el zoom lento salga nítido
-  const bg = Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${W * S}" height="${H * S}"><defs>
-    <radialGradient id="g" cx="0.5" cy="0.36" r="0.75"><stop offset="0" stop-color="#3a2f22"/><stop offset="0.55" stop-color="#16120d"/><stop offset="1" stop-color="#070605"/></radialGradient>
-  </defs><rect width="100%" height="100%" fill="url(#g)"/></svg>`);
-  const layers: { input: Buffer; left: number; top: number }[] = [];
-  const cut = absolute(w.cutout);
-  if (cut) {
-    const png = await sharp(Buffer.from(await (await fetch(cut)).arrayBuffer()))
-      .trim()
-      .resize(Math.round(W * S * 0.62), Math.round(H * S * 0.4), {
-        fit: "inside",
-      })
-      .png()
-      .toBuffer();
-    const m = await sharp(png).metadata();
-    const left = Math.round((W * S - m.width!) / 2);
-    const top = Math.round(H * S * 0.37 - m.height! / 2);
-    // Reflejo: volteado, atenuado de arriba abajo
-    const fade = Buffer.from(
-      `<svg xmlns="http://www.w3.org/2000/svg" width="${m.width}" height="${m.height}"><defs><linearGradient id="f" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity="0.28"/><stop offset="0.45" stop-color="#fff" stop-opacity="0"/></linearGradient></defs><rect width="100%" height="100%" fill="url(#f)"/></svg>`,
-    );
-    const reflection = await sharp(png)
-      .flip()
-      .composite([{ input: fade, blend: "dest-in" }])
-      .png()
-      .toBuffer();
-    layers.push({ input: reflection, left, top: top + m.height! + 6 }, { input: png, left, top });
-  } else {
-    const src = w.images.map(absolute).find(Boolean)!;
-    const photo = await sharp(Buffer.from(await (await fetch(src)).arrayBuffer()))
-      .resize(Math.round(W * S * 0.8), Math.round(H * S * 0.5), {
-        fit: "inside",
-      })
-      .toBuffer();
-    const m = await sharp(photo).metadata();
-    layers.push({
-      input: photo,
-      left: Math.round((W * S - m.width!) / 2),
-      top: Math.round(H * S * 0.37 - m.height! / 2),
-    });
-  }
-  const text = await sharp(
-    await promoOverlay({
-      brand: w.brand,
-      model: w.model,
-      reference: w.reference,
-      price: priceText(w),
-      cta: "Available now · Disponible",
-      handle: "@theheuresociety · (305) 509-5767",
-    }),
-  )
-    .resize(W * S, H * S)
-    .toBuffer();
-  layers.push({ input: text, left: 0, top: 0 });
-  return sharp(bg).composite(layers).jpeg({ quality: 92 }).toBuffer();
-}
-
-// Monta las tomas y el cierre en `dir`; devuelve el MP4 y su duración
+// Monta las tomas en `dir`: fundido entre ellas, la última se congela un momento y encima aparece el texto de la marca
 export async function renderPromo(w: Watch, clips: string[], dir: string) {
   const files = await Promise.all(
     clips.map(async (u, i) => {
@@ -334,33 +273,31 @@ export async function renderPromo(w: Watch, clips: string[], dir: string) {
       return f;
     }),
   );
-  const card = join(dir, "end.jpg");
+  const png = join(dir, "text.png");
   const out = join(dir, "final.mp4");
-  await writeFile(card, await endCard(w));
+  await writeFile(png, await promoOverlay({ brand: w.brand, model: w.model, reference: w.reference, price: priceText(w), cta: "Available now · Disponible", handle: "@theheuresociety · (305) 509-5767" }));
 
-  // Tomas a 720×1280 encadenadas con fundidos; el cierre con un zoom muy lento
-  const X = 0.5;
-  const inputs = files.flatMap((f) => ["-i", f]);
-  const norm = files.map((_, i) => `[${i}:v]scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},fps=24,setsar=1,format=yuv420p,trim=0:${CLIP},setpts=PTS-STARTPTS[v${i}]`);
+  const X = 0.5; // fundido entre tomas
   const n = files.length;
-  const endIn = `[${n}:v]zoompan=z='1+0.05*on/${END * 24}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${END * 24}:s=${W}x${H}:fps=24,setsar=1,format=yuv420p[e]`;
+  const norm = files.map((_, i) => `[${i}:v]scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},fps=24,setsar=1,format=yuv420p,trim=0:${CLIP},setpts=PTS-STARTPTS[v${i}]`);
   const chain: string[] = [];
   let last = "v0";
   let length = CLIP;
-  for (let i = 1; i <= n; i++) {
-    const next = i < n ? `v${i}` : "e";
-    const label = i < n ? `x${i}` : "out";
-    chain.push(`[${last}][${next}]xfade=transition=fade:duration=${X}:offset=${(length - X).toFixed(2)}[${label}]`);
-    length += (i < n ? CLIP : END) - X;
-    last = label;
+  for (let i = 1; i < n; i++) {
+    chain.push(`[${last}][v${i}]xfade=transition=fade:duration=${X}:offset=${(length - X).toFixed(2)}[x${i}]`);
+    length += CLIP - X;
+    last = `x${i}`;
   }
+  // El texto entra a mitad de la última toma (los focos ya encendidos) y se queda en pantalla
+  const textAt = Math.max(0, length - CLIP + 1.5);
+  chain.push(`[${last}]tpad=stop_mode=clone:stop_duration=${HOLD}[p]`, `[${n}:v]format=rgba,fade=in:st=${textAt.toFixed(2)}:d=0.8:alpha=1[t]`, `[p][t]overlay=0:0:shortest=1,format=yuv420p[out]`);
+  length += HOLD;
   const ffmpeg = await ffmpegPath();
   await run(
     ffmpeg,
-    ["-y", ...inputs, "-i", card, "-filter_complex", [...norm, endIn, ...chain].join(";"), "-map", "[out]", "-an", "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-movflags", "+faststart", out],
+    ["-y", ...files.flatMap((f) => ["-i", f]), "-loop", "1", "-framerate", "24", "-i", png, "-filter_complex", [...norm, ...chain].join(";"), "-map", "[out]", "-an", "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-movflags", "+faststart", out],
     { timeout: 180_000 },
   );
-
   return { final: await readFile(out), length };
 }
 
