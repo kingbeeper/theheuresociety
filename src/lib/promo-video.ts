@@ -145,22 +145,8 @@ export const OPENINGS: Record<string, Option> = {
       motion: `Very slow camera orbit around the caseback, light glints across the engravings and screws. Smooth and elegant. ${STILL}`,
     }),
   },
-  muneca: {
-    label: "🤵 Se lo pone en la muñeca",
-    weight: 1,
-    shot: (w) => ({
-      image: `Close-up of a man's hands fastening the clasp of the ${w.brand} ${w.model} on his wrist, crisp white shirt cuff, warm moody interior light, shallow depth of field, the watch dial clearly visible. ${SAME}`,
-      motion: `The man slowly closes the clasp and settles the watch on his wrist, then turns the wrist slightly towards the camera. Gentle push-in. ${STILL}`,
-    }),
-  },
-  estuche: {
-    label: "📦 Se abre el estuche",
-    weight: 1,
-    shot: (w) => ({
-      image: `A luxury dark wooden watch box with green velvet interior, open, with the ${w.brand} ${w.model} resting on the cushion inside, warm light spilling onto the watch, dark background. ${SAME}`,
-      motion: `The lid of the box slowly finishes opening and warm light spills onto the watch inside, gentle push-in towards the dial. ${STILL}`,
-    }),
-  },
+
+
 };
 
 // Segunda toma (5 s): la escena de cierre, sobre la que aparece el texto de la marca
