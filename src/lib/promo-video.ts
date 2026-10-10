@@ -152,7 +152,7 @@ export async function startPromoVideo(watchId: string, chatId: number | null) {
   } catch (e) {
     await db
       .from("promo_videos")
-      .update({ status: "failed", error: (e as Error).message.slice(0, 500) })
+      .update({ status: "failed", error: (e as Error).message.slice(0, 1000) })
       .eq("id", row.id);
     throw e;
   }
@@ -297,11 +297,11 @@ export async function renderPromo(w: Watch, clips: string[], dir: string) {
   const ffmpeg = await ffmpegPath();
   await run(
     ffmpeg,
-    ["-y", "-loglevel", "error", ...files.flatMap((f) => ["-i", f]), "-loop", "1", "-framerate", "24", "-i", png, "-filter_complex", [...norm, ...chain].join(";"), "-map", "[out]", "-an", "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-movflags", "+faststart", out],
+    ["-y", "-loglevel", "warning", ...files.flatMap((f) => ["-i", f]), "-loop", "1", "-framerate", "24", "-i", png, "-filter_complex", [...norm, ...chain].join(";"), "-map", "[out]", "-an", "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-movflags", "+faststart", out],
     { timeout: 180_000 },
   ).catch((e: { stderr?: string; signal?: string; message: string }) => {
     // El mensaje de execFile repite el comando entero: lo útil es lo que dice ffmpeg al final
-    throw new Error(`ffmpeg: ${e.signal ? `detenido (${e.signal}) ` : ""}${(e.stderr || e.message).trim().slice(-400)}`);
+    throw new Error(`ffmpeg: ${e.signal ? `detenido (${e.signal}) ` : ""}${(e.stderr || e.message).trim().slice(0, 900)}`);
   });
   return { final: await readFile(out), length };
 }
@@ -346,7 +346,7 @@ async function finishPromoVideo(row: Row, clips: string[]) {
   } catch (e) {
     await db
       .from("promo_videos")
-      .update({ status: "failed", error: (e as Error).message.slice(0, 500) })
+      .update({ status: "failed", error: (e as Error).message.slice(0, 1000) })
       .eq("id", row.id);
     if (row.chat_id) await sendMessage(row.chat_id, `⚠️ Las tomas se generaron pero falló el montaje: ${h((e as Error).message.slice(0, 200))}\n${clips.join("\n")}`);
   } finally {
