@@ -246,6 +246,8 @@ export async function pollPromoVideo(id: string, budgetMs: number, hop = 0) {
         .from("promo_videos")
         .update({ raw_url: clips.join(" ") })
         .eq("id", id);
+      // El montaje necesita su propia invocación con tiempo de sobra
+      if (deadline - Date.now() < 150_000) return handOff(id, hop + 1);
       return finishPromoVideo(row, clips);
     } else {
       await saveState(id, st);
@@ -295,9 +297,12 @@ export async function renderPromo(w: Watch, clips: string[], dir: string) {
   const ffmpeg = await ffmpegPath();
   await run(
     ffmpeg,
-    ["-y", ...files.flatMap((f) => ["-i", f]), "-loop", "1", "-framerate", "24", "-i", png, "-filter_complex", [...norm, ...chain].join(";"), "-map", "[out]", "-an", "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-movflags", "+faststart", out],
+    ["-y", "-loglevel", "error", ...files.flatMap((f) => ["-i", f]), "-loop", "1", "-framerate", "24", "-i", png, "-filter_complex", [...norm, ...chain].join(";"), "-map", "[out]", "-an", "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-movflags", "+faststart", out],
     { timeout: 180_000 },
-  );
+  ).catch((e: { stderr?: string; signal?: string; message: string }) => {
+    // El mensaje de execFile repite el comando entero: lo útil es lo que dice ffmpeg al final
+    throw new Error(`ffmpeg: ${e.signal ? `detenido (${e.signal}) ` : ""}${(e.stderr || e.message).trim().slice(-400)}`);
+  });
   return { final: await readFile(out), length };
 }
 
