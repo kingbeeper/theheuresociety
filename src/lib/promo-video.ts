@@ -145,8 +145,6 @@ export const OPENINGS: Record<string, Option> = {
       motion: `Very slow camera orbit around the caseback, light glints across the engravings and screws. Smooth and elegant. ${STILL}`,
     }),
   },
-
-
 };
 
 // Segunda toma (5 s): la escena de cierre, sobre la que aparece el texto de la marca
