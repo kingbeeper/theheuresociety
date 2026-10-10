@@ -281,7 +281,7 @@ export async function renderPromo(w: Watch, clips: string[], dir: string) {
 
   const X = 0.5; // fundido entre tomas
   const n = files.length;
-  const norm = files.map((_, i) => `[${i}:v]scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},fps=24,setsar=1,format=yuv420p,trim=0:${CLIP},setpts=PTS-STARTPTS[v${i}]`);
+  const norm = files.map((_, i) => `[${i}:v]scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},trim=0:${CLIP},setpts=PTS-STARTPTS,fps=24,settb=1/24,setsar=1,format=yuv420p[v${i}]`);
   const chain: string[] = [];
   let last = "v0";
   let length = CLIP;
