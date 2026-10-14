@@ -77,7 +77,8 @@ export function WhatsAppConnect({ appId, configId, onboardKey }: { appId: string
         session.current.code = code;
         void trySend();
       },
-      { config_id: configId, response_type: "code", override_default_response_type: true, extras: { setup: {} } }
+      // Coexistencia: el número sigue funcionando en la app WhatsApp Business del teléfono
+      { config_id: configId, response_type: "code", override_default_response_type: true, extras: { setup: {}, featureType: "whatsapp_business_app_onboarding", sessionInfoVersion: "3" } }
     );
   }
 

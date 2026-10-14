@@ -10,16 +10,14 @@ const BASE = (process.env.WHATSAPP_API_BASE ?? "https://graph.facebook.com/v26.0
 const IS_360 = BASE.includes("360dialog");
 export const GRAPH = "https://graph.facebook.com/v26.0";
 
-// Credenciales: de las variables de entorno o, si no están, de la conexión hecha desde la
-// página /admin/whatsapp (tabla wa_settings). Se guardan en memoria unos minutos.
+// Credenciales: de la conexión hecha desde la página /admin/whatsapp (tabla wa_settings) o, si
+// aún no se ha hecho, de las variables de entorno (número de prueba). Se guardan en memoria unos minutos.
 type Config = { token: string; phoneId: string | null };
 let cached: { config: Config | null; at: number } | null = null;
 
 export async function waConfig(): Promise<Config | null> {
   const envToken = process.env.WHATSAPP_TOKEN;
-  if (envToken && (IS_360 || process.env.WHATSAPP_PHONE_NUMBER_ID)) {
-    return { token: envToken, phoneId: process.env.WHATSAPP_PHONE_NUMBER_ID ?? null };
-  }
+  if (envToken && IS_360) return { token: envToken, phoneId: null };
   if (cached && Date.now() - cached.at < 5 * 60_000) return cached.config;
   let config: Config | null = null;
   try {
@@ -30,6 +28,8 @@ export async function waConfig(): Promise<Config | null> {
   } catch {
     config = null;
   }
+  // Sin conexión guardada: el número de prueba de las variables de entorno
+  if (!config && envToken && process.env.WHATSAPP_PHONE_NUMBER_ID) config = { token: envToken, phoneId: process.env.WHATSAPP_PHONE_NUMBER_ID };
   cached = { config, at: Date.now() };
   return config;
 }
