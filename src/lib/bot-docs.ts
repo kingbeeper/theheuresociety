@@ -22,7 +22,7 @@ import type { WatchDraft } from "./watch-ai";
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://theheuresociety.vercel.app";
 
 type FlowKind = DocKind | "purchase";
-type Step = "watch" | "photos" | "client" | "sellerid" | "price" | "asking" | "confirm";
+type Step = "watch" | "photos" | "serial" | "client" | "sellerid" | "price" | "asking" | "confirm";
 type StockPick = { id: string; sku: string; title: string; details: string; serial: string | null; price: number | null; cost: number | null; ownerId: string | null; ownerName: string | null };
 
 export type DocFlow = {
@@ -32,6 +32,7 @@ export type DocFlow = {
   item?: StockPick; // reloj del inventario
   draftId?: string; // reloj nuevo (fotos → ficha de la IA)
   watch?: { title: string; details: string; suggested: number | null };
+  serial?: string | null; // número de serie del reloj nuevo (historial)
   customerId?: string | null;
   client?: { name: string | null; phone: string | null; email: string | null };
   sellerId?: { type: string | null; number: string } | null; // compra: identificación del vendedor
@@ -104,6 +105,15 @@ export async function onText(chatId: number, text: string, flow: DocFlow) {
       if (!flow.draftId) return sendMessage(chatId, "Envíame primero las fotos del reloj.");
       await adminDb().from("bot_drafts").update({ caption: text, updated_at: new Date().toISOString() }).eq("id", flow.draftId);
       return analyze(chatId, flow.draftId);
+    }
+    case "serial": {
+      flow.serial = text.trim().slice(0, 80);
+      const { serialHistory, serialSummary } = await import("./serials");
+      const rows = await serialHistory(flow.serial);
+      if (rows.length) await sendMessage(chatId, serialSummary(rows, flow.serial));
+      flow.step = "client";
+      await saveFlow(chatId, flow);
+      return askClient(chatId, rows.length ? "Si todo está bien, seguimos:" : `✅ Serial <code>${h(flow.serial)}</code>: no había pasado antes por el sistema.`, flow);
     }
     case "client":
       return pickClient(chatId, parseClient(text), flow);
@@ -221,9 +231,11 @@ export async function afterAnalysis(chatId: number, draftId: string) {
   flow.watch = watchSummary(w);
   const warn = w.warnings.length ? `\n⚠️ ${w.warnings.map(h).join("\n⚠️ ")}` : "";
   const head = `⌚ <b>${h(w.brand)} ${h(w.model)}</b> · Ref. ${h(w.reference)}${w.year ? ` · ${w.year}` : ""}\n${h(flow.watch.details)}${warn}`;
-  flow.step = "client";
+  flow.step = "serial";
   await saveFlow(chatId, flow);
-  await askClient(chatId, head, flow);
+  await sendMessage(chatId, `${head}\n\n🔢 ¿<b>Número de serie</b>? Sale en el documento, queda en el historial y te aviso si el reloj ya pasó antes por el sistema.`, {
+    reply_markup: keyboard([[{ text: "Omitir", callback_data: "dser:skip" }]]),
+  });
   return true;
 }
 
@@ -404,7 +416,7 @@ export async function finish(chatId: number, flow: DocFlow) {
       published = `${SITE_URL}/es/watches/${slug}`;
       const { data: stock } = await db.from("inventory_items").select("id").eq("watch_id", id).single();
       itemId = stock!.id;
-      await db.from("inventory_items").update({ acquisition, purchase_date: today, ...supplier }).eq("id", itemId);
+      await db.from("inventory_items").update({ acquisition, purchase_date: today, ...supplier, ...(flow.serial && { serial: flow.serial }) }).eq("id", itemId);
       after(() => cutoutJob(chatId, id));
       after(() => notifyAlertMatches(chatId, draft.data, slug).catch((e) => console.error("Avisos:", e)));
     } else {
@@ -413,6 +425,7 @@ export async function finish(chatId: number, flow: DocFlow) {
           acquisition, brand: w.brand, model: w.model, reference: w.reference, condition: "Pre-Owned", purchase_date: today,
           comes_with: [w.hasBox && "Box", w.hasPapers && "Papers"].filter(Boolean).join(", ") || null,
           asking_price: flow.kind === "invoice" || flow.kind === "quote" || flow.kind === "memo" ? price : flow.asking ?? null,
+          serial: flow.serial ?? null,
           ...supplier,
         },
         flow.user,
@@ -422,7 +435,7 @@ export async function finish(chatId: number, flow: DocFlow) {
       await updateDraft(flow.draftId, { status: "cancelled", awaiting: null }); // las fotos quedan guardadas
     }
     const { data: row } = await db.from("inventory_items").select("sku").eq("id", itemId).single();
-    item = { id: itemId, sku: row!.sku, title: flow.watch!.title, details: flow.watch!.details, serial: null, price: null, cost: null, ownerId: null, ownerName: null };
+    item = { id: itemId, sku: row!.sku, title: flow.watch!.title, details: flow.watch!.details, serial: flow.serial ?? null, price: null, cost: null, ownerId: null, ownerName: null };
   }
   if (!item) return sendMessage(chatId, "Falta el reloj. Empieza de nuevo con el comando.");
 
@@ -499,6 +512,13 @@ export async function deliver(chatId: number, d: Doc) {
 export async function onCallback(chatId: number, cbId: string, messageId: number, action: string, arg: string, user: string) {
   const answer = (text?: string) => tg("answerCallbackQuery", { callback_query_id: cbId, ...(text && { text }) }).catch(() => {});
   const clearButtons = () => tg("editMessageReplyMarkup", { chat_id: chatId, message_id: messageId, reply_markup: keyboard([]) }).catch(() => {});
+
+  // «Omitir» el número de serie tras publicar un reloj
+  if (action === "dsno") {
+    await answer();
+    await clearButtons();
+    return (await import("./bot-serial")).onSerialSkip(chatId);
+  }
 
   // Encargos con anticipo: su propio asistente y sus botones
   if (SOURCING_ACTIONS.has(action)) return onSourcingCallback(chatId, cbId, messageId, action, arg, user);
@@ -644,6 +664,12 @@ export async function onCallback(chatId: number, cbId: string, messageId: number
     case "dsel":
       await clearButtons();
       return setItem(chatId, arg, flow);
+    case "dser":
+      await clearButtons();
+      flow.serial = null;
+      flow.step = "client";
+      await saveFlow(chatId, flow);
+      return askClient(chatId, "Sin serial.", flow);
     case "dcli":
       await clearButtons();
       if (arg === "skip") {

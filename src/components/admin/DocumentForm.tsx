@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 import { convertSourcing, markDepositReceived, markPaid, saveDocument } from "@/app/admin/document-actions";
 import { ID_TYPES, KIND_LABEL, depositPct, docTotals, suggestedDeposit, usd, type Doc, type DocKind, type DocLine } from "@/lib/doc-labels";
 import { PAYMENT } from "@/lib/stock-labels";
+import { SerialWarning } from "./SerialCheck";
 
 const field =
   "w-full border border-line bg-ink/60 px-3 py-2.5 text-sm text-ivory placeholder:text-stone/50 outline-none transition-colors focus:border-brass/70";
@@ -149,6 +150,7 @@ export function DocumentForm({
             <input value={l.qty} onChange={(e) => update(i, { qty: Number(e.target.value) || 1 })} inputMode="numeric" aria-label="Cantidad" className={small} />
             <input value={l.price} onChange={(e) => update(i, { price: Number(e.target.value.replace(/[^\d.]/g, "")) || 0 })} inputMode="decimal" aria-label="Precio" className={small} />
             <button type="button" onClick={() => setLines(lines.filter((_, j) => j !== i))} className="px-2 py-2 text-xs text-stone hover:text-red-200" aria-label="Quitar">✕</button>
+            <div className="sm:col-span-6"><SerialWarning value={l.serial} itemId={l.item_id} docId={doc?.id} /></div>
           </div>
         ))}
         <div className={`flex flex-wrap gap-2 ${sourcing ? "hidden" : ""}`}>
@@ -265,16 +267,25 @@ export function DepositForm({ id, today }: { id: string; today: string }) {
 export function SourcedForm({ id, stock, price }: { id: string; stock: StockOption[]; price: number }) {
   const [state, action, pending] = useActionState(convertSourcing.bind(null, id), null);
   const [final, setFinal] = useState(String(price || ""));
+  const [picked, setPicked] = useState("");
+  const [serial, setSerial] = useState("");
   return (
     <form action={action} className="grid gap-3 sm:grid-cols-[1fr_160px_auto] sm:items-end">
       <label>
         <span className={label}>Reloj conseguido</span>
-        <select name="item_id" defaultValue="" onChange={(e) => { const s = stock.find((x) => x.id === e.target.value); if (s?.price) setFinal(String(s.price)); }} className={field}>
+        <select name="item_id" value={picked} onChange={(e) => { setPicked(e.target.value); const s = stock.find((x) => x.id === e.target.value); if (s?.price) setFinal(String(s.price)); }} className={field}>
           <option value="">— El descrito en el encargo (aún no está en el inventario) —</option>
           {stock.map((s) => <option key={s.id} value={s.id}>{s.sku} · {s.title}{s.price ? ` · ${usd(s.price)}` : ""}</option>)}
         </select>
       </label>
       <label><span className={label}>Precio final $</span><input name="price" value={final} onChange={(e) => setFinal(e.target.value)} inputMode="decimal" className={field} /></label>
+      {!picked && (
+        <div className="sm:col-span-3">
+          <label htmlFor="sourced_serial" className={label}>Serial del reloj conseguido</label>
+          <input id="sourced_serial" name="serial" value={serial} onChange={(e) => setSerial(e.target.value)} autoComplete="off" className={field} />
+          <SerialWarning value={serial} />
+        </div>
+      )}
       <button disabled={pending} className="bg-ivory px-5 py-2.5 text-[0.68rem] tracking-[0.22em] uppercase text-ink hover:bg-brass disabled:opacity-60">
         {pending ? "Creando…" : "Conseguido: facturar"}
       </button>

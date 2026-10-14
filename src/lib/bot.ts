@@ -11,7 +11,7 @@ import { downloadFile, escapeHtml as h, keyboard, sendMessage, sendPhoto, tg } f
 import { toSlug } from "./watches";
 import { MENU, WELCOME, mainKeyboard } from "./bot-keyboard";
 import { isMenuAction, onMenuCallback, onMenuText } from "./bot-menu";
-import { FLOW_COMMANDS, afterAnalysis, onSellerIdPhoto, appraisePending, clearAppraise, onAppraisalPhoto, onAppraisalText, startAppraisal, askCost, costCommand, onCostText, attachDraft, clearFlow, getFlow, demandSummary, listFollowUps, listOpenDocs, onCallback, onContact, onText, resendDoc, startFlow } from "./bot-docs";
+import { FLOW_COMMANDS, afterAnalysis, onSellerIdPhoto, appraisePending, clearAppraise, onAppraisalPhoto, onAppraisalText, startAppraisal, costCommand, onCostText, attachDraft, clearFlow, getFlow, demandSummary, listFollowUps, listOpenDocs, onCallback, onContact, onText, resendDoc, startFlow } from "./bot-docs";
 
 // ───────────────────────── Tipos de Telegram (solo lo que usamos) ─────────────────────────
 type TgPhoto = { file_id: string; width: number; height: number };
@@ -112,6 +112,9 @@ export async function handleMessage(msg: TgMessage) {
   // Encargo con anticipo a medias
   const { onSourcingText } = await import("./bot-sourcing");
   if (await onSourcingText(chatId, text)) return;
+  // Respuesta a «¿número de serie?»
+  const { onSerialText } = await import("./bot-serial");
+  if (await onSerialText(chatId, text)) return;
   // Respuesta a «¿cuánto te costó?»
   if (await onCostText(chatId, text, await userLabel(msg.from))) return;
 
@@ -313,8 +316,9 @@ export async function handleCallback(cb: TgCallback) {
     // Compradores que esperaban una pieza así (búsquedas «avísenme» del CRM)
     after(() => notifyAlertMatches(chatId, draft.data!, slug).catch((e) => console.error("Avisos:", e)));
     // El costo (para el margen): se pregunta al momento; se puede dejar para más tarde
+    // Primero el número de serie (historial) y después el costo
     const { data: stock } = await adminDb().from("inventory_items").select("id").eq("watch_id", id).maybeSingle();
-    if (stock) await askCost(chatId, stock.id as string);
+    if (stock) await (await import("./bot-serial")).askSerial(chatId, stock.id as string, "cost");
     return;
   }
 
@@ -634,6 +638,8 @@ async function handleCommand(chatId: number, text: string, user: string) {
   if (FLOW_COMMANDS[command]) return startFlow(chatId, FLOW_COMMANDS[command], arg, user);
 
   switch (command) {
+    case "/serial":
+      return (await import("./bot-serial")).serialCommand(chatId, arg);
     case "/encargo": {
       const { startSourcing } = await import("./bot-sourcing");
       return startSourcing(chatId, user);

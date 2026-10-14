@@ -76,6 +76,7 @@ export default async function InventarioPage({ searchParams }: PageProps<"/admin
             {showCosts && <ImportInventory />}
             {/* Descarga de archivo: enlace normal, no navegación de Next */}
             {showCosts && <a href="/api/inventory/export" download className={ghostButtonClass}>Exportar a Excel</a>}
+            <Link href="/admin/inventario/serial" className={ghostButtonClass}>Buscar serial</Link>
             <Link href="/admin/inventario/conteo" className={ghostButtonClass}>Conteo</Link>
             <a href="/admin/etiquetas" target="_blank" rel="noreferrer" className={ghostButtonClass}>Etiquetas QR</a>
             <Link href="/admin/inventario/nuevo" className={buttonClass}>+ Añadir reloj</Link>

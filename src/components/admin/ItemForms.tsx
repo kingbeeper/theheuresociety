@@ -5,6 +5,7 @@ import { ACQUISITION, CONDITIONS, PAYMENT } from "@/lib/stock-labels";
 import { SOURCE_LABEL } from "@/lib/crm-labels";
 import { returnItem, saveItem, sellItem } from "@/app/admin/inventory-actions";
 import type { Item } from "@/lib/stock";
+import { SerialInput } from "./SerialCheck";
 
 const field =
   "w-full border border-line bg-ink/60 px-3 py-2.5 text-sm text-ivory placeholder:text-stone/50 outline-none transition-colors focus:border-brass/70";
@@ -29,7 +30,7 @@ export function ItemForm({ item, watches, showCosts = true }: { item?: Item; wat
           <label><span className={label}>Marca *</span><input name="brand" defaultValue={v("brand")} required className={field} /></label>
           <label><span className={label}>Modelo</span><input name="model" defaultValue={v("model")} className={field} /></label>
           <label><span className={label}>Ref #</span><input name="reference" defaultValue={v("reference")} className={field} /></label>
-          <label><span className={label}>Serial #</span><input name="serial" defaultValue={v("serial")} className={field} /></label>
+          <div><label htmlFor="serial" className={label}>Serial #</label><SerialInput id="serial" name="serial" defaultValue={v("serial")} itemId={item?.id} className={field} /></div>
           <label><span className={label}>Fecha de papeles</span><input name="papers_date" type="date" defaultValue={v("papers_date")} className={field} /></label>
           <label><span className={label}>Eslabones (Links #)</span><input name="links" defaultValue={v("links")} placeholder="Full links, +2…" className={field} /></label>
           <label>
@@ -139,7 +140,7 @@ export function SaleForm({ item, customers, today, sellers = [], me }: { item: I
           <label><span className={label}>Marca</span><input name="trade_brand" className={field} /></label>
           <label><span className={label}>Modelo</span><input name="trade_model" className={field} /></label>
           <label><span className={label}>Ref #</span><input name="trade_reference" className={field} /></label>
-          <label><span className={label}>Serial #</span><input name="trade_serial" className={field} /></label>
+          <div><label htmlFor="trade_serial" className={label}>Serial #</label><SerialInput id="trade_serial" name="trade_serial" className={field} /></div>
           <label><span className={label}>Valor reconocido (USD)</span><input name="trade_value" inputMode="decimal" className={field} /></label>
           <label><span className={label}>Incluye</span><input name="trade_comes_with" placeholder="Caja, papeles…" className={field} /></label>
         </div>

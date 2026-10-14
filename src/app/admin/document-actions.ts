@@ -181,7 +181,7 @@ export async function convertSourcing(id: string, _: unknown, f: FormData) {
   const price = num(f, "price");
   if (price <= 0) return { error: "Indica el precio final del reloj." };
   const itemId = text(f, "item_id");
-  let line: DocLine = { title: d.items[0]?.title ?? "Timepiece", details: d.items[0]?.details ?? null, qty: 1, price };
+  let line: DocLine = { title: d.items[0]?.title ?? "Timepiece", details: d.items[0]?.details ?? null, serial: text(f, "serial"), qty: 1, price };
   if (itemId) {
     const { data: i } = await adminDb().from("inventory_items").select("id, sku, brand, model, reference, serial, condition, comes_with, papers_date").eq("id", itemId).maybeSingle();
     if (!i) return { error: "Ese reloj ya no está en el inventario." };
