@@ -30,6 +30,29 @@ export async function ideaVideoAction(watchId: string, f: FormData) {
   refresh();
 }
 
+// Instagram: publicar una idea ya (lo que falte de procesar lo termina la pasada de cada 10 minutos)
+export async function publishNowAction(id: string) {
+  await requireAdmin("redes");
+  const { adminDb } = await import("@/lib/supabase");
+  const db = adminDb();
+  await db.from("content_ideas").update({ status: "approved", auto_publish: true, scheduled_for: new Date().toISOString(), publish_error: null }).eq("id", id);
+  const { data } = await db.from("content_ideas").select("*").eq("id", id).single();
+  const { advancePublish } = await import("@/lib/ig-publish");
+  try {
+    await advancePublish(data, 90_000);
+  } catch (e) {
+    await db.from("content_ideas").update({ publish_error: (e as Error).message.slice(0, 300) }).eq("id", id);
+  }
+  refresh();
+}
+
+export async function autoPublishAction(id: string, on: boolean) {
+  await requireAdmin("redes");
+  const { adminDb } = await import("@/lib/supabase");
+  await adminDb().from("content_ideas").update({ auto_publish: on, publish_error: null }).eq("id", id);
+  refresh();
+}
+
 export async function replyCommentAction(id: string, f: FormData) {
   await requireAdmin("redes");
   const text = String(f.get("reply") ?? "").trim();

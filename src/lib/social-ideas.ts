@@ -19,7 +19,12 @@ async function watchLabel(id: string | null) {
 
 export async function ideaMessage(i: Idea, mode: "proposal" | "reminder") {
   const watch = await watchLabel(i.watch_id);
-  const head = mode === "reminder" ? `📅 <b>Hoy toca publicar</b> · ${when(i.scheduled_for)}` : `💡 <b>Idea para publicar</b> · ${when(i.scheduled_for)}`;
+  // Recordatorio de una idea que se publica sola: se avisa en lugar de pedir que la suba
+  const { mediaFor } = await import("./ig-publish");
+  const auto = mode === "reminder" && i.auto_publish !== false && Boolean(await mediaFor(i));
+  const head = mode === "reminder"
+    ? auto ? `📤 <b>Hoy se publica sola en Instagram</b> · ${when(i.scheduled_for)}` : `📅 <b>Hoy toca publicar</b> · ${when(i.scheduled_for)}`
+    : `💡 <b>Idea para publicar</b> · ${when(i.scheduled_for)}`;
   const text = [
     head,
     `${FORMAT[i.format] ?? i.format} · <b>${h(i.title)}</b>${watch ? `\n⌚ ${h(watch)}` : ""}`,

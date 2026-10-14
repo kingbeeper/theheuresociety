@@ -8,7 +8,7 @@ import { competitorBoard, unansweredComments, type Idea } from "@/lib/social-gro
 import { TIME_ZONE } from "@/lib/booking";
 import { OPENINGS, SCENARIOS, promoConfigured } from "@/lib/promo-video";
 import { buttonClass, Card, fieldClass, ghostButtonClass, PageTitle } from "@/components/admin/ui";
-import { generateIdeasAction, ideaStatusAction, ideaVideoAction, ignoreCommentAction, replyCommentAction, saveEngagementSettings, suggestRepliesAction } from "../../../social-actions";
+import { autoPublishAction, generateIdeasAction, ideaStatusAction, ideaVideoAction, publishNowAction, ignoreCommentAction, replyCommentAction, saveEngagementSettings, suggestRepliesAction } from "../../../social-actions";
 
 export const metadata = { title: "Engagement" };
 
@@ -60,6 +60,46 @@ function IdeaPreview({ idea, watch, video, canVideo }: { idea: Idea; watch?: Pre
         )}
         {pending && <Link href="/admin/redes/engagement" className="mt-3 inline-block text-[0.62rem] tracking-[0.16em] uppercase text-brass hover:text-ivory">↻ Actualizar</Link>}
         {ready && <a href={video.final_url!} download className="mt-2 inline-block text-[0.62rem] tracking-[0.16em] uppercase text-stone hover:text-ivory">⬇ Descargar video</a>}
+      </div>
+    </div>
+  );
+}
+
+// Hay algo que publicar: el video listo (reel) o fotos del reloj (foto, carrusel, historia)
+const mediaReady = (i: Idea, watch?: PreviewWatch, video?: PreviewVideo) =>
+  i.format === "reel" ? video?.status === "done" && Boolean(video.final_url) : Boolean(watch?.images?.length);
+
+// Publicación en Instagram: a su hora (automática) o ahora mismo, con confirmación
+function PublishControls({ idea, ready, canPublish }: { idea: Idea; ready: boolean; canPublish: boolean }) {
+  if (!canPublish) return null;
+  const auto = idea.auto_publish !== false;
+  const small = "text-[0.62rem] tracking-[0.16em] uppercase";
+  return (
+    <div className="mt-3 border-t border-line/60 pt-3 text-xs">
+      {idea.publish_error ? (
+        <p className="text-red-200">⚠️ No se publicó: {idea.publish_error}</p>
+      ) : idea.ig_container_id ? (
+        <p className="text-amber-200">⏳ Instagram está procesando el archivo; se publica en los próximos minutos.</p>
+      ) : idea.status === "approved" ? (
+        <p className={auto && ready ? "text-emerald-200" : "text-stone"}>
+          {!auto ? "Publicación automática en pausa: súbela tú o actívala." : ready ? `📤 Se publicará sola en Instagram el ${when(idea.scheduled_for)}.` : `Falta ${idea.format === "reel" ? "el video" : "una foto del reloj"}: hasta que lo tenga no se publicará sola.`}
+        </p>
+      ) : (
+        <p className="text-stone">Al aprobarla, se publicará sola en Instagram a esa hora.</p>
+      )}
+      <div className={`mt-2 flex flex-wrap items-center gap-3 ${small}`}>
+        {idea.status === "approved" && (
+          <form action={autoPublishAction.bind(null, idea.id, !auto)}><button className="text-stone hover:text-ivory">{auto ? "⏸ Pausar publicación automática" : "▶ Activar publicación automática"}</button></form>
+        )}
+        {ready && !idea.ig_container_id && (
+          <details>
+            <summary className="cursor-pointer list-none text-brass hover:text-ivory">📤 Publicar ahora en Instagram</summary>
+            <form action={publishNowAction.bind(null, idea.id)} className="mt-2 flex flex-wrap items-center gap-3 normal-case tracking-normal">
+              <span className="text-stone">Se publica con el texto en español e inglés y los hashtags. ¿Seguro?</span>
+              <button className="bg-ivory px-3 py-1.5 text-[0.62rem] tracking-[0.16em] uppercase text-ink hover:bg-brass">Sí, publicar ya</button>
+            </form>
+          </details>
+        )}
       </div>
     </div>
   );
@@ -144,6 +184,7 @@ export default async function EngagementPage() {
                     {i.status === "approved" && <form action={ideaStatusAction.bind(null, i.id, "posted")}><button className="text-emerald-200 hover:text-ivory">✓ Publicada</button></form>}
                     <form action={ideaStatusAction.bind(null, i.id, "dismissed")}><button className="text-stone hover:text-ivory">Descartar</button></form>
                   </div>
+                  <PublishControls idea={i} ready={mediaReady(i, i.watch_id ? watches.get(i.watch_id) : undefined, i.watch_id ? videos.get(i.watch_id) : undefined)} canPublish={Boolean(s.ig_id)} />
                 </li>
               ))}
             </ul>

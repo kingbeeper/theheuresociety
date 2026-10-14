@@ -11,7 +11,7 @@ export const META_APP_ID = process.env.NEXT_PUBLIC_META_APP_ID ?? "";
 export const META_APP_SECRET = process.env.META_APP_SECRET ?? process.env.WHATSAPP_APP_SECRET ?? "";
 export const META_VERIFY_TOKEN = process.env.META_VERIFY_TOKEN ?? process.env.WHATSAPP_VERIFY_TOKEN ?? "";
 
-// Permisos que se piden al conectar (métricas, mensajes y comentarios de Instagram y Facebook)
+// Permisos que se piden al conectar (métricas, mensajes, comentarios y publicación en Instagram y Facebook)
 export const META_SCOPES = [
   "pages_show_list",
   "pages_read_engagement",
@@ -23,6 +23,7 @@ export const META_SCOPES = [
   "instagram_manage_insights",
   "instagram_manage_messages",
   "instagram_manage_comments",
+  "instagram_content_publish",
   "business_management",
 ];
 

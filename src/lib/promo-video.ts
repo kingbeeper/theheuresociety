@@ -442,6 +442,7 @@ export async function renderPromo(w: Watch, clips: string[], dir: string) {
   const out = join(dir, "final.mp4");
   await writeFile(png, await promoOverlay({ brand: w.brand, model: w.model, reference: w.reference, price: priceText(w), cta: "Available now · Disponible", handle: "@theheuresociety · (305) 509-5767" }));
 
+  // Pista de audio en silencio: Instagram rechaza a veces los reels sin audio (la música se pone en la app)
   const X = 0.5; // fundido entre tomas
   const n = files.length;
   const norm = files.map((_, i) => `[${i}:v]scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},trim=0:${CLIP},setpts=PTS-STARTPTS,fps=24,settb=1/24,setsar=1,format=yuv420p[v${i}]`);
@@ -460,7 +461,7 @@ export async function renderPromo(w: Watch, clips: string[], dir: string) {
   const ffmpeg = await ffmpegPath();
   await run(
     ffmpeg,
-    ["-y", "-loglevel", "warning", ...files.flatMap((f) => ["-i", f]), "-loop", "1", "-framerate", "24", "-i", png, "-filter_complex", [...norm, ...chain].join(";"), "-map", "[out]", "-an", "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-movflags", "+faststart", out],
+    ["-y", "-loglevel", "warning", ...files.flatMap((f) => ["-i", f]), "-loop", "1", "-framerate", "24", "-i", png, "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100", "-filter_complex", [...norm, ...chain].join(";"), "-map", "[out]", "-map", `${files.length + 1}:a`, "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-c:a", "aac", "-b:a", "128k", "-shortest", "-movflags", "+faststart", out],
     { timeout: 180_000 },
   ).catch((e: { stderr?: string; signal?: string; message: string }) => {
     // El mensaje de execFile repite el comando entero: lo útil es lo que dice ffmpeg al final

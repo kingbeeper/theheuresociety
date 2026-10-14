@@ -221,4 +221,4 @@ export async function generateContentPlan(user: string, count = 5) {
   return data ?? [];
 }
 
-export type Idea = { id: string; status: string; format: string; title: string; why: string | null; watch_id: string | null; caption_es: string | null; caption_en: string | null; hashtags: string[]; visual_brief: string | null; scheduled_for: string | null };
+export type Idea = { id: string; status: string; format: string; title: string; why: string | null; watch_id: string | null; caption_es: string | null; caption_en: string | null; hashtags: string[]; visual_brief: string | null; scheduled_for: string | null; auto_publish?: boolean; ig_container_id?: string | null; publish_error?: string | null; permalink?: string | null };
