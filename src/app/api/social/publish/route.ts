@@ -11,7 +11,7 @@ export async function GET(request: Request) {
   if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) return new Response("Unauthorized", { status: 401 });
   const reminders = await sendDueReminders().catch((e) => `error: ${(e as Error).message}`);
   const results = await publishDue();
-  // Precio de mercado: un reloj por pasada (los que llevan más de 7 días sin revisar)
+  // Precio de mercado: un reloj por pasada (los que llevan más de 5 días sin revisar)
   const market = await marketPass().catch((e) => `error: ${(e as Error).message}`);
   return Response.json({ ok: true, reminders, results, market });
 }

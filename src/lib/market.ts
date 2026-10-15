@@ -4,15 +4,15 @@ import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
 import { adminDb } from "./supabase";
 
-// Precio de mercado semanal de los relojes en stock: Claude busca anuncios actuales (Chrono24 primero,
+// Precio de mercado de los relojes en stock, cada 5 días: Claude busca anuncios actuales (Chrono24 primero,
 // WatchCharts y otros dealers) y guarda el rango en la ficha. La pasada de cada 10 minutos revisa un
-// reloj cada vez, los que llevan más de 7 días sin revisar; el resumen de los lunes compara con
+// reloj cada vez, los que llevan más de 5 días sin revisar (si todos están al día, no hace nada); el resumen de los lunes compara con
 // nuestro precio. Usa Sonnet (más barato) porque es un trabajo de fondo repetido.
 
 const client = new Anthropic();
 const MODEL = "claude-sonnet-5-5";
 const SITES = ["chrono24.com", "watchcharts.com", "bobswatches.com", "watchfinder.com", "ebay.com"];
-const WEEK = 7 * 86_400_000;
+const EVERY = 5 * 86_400_000; // cada reloj se revisa una vez cada 5 días
 
 const MarketSchema = z.object({
   low: z.number().nullable().describe("Precio pedido más bajo encontrado, USD"),
@@ -60,7 +60,7 @@ export async function checkMarket(i: Item): Promise<Market | null> {
   return res.parsed_output ?? null;
 }
 
-// Una pasada: el reloj en stock que lleva más tiempo sin revisar (si pasaron 7 días)
+// Una pasada: el reloj en stock que lleva más tiempo sin revisar (si pasaron 5 días)
 export async function marketPass() {
   const db = adminDb();
   const { data } = await db
@@ -68,7 +68,7 @@ export async function marketPass() {
     .select("id, sku, brand, model, reference, condition, comes_with, papers_date, asking_price, market_checked_at")
     .in("status", ["in_stock", "reserved"])
     .not("brand", "is", null)
-    .or(`market_checked_at.is.null,market_checked_at.lt.${new Date(Date.now() - WEEK).toISOString()}`)
+    .or(`market_checked_at.is.null,market_checked_at.lt.${new Date(Date.now() - EVERY).toISOString()}`)
     .order("market_checked_at", { ascending: true, nullsFirst: true })
     .limit(1);
   const i = data?.[0] as Item | undefined;

@@ -295,7 +295,7 @@ export async function deleteItem(id: string) {
   redirect("/admin/inventario");
 }
 
-// Revisar el precio de mercado ahora (si no, se revisa solo cada semana)
+// Revisar el precio de mercado ahora (si no, se revisa solo cada 5 días)
 export async function marketCheckAction(id: string) {
   await requireAdmin("inventario");
   const db = adminDb();

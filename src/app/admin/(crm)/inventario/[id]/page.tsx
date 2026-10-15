@@ -138,7 +138,7 @@ export default async function ItemPage({ params }: PageProps<"/admin/inventario/
                   )}
                 </div>
               ) : (
-                <p className="text-sm text-stone">{item.market_checked_at ? "No se encontraron anuncios comparables." : "Aún sin revisar: se revisa solo cada semana."}</p>
+                <p className="text-sm text-stone">{item.market_checked_at ? "No se encontraron anuncios comparables." : "Aún sin revisar: se revisa solo cada 5 días."}</p>
               )}
               <form action={marketCheckAction.bind(null, item.id)} className="mt-3">
                 <button className="border border-line px-3 py-1.5 text-[0.62rem] tracking-[0.18em] uppercase text-stone hover:text-ivory">Revisar ahora (Chrono24, WatchCharts…)</button>
