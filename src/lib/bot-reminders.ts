@@ -264,8 +264,15 @@ export async function onReminderCallback(chatId: number, cbId: string, messageId
         return sendMessage(chatId, "📝 Escribe cómo quedó (ej. «le pareció caro, vuelve en enero»).");
       }
       if (by === "lost") {
-        if (r.customer_id) await addEvent(r.customer_id, "follow_up", `No le interesa: ${r.body}`, { reminder: r.id }, user);
-        return sendMessage(chatId, "Anotado en su ficha: no le interesa. Si más adelante cambia de idea, crea otro recordatorio.");
+        // Pasa a «Perdido»: sale de los leads activos, los seguimientos y la Demanda (la ficha se queda)
+        if (r.customer_id) {
+          const { data: cust } = await db.from("customers").select("stage").eq("id", r.customer_id).single();
+          await db.from("customers").update({ stage: "lost", follow_up_at: null, follow_up_note: null, last_activity_at: new Date().toISOString() }).eq("id", r.customer_id);
+          await addEvent(r.customer_id, "stage", `No le interesa: ${r.body} · Etapa: Perdido`, { reminder: r.id, from: cust?.stage, to: "lost" }, user);
+          await db.from("watch_alerts").update({ active: false }).eq("customer_id", r.customer_id).eq("query", r.body.slice(0, 120));
+          await db.from("reminders").update({ done_at: new Date().toISOString() }).eq("customer_id", r.customer_id).is("done_at", null);
+        }
+        return sendMessage(chatId, `❌ <b>${h(r.customer?.name ?? "Cliente")}</b> pasa a <b>Perdido</b>. Su ficha y su historial se quedan en el CRM; si vuelve a escribir, se reactiva solo y te aviso.`);
       }
       return sendMessage(chatId, "👍 Cerrado.");
     }

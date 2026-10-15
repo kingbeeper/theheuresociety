@@ -109,10 +109,16 @@ export async function upsertLead(input: LeadInput) {
     if (!existing.intent && input.intent) patch.intent = input.intent;
     if (input.interests) patch.interests = existing.interests ? `${existing.interests}\n${input.interests}` : input.interests;
     if (input.stage && rank(input.stage) > rank(existing.stage) && existing.stage !== "lost") patch.stage = input.stage;
+    // Un cliente «Perdido» que vuelve a escribir (o con quien vuelves a trabajar) se reactiva con todo su historial
+    const revived = existing.stage === "lost";
+    if (revived) patch.stage = input.stage && input.stage !== "lost" && rank(input.stage) > rank("contacted") ? input.stage : "contacted";
     const { data, error } = await db.from("customers").update(patch).eq("id", existing.id).select("*").single();
     if (error) throw error;
     customer = data as Customer;
-    if (patch.stage) await addEvent(customer.id, "stage", `Etapa: ${STAGE_LABEL[patch.stage as Stage]}`, { from: existing.stage, to: patch.stage });
+    if (patch.stage) await addEvent(customer.id, "stage", `${revived ? "Reactivado (estaba perdido) · " : ""}Etapa: ${STAGE_LABEL[patch.stage as Stage]}`, { from: existing.stage, to: patch.stage });
+    if (revived && input.notify !== false) {
+      await notifyAdmins(`♻️ <b>Vuelve un cliente que estaba perdido</b>: ${h(customer.name ?? customer.phone ?? "Cliente")}${input.event?.body ? `\n«${h(input.event.body.slice(0, 200))}»` : ""}\nFicha: ${process.env.NEXT_PUBLIC_SITE_URL ?? "https://theheuresociety.vercel.app"}/admin/leads/${customer.id}`).catch(() => {});
+    }
   } else {
     const { data, error } = await db
       .from("customers")
