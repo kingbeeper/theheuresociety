@@ -91,13 +91,16 @@ export async function buildDigest(now = Date.now()) {
   const sourcing = docs.filter((d) => d.kind === "sourcing");
   const held = sourcing.filter((d) => d.deposit_paid_at);
   const sourcingEnding = sourcing.filter((d) => d.due_date && d.due_date <= new Date(now + 7 * DAY).toISOString().slice(0, 10));
-  if (unpaid.length || memosLate.length || quotesEnding.length || consignEnding.length || sourcing.length) {
+  const proformas = docs.filter((d) => d.kind === "proforma");
+  if (unpaid.length || memosLate.length || quotesEnding.length || consignEnding.length || sourcing.length || proformas.length) {
     lines.push("", "📄 <b>Documentos</b>");
     if (unpaid.length) lines.push(`• ${usd(unpaid.reduce((a, d) => a + Number(d.total) - Number(d.deposit ?? 0), 0))} por cobrar (${unpaid.length} factura/s${overdue.length ? `, ${overdue.length} vencida/s` : ""})`);
     for (const m of memosLate) lines.push(`• ⏳ Memo ${h(m.number)} vencido · ${h(m.client_name ?? "")}`);
     for (const c of consignEnding) lines.push(`• Consignación ${h(c.number)} de ${h(c.client_name ?? "")} termina el ${c.due_date}: renovar o devolver`);
     for (const q of quotesEnding) lines.push(`• Cotización ${h(q.number)} caduca pronto · ${h(q.client_name ?? "")} · ${usd(Number(q.total))}`);
     if (sourcing.length) lines.push(`• 🔎 ${sourcing.length} encargo(s) buscando · ${usd(held.reduce((a, d) => a + Number(d.deposit ?? 0), 0))} en anticipos retenidos`);
+    if (proformas.length) lines.push(`• 📄 ${proformas.length} proforma(s) abierta(s) · ${usd(proformas.reduce((a, d) => a + Number(d.deposit ?? 0), 0))} en depósitos · saldo pendiente ${usd(proformas.reduce((a, d) => a + Math.max(0, Number(d.total) - Number(d.deposit ?? 0)), 0))}`);
+    for (const p of proformas.filter((d) => d.due_date && d.due_date < today)) lines.push(`• ⏳ Proforma ${h(p.number)} de ${h(p.client_name ?? "")}: el saldo vencía el ${p.due_date}`);
     for (const s of sourcingEnding) lines.push(`• ⏳ Encargo ${h(s.number)} de ${h(s.client_name ?? "")} (${h((s.items as { title: string }[])[0]?.title ?? "")}) ${s.due_date! < today ? "<b>plazo vencido</b>" : `termina el ${s.due_date}`}: ampliar o devolver el anticipo`);
   }
 

@@ -44,6 +44,7 @@ export async function onMenuText(chatId: number, text: string, user: string) {
             { text: "📋 Memo", callback_data: "mnew:memo" },
             { text: "🤝 Consignación", callback_data: "mnew:consignment" },
             { text: "💬 Cotización", callback_data: "mnew:quote" },
+            { text: "📄 Proforma", callback_data: "mnew:proforma" },
           ]),
           [{ text: "🛒 Compré un reloj", callback_data: "mnew:purchase" }],
           [{ text: "🔎 Encargo con anticipo", callback_data: "mnew:sourcing" }],
@@ -130,6 +131,7 @@ export async function onMenuCallback(chatId: number, cbId: string, messageId: nu
               { text: "🤝 Consignaciones", callback_data: "mopen:consignment" },
               { text: "📋 Memos", callback_data: "mopen:memo" },
               { text: "🔎 Encargos", callback_data: "mopen:sourcing" },
+              { text: "📄 Proformas", callback_data: "mopen:proforma" },
               { text: "📂 Todos", callback_data: "mopen:all" },
             ])
           ),

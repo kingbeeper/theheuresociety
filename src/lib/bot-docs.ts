@@ -7,7 +7,7 @@ import { PAYMENT } from "./stock-labels";
 import { todayInMiami } from "./booking";
 import { closeReturned, consignorPaid, getDoc, getDocSettings, insertDoc, issueDoc, payInvoice, toInvoice } from "./documents";
 import { pdfName, renderDocPdf } from "./doc-pdf";
-import { KIND_LABEL, docTotals, termsFor, usd, type Doc, type DocKind } from "./doc-labels";
+import { KIND_LABEL, docTotals, paidSoFar, termsFor, usd, type Doc, type DocKind } from "./doc-labels";
 import { SOURCING_ACTIONS, onSourcingCallback, sourcingButtons } from "./bot-sourcing";
 import { escapeHtml as h, keyboard, sendDocumentFile, sendMessage, tg, type InlineButton } from "./telegram";
 import { analyze, cutoutJob, draftWatch, notifyAlertMatches, parsePrice, publish, updateDraft } from "./bot";
@@ -52,10 +52,11 @@ export const FLOW_COMMANDS: Record<string, FlowKind> = {
   "/cotizacion": "quote",
   "/cotización": "quote",
   "/compra": "purchase",
+  "/proforma": "proforma",
 };
 const NAME: Record<FlowKind, string> = { ...KIND_LABEL, purchase: "Compra" };
-const ICON: Record<FlowKind, string> = { invoice: "🧾", memo: "📋", consignment: "🤝", quote: "💬", purchase: "🛒", sourcing: "🔎" };
-const DUE_DAYS: Record<DocKind, number> = { quote: 7, memo: 14, invoice: 0, consignment: 90, purchase: 0, sourcing: 60 };
+const ICON: Record<FlowKind, string> = { invoice: "🧾", memo: "📋", consignment: "🤝", quote: "💬", purchase: "🛒", sourcing: "🔎", proforma: "📄" };
+const DUE_DAYS: Record<DocKind, number> = { quote: 7, memo: 14, invoice: 0, consignment: 90, purchase: 0, sourcing: 60, proforma: 14 };
 
 // ───────────────────────────── Estado (uno por chat) ─────────────────────────────
 const key = (chatId: number) => `tgdoc:${chatId}`;
@@ -83,7 +84,7 @@ export async function startFlow(chatId: number, kind: FlowKind, arg: string, use
   for (const d of open ?? []) await updateDraft(d.id as string, { status: "cancelled", awaiting: null });
 
   await clearAppraise(chatId);
-  const flow: DocFlow = { kind, step: "watch", user, lang: "en", tax: kind === "invoice" ? Number(settings.doc_tax_rate) || 0 : 0 };
+  const flow: DocFlow = { kind, step: "watch", user, lang: "en", tax: kind === "invoice" || kind === "proforma" ? Number(settings.doc_tax_rate) || 0 : 0 };
   await saveFlow(chatId, flow);
   if (kind === "purchase") {
     return sendMessage(chatId, `${ICON.purchase} <b>Compra de un reloj</b>\n\nEnvíame las fotos del reloj (de 1 a 10) y después la referencia y los extras.\n<i>Ej.: Rolex 126610LN, caja y papeles, excelente estado</i>\n\n/cancelar para salir.`);
@@ -312,6 +313,7 @@ function askPrice(chatId: number, flow: DocFlow) {
     consignment: "💵 ¿Cuánto le pagarás al dueño cuando se venda? (neto al consignante)",
     purchase: "💵 ¿Cuánto pagaste por el reloj?",
     sourcing: "💵 ¿Precio máximo acordado?",
+    proforma: "💵 ¿Precio de venta? (sin impuesto)",
   }[flow.kind];
   const s = suggested(flow);
   return sendMessage(chatId, q, s ? { reply_markup: keyboard([[{ text: `Usar ${usd(s)}`, callback_data: `dprice:${s}` }]]) } : {});
@@ -345,7 +347,7 @@ async function confirm(chatId: number, flow: DocFlow, prefix = "") {
     `⌚ ${h(watch)}`,
     `👤 ${h(who)}${flow.customerId ? "" : c?.name || c?.phone ? " <i>(nuevo en el CRM)</i>" : ""}`,
   ];
-  if (flow.kind === "invoice") {
+  if (flow.kind === "invoice" || flow.kind === "proforma") {
     const t = docTotals({ items: [{ title: "", qty: 1, price }], discount: 0, tax_rate: flow.tax, shipping: 0 });
     lines.push(`💵 ${usd(price)}${flow.tax ? ` + impuesto ${flow.tax}% = <b>${usd(t.total)}</b>` : " <b>(sin impuesto)</b>"}`);
   } else if (flow.kind === "consignment") {
@@ -367,7 +369,7 @@ async function confirm(chatId: number, flow: DocFlow, prefix = "") {
   const rows: InlineButton[][] = [[{ text: flow.kind === "purchase" ? "✅ Registrar compra y contrato" : "✅ Crear y enviar", callback_data: "dok:1" }]];
   const opts: InlineButton[] = [];
   opts.push({ text: flow.lang === "en" ? "🌐 Cambiar a español" : "🌐 Cambiar a inglés", callback_data: "dlang:1" });
-  if (flow.kind === "invoice") opts.push({ text: flow.tax ? "Sin impuesto" : "Con impuesto", callback_data: "dtax:1" });
+  if (flow.kind === "invoice" || flow.kind === "proforma") opts.push({ text: flow.tax ? "Sin impuesto" : "Con impuesto", callback_data: "dtax:1" });
   if (opts.length) rows.push(opts);
   rows.push([
     { text: "✏️ Precio", callback_data: "dedit:price" },
@@ -424,7 +426,7 @@ export async function finish(chatId: number, flow: DocFlow) {
         {
           acquisition, brand: w.brand, model: w.model, reference: w.reference, condition: "Pre-Owned", purchase_date: today,
           comes_with: [w.hasBox && "Box", w.hasPapers && "Papers"].filter(Boolean).join(", ") || null,
-          asking_price: flow.kind === "invoice" || flow.kind === "quote" || flow.kind === "memo" ? price : flow.asking ?? null,
+          asking_price: flow.kind === "invoice" || flow.kind === "quote" || flow.kind === "memo" || flow.kind === "proforma" ? price : flow.asking ?? null,
           serial: flow.serial ?? null,
           ...supplier,
         },
@@ -461,7 +463,7 @@ export async function finish(chatId: number, flow: DocFlow) {
     ...(kind === "purchase" && flow.sellerId && { seller_id_type: flow.sellerId.type, seller_id_number: flow.sellerId.number }),
     ...(kind === "purchase" && flow.sellerIdPhoto && { id_photo_path: flow.sellerIdPhoto }),
     items: [{ item_id: item.id, sku: item.sku, title: item.title, details: item.details || null, serial: item.serial, qty: 1, price }],
-    tax_rate: kind === "invoice" ? flow.tax : 0,
+    tax_rate: kind === "invoice" || kind === "proforma" ? flow.tax : 0,
     show_serial: kind !== "quote",
     payment_method: null,
     notes: [flow.notes, kind === "consignment" && flow.asking ? (flow.lang === "es" ? `Precio de venta acordado: ${usd(flow.asking)}` : `Agreed listing price: ${usd(flow.asking)}`) : null].filter(Boolean).join("\n") || null,
@@ -477,7 +479,7 @@ export async function finish(chatId: number, flow: DocFlow) {
 export async function deliver(chatId: number, d: Doc) {
   const link = `${SITE_URL}/d/${d.token}`;
   const first = (d.client_name ?? "").split(" ")[0];
-  const label = d.lang === "es" ? KIND_LABEL[d.kind].toLowerCase() : { quote: "quotation", memo: "memorandum", invoice: "invoice", consignment: "consignment agreement", purchase: "bill of sale", sourcing: "sourcing agreement" }[d.kind];
+  const label = d.lang === "es" ? KIND_LABEL[d.kind].toLowerCase() : { quote: "quotation", memo: "memorandum", invoice: "invoice", consignment: "consignment agreement", purchase: "bill of sale", sourcing: "sourcing agreement", proforma: "proforma invoice" }[d.kind];
   const msg = d.lang === "es"
     ? `Hola ${first}, le comparto su ${label} ${d.number} de The Heure Society: ${link}`
     : `Hi ${first}, here is your ${label} ${d.number} from The Heure Society: ${link}`;
@@ -490,7 +492,8 @@ export async function deliver(chatId: number, d: Doc) {
     if (d.kind === "invoice" && process.env.STRIPE_SECRET_KEY) rows.push([{ text: "💳 Enlace de pago con tarjeta", url: `${SITE_URL}/api/pay?t=${d.token}` }]);
     if (d.kind === "memo") rows.push([{ text: "↩️ Devuelto", callback_data: `dret:${d.id}` }, { text: "🧾 Se lo queda: facturar", callback_data: `dinv:${d.id}` }]);
     if (d.kind === "consignment") rows.push([{ text: "💵 Vendido: pagado al dueño", callback_data: `down:${d.id}` }, { text: "↩️ Devuelto al dueño", callback_data: `dret:${d.id}` }]);
-    if (d.kind === "quote") rows.push([{ text: "🧾 Convertir en factura", callback_data: `dinv:${d.id}` }]);
+    if (d.kind === "quote") rows.push([{ text: "📄 Aceptada: hacer proforma", callback_data: `dpf:fromquote|${d.id}` }], [{ text: "🧾 Convertir en factura", callback_data: `dinv:${d.id}` }]);
+    if (d.kind === "proforma") rows.push([{ text: "💵 Registrar depósito", callback_data: `dpf:dep|${d.id}` }], [{ text: "✅ Saldada: facturar", callback_data: `dpf:close|${d.id}` }]);
     if (d.kind === "sourcing") rows.push(...sourcingButtons(d));
   }
   rows.push([{ text: "Abrir en el CRM", url: `${SITE_URL}/admin/documentos/${d.id}` }]);
@@ -499,6 +502,8 @@ export async function deliver(chatId: number, d: Doc) {
     `📄 <b>${KIND_LABEL[d.kind]} ${h(d.number)}</b>`,
     d.kind === "sourcing"
       ? `${h(d.client_name ?? "")} · busca ${h(d.items[0]?.title ?? "")} hasta <b>${usd(d.total)}</b>\n💵 Anticipo ${usd(d.deposit ?? 0)}${d.deposit_paid_at ? " · recibido" : " · pendiente"}`
+      : d.kind === "proforma"
+      ? `${h(d.client_name ?? "")} · total <b>${usd(d.total)}</b> · pagado ${usd(paidSoFar(d))} · saldo <b>${usd(Math.max(0, Number(d.total) - paidSoFar(d)))}</b>`
       : `${h(d.client_name ?? "")} · <b>${usd(d.total)}</b>${d.kind === "consignment" ? " neto al dueño" : ""}`,
     "",
     `Enlace para el cliente${d.status === "sent" && !d.signed_at ? " (puede firmarlo ahí con el dedo)" : ""}:\n${link}`,
@@ -512,6 +517,9 @@ export async function deliver(chatId: number, d: Doc) {
 export async function onCallback(chatId: number, cbId: string, messageId: number, action: string, arg: string, user: string) {
   const answer = (text?: string) => tg("answerCallbackQuery", { callback_query_id: cbId, ...(text && { text }) }).catch(() => {});
   const clearButtons = () => tg("editMessageReplyMarkup", { chat_id: chatId, message_id: messageId, reply_markup: keyboard([]) }).catch(() => {});
+
+  // Proforma: depósitos y cierre
+  if (action === "dpf") return (await import("./bot-proforma")).onProformaCallback(chatId, cbId, messageId, arg, user);
 
   // Venta (marcar vendido = factura pagada)
   if (action === "dsale") return (await import("./bot-sale")).onSaleCallback(chatId, cbId, messageId, arg);
@@ -1041,6 +1049,7 @@ const LIST_TITLE: Record<string, string> = {
   invoice: "Facturas por cobrar",
   quote: "Cotizaciones abiertas",
   sourcing: "Encargos buscando",
+  proforma: "Proformas abiertas",
 };
 
 export async function listOpenDocs(chatId: number, kind: DocKind | "all" = "all") {

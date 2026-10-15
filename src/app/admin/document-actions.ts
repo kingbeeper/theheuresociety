@@ -5,7 +5,7 @@ import { refresh } from "next/cache";
 import { requireAdmin } from "@/lib/admin-auth";
 import { adminDb } from "@/lib/supabase";
 import { upsertLead } from "@/lib/crm";
-import { closeReturned, consignorPaid, depositReceived, docEvent, getDoc, insertDoc, issueDoc, payInvoice, refundDeposit, reserveStock, saveDocSettings, sourcingToInvoice, toInvoice, voidDoc } from "@/lib/documents";
+import { addProformaPayment, closeProforma, closeReturned, consignorPaid, depositReceived, toProforma, docEvent, getDoc, insertDoc, issueDoc, payInvoice, refundDeposit, reserveStock, saveDocSettings, sourcingToInvoice, toInvoice, voidDoc } from "@/lib/documents";
 import { DOC_SETTING_KEYS, KIND_LABEL, docTotals, usd, type DocKind, type DocLine } from "@/lib/doc-labels";
 
 // Acciones de cotizaciones, memos y facturas. Todas comprueban la sesión.
@@ -141,7 +141,7 @@ export async function markConsignorPaid(id: string) {
 export async function convertToInvoice(id: string) {
   const user = await requireAdmin("documentos");
   const d = await getDoc(id);
-  if (!d || d.kind === "invoice" || d.kind === "consignment" || d.kind === "purchase" || d.kind === "sourcing") return;
+  if (!d || d.kind === "invoice" || d.kind === "consignment" || d.kind === "purchase" || d.kind === "sourcing" || d.kind === "proforma") return;
   const invoice = await toInvoice(d, user);
   redirect(`/admin/documentos/${invoice.id}`);
 }
@@ -153,6 +153,37 @@ export async function markPaid(id: string, _: unknown, f: FormData) {
   await payInvoice(d, text(f, "payment_method"), date(f, "paid_at") ?? today(), user);
   refresh();
   return { ok: true };
+}
+
+// ───────────────────── Proforma ─────────────────────
+// Cotización aceptada → proforma con los mismos datos (el reloj queda reservado al emitirla)
+export async function convertToProforma(id: string) {
+  const user = await requireAdmin("documentos");
+  const d = await getDoc(id);
+  if (!d || d.kind !== "quote" || !["draft", "sent", "accepted"].includes(d.status)) return;
+  const pf = await toProforma(d, user);
+  redirect(`/admin/documentos/${pf.id}`);
+}
+
+export async function proformaPaymentAction(id: string, _: unknown, f: FormData) {
+  const user = await requireAdmin("documentos");
+  const d = await getDoc(id);
+  if (!d || d.kind !== "proforma" || !["draft", "sent"].includes(d.status)) return { error: "Esta proforma ya está cerrada." };
+  const amount = num(f, "amount");
+  if (amount <= 0) return { error: "Indica el importe del depósito." };
+  await addProformaPayment(d, { date: date(f, "paid_at") ?? today(), amount, method: text(f, "payment_method") }, user);
+  refresh();
+  return { ok: true };
+}
+
+// Saldada: el saldo se registra como último pago y se emite la factura pagada
+export async function closeProformaAction(id: string, _: unknown, f: FormData) {
+  const user = await requireAdmin("documentos");
+  const d = await getDoc(id);
+  if (!d || d.kind !== "proforma" || !["draft", "sent"].includes(d.status)) return { error: "Esta proforma ya está cerrada." };
+  if (d.status === "draft") await issueDoc(d, user);
+  const invoice = await closeProforma({ ...d, status: "sent" }, { date: date(f, "paid_at") ?? today(), method: text(f, "payment_method") }, user);
+  redirect(`/admin/documentos/${invoice.id}`);
 }
 
 // ───────────────────── Encargos ─────────────────────

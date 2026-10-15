@@ -4,7 +4,7 @@ import { adminDb } from "./supabase";
 import { addEvent, STAGES, STAGE_LABEL, type Stage } from "./crm";
 import { logItem, recordPurchase, syncWebStatus, type Item } from "./stock";
 import { isOwnerStock } from "./stock-labels";
-import { DOC_DEFAULTS, DOC_SETTING_KEYS, KIND_LABEL, KIND_PREFIX, docTotals, termsFor, usd, type Doc, type DocKind, type DocSettings } from "./doc-labels";
+import { DOC_DEFAULTS, DOC_SETTING_KEYS, KIND_LABEL, KIND_PREFIX, docTotals, paidSoFar, termsFor, usd, type Doc, type DocKind, type DocPayment, type DocSettings } from "./doc-labels";
 import { escapeHtml as h, notifyAdmins } from "./telegram";
 
 // Cotizaciones, memos y facturas. Van enlazadas al cliente del CRM y a los relojes del inventario:
@@ -223,7 +223,11 @@ export async function payInvoice(d: Doc, method: string | null, paidAt: string, 
 export async function voidDoc(d: Doc, user: string) {
   await touch(d.id, { status: "void" });
   if (d.kind === "sourcing") await sourcingAlert(d, false);
-  if (d.status === "sent" && (d.kind === "memo" || d.kind === "invoice")) await releaseStock(d, user, "documento anulado");
+  if (d.status === "sent" && (d.kind === "memo" || d.kind === "invoice" || d.kind === "proforma")) await releaseStock(d, user, "documento anulado");
+  if (d.kind === "proforma" && paidSoFar(d) > 0) {
+    await touch(d.id, { refunded_at: isoToday() });
+    await docEvent(d, `anulada con ${usd(paidSoFar(d))} en depósitos: devolverlos al cliente`, user);
+  }
   await docEvent(d, "anulada", user);
 }
 
@@ -328,6 +332,9 @@ export async function openInvoiceFor(itemId: string) {
 }
 
 export async function sellViaInvoice(itemId: string, sale: Sale, user: string) {
+  // Proforma abierta: la venta la cierra (el saldo es el último pago)
+  const { data: pf } = await adminDb().from("documents").select("*").eq("kind", "proforma").in("status", ["draft", "sent"]).filter("items", "cs", JSON.stringify([{ item_id: itemId }])).order("created_at", { ascending: false }).limit(1);
+  if (pf?.[0]) return closeProforma(pf[0] as Doc, { date: sale.date, method: sale.method }, user);
   const open = await openInvoiceFor(itemId);
   if (open) {
     if (open.status === "draft") await issueDoc(open, user);
@@ -358,4 +365,80 @@ export async function sellViaInvoice(itemId: string, sale: Sale, user: string) {
   await docEvent(invoice, `creada al vender ${i.sku} desde el inventario`, user);
   await touch(invoice.id, { status: "sent" });
   return payInvoice({ ...invoice, status: "sent" }, sale.method, sale.date, user);
+}
+
+// ───────────────────── Factura proforma ─────────────────────
+// Cotización aceptada → proforma (reserva el reloj) → depósitos → saldada: factura pagada con los
+// depósitos descontados y el reloj vendido.
+export async function toProforma(d: Doc, user: string) {
+  const settings = await getDocSettings();
+  const due = new Date(Date.now() + 14 * 86_400_000).toISOString().slice(0, 10);
+  const pf = await insertDoc({
+    kind: "proforma",
+    customer_id: d.customer_id,
+    client_name: d.client_name, client_company: d.client_company, client_email: d.client_email, client_phone: d.client_phone, client_address: d.client_address,
+    lang: d.lang,
+    issue_date: isoToday(),
+    due_date: due,
+    items: d.items,
+    discount: d.discount,
+    tax_rate: d.tax_rate,
+    shipping: d.shipping,
+    show_serial: d.show_serial,
+    notes: d.notes,
+    terms: termsFor("proforma", d.lang, settings),
+    payment_method: d.payment_method,
+    source_id: d.id,
+    created_by: user,
+  });
+  await touch(d.id, { status: "converted" });
+  await docEvent(d, `aceptada: proforma ${pf.number}`, user);
+  await docEvent(pf, `creada desde la cotización ${d.number}`, user);
+  return pf;
+}
+
+export async function addProformaPayment(d: Doc, p: DocPayment, user: string) {
+  if (d.status === "draft") await issueDoc(d, user); // con el primer depósito queda emitida y el reloj reservado
+  const payments = [...(d.payments ?? []), { date: p.date, amount: Math.round(p.amount * 100) / 100, method: p.method }];
+  const paid = paidSoFar({ payments });
+  await touch(d.id, { status: "sent", payments, deposit: paid, deposit_paid_at: p.date, deposit_method: p.method });
+  const balance = Math.max(0, Math.round((Number(d.total) - paid) * 100) / 100);
+  await docEvent(d, `depósito de ${usd(p.amount)}${p.method ? ` (${p.method})` : ""} · pagado ${usd(paid)} · saldo ${usd(balance)}`, user);
+  await notifyAdmins(`💵 <b>Depósito recibido · ${h(d.number)}</b>\n${h(d.client_name ?? "Cliente")} · <b>${usd(p.amount)}</b>${p.method ? ` · ${h(p.method)}` : ""}\nPagado ${usd(paid)} de ${usd(d.total)} · saldo <b>${usd(balance)}</b>`).catch(() => {});
+  return { ...d, status: "sent" as const, payments, deposit: paid, balance };
+}
+
+// Saldada: el saldo es el último pago; se emite la factura (pagada) con los depósitos descontados
+export async function closeProforma(d: Doc, p: { date: string; method: string | null }, user: string) {
+  const before = paidSoFar(d);
+  const balance = Math.max(0, Math.round((Number(d.total) - before) * 100) / 100);
+  const payments = balance > 0 ? [...(d.payments ?? []), { date: p.date, amount: balance, method: p.method }] : d.payments ?? [];
+  const settings = await getDocSettings();
+  const methods = [...new Set(payments.map((x) => x.method).filter(Boolean))].join(" + ") || p.method;
+  const list = payments.map((x) => `${x.date} ${usd(x.amount)}${x.method ? ` ${x.method}` : ""}`).join(" · ");
+  const invoice = await insertDoc({
+    kind: "invoice",
+    customer_id: d.customer_id,
+    client_name: d.client_name, client_company: d.client_company, client_email: d.client_email, client_phone: d.client_phone, client_address: d.client_address,
+    lang: d.lang,
+    issue_date: p.date,
+    due_date: p.date,
+    items: d.items,
+    discount: d.discount,
+    tax_rate: d.tax_rate,
+    shipping: d.shipping,
+    show_serial: true,
+    deposit: before,
+    payments,
+    notes: [d.notes, d.lang === "es" ? `Proforma ${d.number}. Pagos: ${list}` : `Proforma ${d.number}. Payments: ${list}`].filter(Boolean).join("\n"),
+    terms: termsFor("invoice", d.lang, settings),
+    payment_method: methods,
+    source_id: d.id,
+    created_by: d.created_by ?? user,
+  });
+  await touch(d.id, { status: "converted", payments, deposit: paidSoFar({ payments }) });
+  await docEvent(d, `saldada: factura ${invoice.number}`, user);
+  await docEvent(invoice, `creada al saldar la proforma ${d.number}`, user);
+  await touch(invoice.id, { status: "sent" });
+  return payInvoice({ ...invoice, status: "sent" }, methods ?? null, p.date, user);
 }

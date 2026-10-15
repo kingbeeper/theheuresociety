@@ -4,12 +4,12 @@ import { connection } from "next/server";
 import { adminDb } from "@/lib/supabase";
 import { requireAdmin } from "@/lib/admin-auth";
 import { formOptions, getDoc, getDocSettings } from "@/lib/documents";
-import { KIND_LABEL, PRINT, STATUS_LABEL, STATUS_STYLE, balanceDue, usd } from "@/lib/doc-labels";
+import { KIND_LABEL, PRINT, STATUS_LABEL, STATUS_STYLE, balanceDue, paidSoFar, usd } from "@/lib/doc-labels";
 import { todayInMiami } from "@/lib/booking";
 import { SITE_URL } from "@/lib/seo";
 import { Card, fmtDate, ghostButtonClass, PageTitle, requestTime } from "@/components/admin/ui";
-import { DepositForm, DocumentForm, PaidForm, SourcedForm } from "@/components/admin/DocumentForm";
-import { convertToInvoice, deleteDocument, markConsignorPaid, refundSourcing, returnMemo, sendDocument, setQuoteResult, voidDocument } from "../../../document-actions";
+import { CloseProformaForm, DepositForm, DocumentForm, PaidForm, ProformaPaymentForm, SourcedForm } from "@/components/admin/DocumentForm";
+import { convertToInvoice, convertToProforma, deleteDocument, markConsignorPaid, refundSourcing, returnMemo, sendDocument, setQuoteResult, voidDocument } from "../../../document-actions";
 
 export const metadata = { title: "Documento" };
 
@@ -31,7 +31,10 @@ export default async function DocumentPage({ params }: PageProps<"/admin/documen
   const late = d.status === "sent" && d.kind !== "quote" && d.due_date && d.due_date < today;
   const lateLabel = d.kind === "memo" ? "Memo vencido" : d.kind === "consignment" || d.kind === "sourcing" ? "Plazo cumplido" : "Vencida";
   const sourcing = d.kind === "sourcing";
+  const proforma = d.kind === "proforma";
   const deposit = Number(d.deposit ?? 0);
+  const pfPaid = paidSoFar(d);
+  const pfBalance = Math.max(0, Math.round((Number(d.total) - pfPaid) * 100) / 100);
 
   // Mensaje listo para enviar el enlace por WhatsApp o correo
   const first = (d.client_name ?? "").split(" ")[0];
@@ -64,7 +67,9 @@ export default async function DocumentPage({ params }: PageProps<"/admin/documen
         {[
           ["Estado", late ? lateLabel : STATUS_LABEL[d.kind][d.status] ?? d.status],
           [d.kind === "consignment" ? "Neto al dueño" : d.kind === "purchase" ? "Pagado al vendedor" : sourcing ? "Precio hasta" : d.kind === "invoice" && deposit ? `Total · saldo ${usd(balanceDue(d))}` : "Total", usd(d.total)],
-          sourcing
+          proforma
+            ? [`Pagado · saldo ${usd(pfBalance)}`, usd(pfPaid)]
+            : sourcing
             ? [d.refunded_at && d.deposit_paid_at ? "Anticipo devuelto" : d.deposit_paid_at ? `Anticipo recibido ${fmtDate(`${d.deposit_paid_at}T12:00:00`)}` : "Anticipo pendiente", usd(deposit)]
             : ["Fecha", fmtDate(`${d.issue_date}T12:00:00`)],
           [sourcing ? "Plazo de búsqueda hasta" : d.kind === "quote" ? "Válida hasta" : d.kind === "memo" ? "Devolver antes de" : d.kind === "consignment" ? (d.status === "paid" ? "Pagada al dueño el" : "Vigente hasta") : d.status === "paid" ? "Pagada el" : "Vence", d.status === "paid" && d.paid_at ? fmtDate(`${d.paid_at}T12:00:00`) : d.due_date ? fmtDate(`${d.due_date}T12:00:00`) : "—"],
@@ -88,7 +93,7 @@ export default async function DocumentPage({ params }: PageProps<"/admin/documen
         <div className="flex flex-wrap items-center gap-2">
           {d.status === "draft" && (
             <form action={sendDocument.bind(null, d.id)}>
-              <button className={button}>{d.kind === "memo" ? "Marcar como entregado" : d.kind === "invoice" ? "Emitir factura" : (d.kind === "consignment" || d.kind === "purchase" || sourcing) ? "Marcar como firmado" : "Marcar como enviada"}</button>
+              <button className={button}>{d.kind === "memo" ? "Marcar como entregado" : d.kind === "invoice" ? "Emitir factura" : (d.kind === "consignment" || d.kind === "purchase" || sourcing) ? "Marcar como firmado" : proforma ? "Emitir proforma (reserva el reloj)" : "Marcar como enviada"}</button>
             </form>
           )}
           {d.kind === "quote" && d.status === "sent" && (
@@ -96,6 +101,9 @@ export default async function DocumentPage({ params }: PageProps<"/admin/documen
               <form action={setQuoteResult.bind(null, d.id, true)}><button className={ghostButtonClass}>Aceptada</button></form>
               <form action={setQuoteResult.bind(null, d.id, false)}><button className={ghostButtonClass}>Rechazada</button></form>
             </>
+          )}
+          {d.kind === "quote" && ["draft", "sent", "accepted"].includes(d.status) && (
+            <form action={convertToProforma.bind(null, d.id)}><button className={button}>Aceptada: hacer proforma</button></form>
           )}
           {((d.kind === "quote" && ["sent", "accepted"].includes(d.status)) || (d.kind === "memo" && d.status === "sent")) && (
             <form action={convertToInvoice.bind(null, d.id)}><button className={button}>{d.kind === "memo" ? "Se lo queda: facturar" : "Convertir en factura"}</button></form>
@@ -123,6 +131,23 @@ export default async function DocumentPage({ params }: PageProps<"/admin/documen
           <div className="mt-5 border-t border-line pt-5">
             <PaidForm id={d.id} today={today} method={d.payment_method} />
             <p className="mt-2 text-xs text-stone">Al marcarla pagada, los relojes del inventario quedan vendidos (también en la web) y el cliente pasa a «Ganado».</p>
+          </div>
+        )}
+        {proforma && (d.status === "draft" || d.status === "sent") && (
+          <div className="mt-5 grid gap-5 border-t border-line pt-5">
+            {(d.payments ?? []).length > 0 && (
+              <ul className="space-y-1 text-sm">
+                {(d.payments ?? []).map((p, i) => (
+                  <li key={i}>💵 {fmtDate(`${p.date}T12:00:00`)} · <b>{usd(p.amount)}</b>{p.method ? ` · ${p.method}` : ""}</li>
+                ))}
+                <li className="text-stone">Pagado {usd(pfPaid)} de {usd(d.total)} · saldo <b className="text-ivory">{usd(pfBalance)}</b></li>
+              </ul>
+            )}
+            <ProformaPaymentForm id={d.id} today={today} />
+            <div className="border-t border-line/60 pt-5">
+              <CloseProformaForm id={d.id} today={today} balance={pfBalance} />
+              <p className="mt-2 text-xs text-stone">Al saldarla se registra el saldo como último pago y se crea la <b>factura pagada</b> con los depósitos descontados; el reloj queda vendido (inventario y web).</p>
+            </div>
           </div>
         )}
         {sourcing && (d.status === "draft" || d.status === "sent") && !d.deposit_paid_at && (
@@ -162,7 +187,7 @@ export default async function DocumentPage({ params }: PageProps<"/admin/documen
             kind={d.kind}
             customers={customers}
             stock={[...stock, ...d.items.filter((l) => l.item_id && !stock.some((x) => x.id === l.item_id)).map((l) => ({ id: l.item_id!, sku: l.sku ?? "", title: l.title, details: l.details ?? "", serial: l.serial ?? null, price: l.price }))]}
-            terms={{ quote: s.doc_terms_quote, memo: s.doc_terms_memo, invoice: s.doc_terms_invoice, consignment: s.doc_terms_consignment, purchase: s.doc_terms_purchase, sourcing: s.doc_terms_sourcing }}
+            terms={{ quote: s.doc_terms_quote, memo: s.doc_terms_memo, invoice: s.doc_terms_invoice, consignment: s.doc_terms_consignment, purchase: s.doc_terms_purchase, sourcing: s.doc_terms_sourcing, proforma: s.doc_terms_proforma }}
             taxRate={Number(s.doc_tax_rate) || 0}
             today={today}
           />

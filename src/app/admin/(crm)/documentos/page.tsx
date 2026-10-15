@@ -25,13 +25,13 @@ export default async function DocumentsPage({ searchParams }: PageProps<"/admin/
   const sum = (ds: Doc[]) => ds.reduce((a, d) => a + Number(d.total), 0);
   // Anticipos de encargos abiertos: dinero del cliente que se devuelve si no se consigue el reloj (pasivo)
   const sourcingOpen = docs.filter((d) => d.kind === "sourcing" && d.status === "sent");
-  const held = sourcingOpen.filter((d) => d.deposit_paid_at && !d.refunded_at);
+  const held = [...sourcingOpen.filter((d) => d.deposit_paid_at && !d.refunded_at), ...docs.filter((d) => d.kind === "proforma" && d.status === "sent")];
   const kpis = [
     { label: "Por cobrar", value: money(unpaid.reduce((a, d) => a + balanceDue(d), 0)), sub: `${unpaid.length} factura(s)`, href: "?tipo=invoice" },
     { label: "Vencidas", value: money(overdue.reduce((a, d) => a + balanceDue(d), 0)), sub: `${overdue.length} factura(s)`, href: "?tipo=invoice" },
     { label: "Relojes en memo", value: String(memosOut.length), sub: money(sum(memosOut)), href: "?tipo=memo" },
     { label: "Cotizaciones abiertas", value: String(quotesOpen.length), sub: money(sum(quotesOpen)), href: "?tipo=quote" },
-    { label: "Anticipos de encargos", value: money(held.reduce((a, d) => a + Number(d.deposit ?? 0), 0)), sub: `${sourcingOpen.length} encargo(s) buscando`, href: "?tipo=sourcing" },
+    { label: "Depósitos y anticipos", value: money(held.reduce((a, d) => a + Number(d.deposit ?? 0), 0)), sub: `${sourcingOpen.length} encargo(s) · ${docs.filter((d) => d.kind === "proforma" && d.status === "sent").length} proforma(s)`, href: "?tipo=proforma" },
   ];
 
   return (
@@ -47,6 +47,7 @@ export default async function DocumentsPage({ searchParams }: PageProps<"/admin/
             <Link href="/admin/documentos/nuevo?tipo=consignment" className={ghostButtonClass}>+ Consignación</Link>
             <Link href="/admin/documentos/nuevo?tipo=purchase" className={ghostButtonClass}>+ Compra</Link>
             <Link href="/admin/documentos/nuevo?tipo=sourcing" className={ghostButtonClass}>+ Encargo</Link>
+            <Link href="/admin/documentos/nuevo?tipo=proforma" className={ghostButtonClass}>+ Proforma</Link>
             <Link href="/admin/documentos/nuevo?tipo=invoice" className={buttonClass}>+ Factura</Link>
           </div>
         }
@@ -64,7 +65,7 @@ export default async function DocumentsPage({ searchParams }: PageProps<"/admin/
       </div>
 
       <div className="mt-6 flex gap-1 overflow-x-auto">
-        {(["all", "quote", "memo", "invoice", "consignment", "purchase", "sourcing"] as const).map((k) => (
+        {(["all", "quote", "proforma", "memo", "invoice", "consignment", "purchase", "sourcing"] as const).map((k) => (
           <Link
             key={k}
             href={k === "all" ? "/admin/documentos" : `/admin/documentos?tipo=${k}`}

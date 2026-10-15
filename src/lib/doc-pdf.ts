@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { PDFDocument, degrees, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import fontkit from "@pdf-lib/fontkit";
-import { PRINT, balanceDue, docTotals, maskedId, usd, type Doc, type DocSettings } from "./doc-labels";
+import { PRINT, balanceDue, docTotals, maskedId, paidSoFar, usd, type Doc, type DocSettings } from "./doc-labels";
 import { downloadPrivate } from "./private-files";
 
 // PDF de cotizaciones, memos, facturas y consignaciones, con el mismo diseño que la página del
@@ -97,7 +97,7 @@ export async function renderDocPdf(d: Doc, s: Required<DocSettings>) {
   contact.forEach((l, i) => text(l, cx, y - 28 - i * 11, { font: light, size: 8, color: GRAY }));
 
   const title = t[d.kind];
-  text(title, W - M, y - 20, { font: display, size: consign || sourcing ? 21 : 26, align: "right", track: 0.6 });
+  text(title, W - M, y - 20, { font: display, size: consign || sourcing || d.kind === "proforma" ? 21 : 26, align: "right", track: 0.6 });
   const date = (iso: string | null) =>
     iso ? new Intl.DateTimeFormat(d.lang === "es" ? "es-ES" : "en-US", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${iso}T12:00:00Z`)) : "-";
   const meta: [string, string][] = [[t.number, d.number], [t.date, date(d.issue_date)], ...(d.due_date && t.due[d.kind] ? [[t.due[d.kind], date(d.due_date)] as [string, string]] : [])];
@@ -179,10 +179,18 @@ export async function renderDocPdf(d: Doc, s: Required<DocSettings>) {
   // Anticipo del encargo, o el anticipo descontado en la factura y el saldo
   const after: [string, string, boolean][] = [];
   if (sourcing && deposit > 0) after.push([d.refunded_at && d.deposit_paid_at ? t.depositRefunded : d.deposit_paid_at ? t.depositPaid : t.depositDue, usd(deposit), false]);
-  if (d.kind === "invoice" && deposit > 0) after.push([t.lessDeposit, `-${usd(deposit)}`, false], [t.balance, usd(balanceDue(d)), true]);
+  if (d.kind === "invoice" && deposit > 0) after.push([t.lessDeposit, `-${usd(deposit)}`, false], [d.status === "paid" ? t.balancePaid : t.balance, usd(balanceDue(d)), true]);
+  // Proforma: cada pago recibido y el saldo
+  if (d.kind === "proforma") {
+    const short = (iso: string) => new Intl.DateTimeFormat(d.lang === "es" ? "es-ES" : "en-US", { day: "numeric", month: "short", timeZone: "UTC" }).format(new Date(`${iso}T12:00:00Z`));
+    for (const p of d.payments ?? []) after.push([`${t.paymentLine} ${short(p.date)}${p.method ? ` · ${p.method}` : ""}`, `-${usd(p.amount)}`, false]);
+    after.push([t.balance, usd(Math.max(0, Number(d.total) - paidSoFar(d))), true]);
+  }
   for (const [k, v, big] of after) {
     y -= big ? 20 : 16;
-    text(k, tx, y, big ? { font: display, size: 13 } : { font: light, size: 9, color: GRAY });
+    // Las etiquetas largas (pago · forma de pago) empiezan más a la izquierda para no pisar el importe
+    const lx = !big && width(k, light, 9) > 140 ? right - 90 - width(k, light, 9) : tx;
+    text(k, lx, y, big ? { font: display, size: 13 } : { font: light, size: 9, color: GRAY });
     text(v, right, y, big ? { font: display, size: 13, align: "right" } : { size: 9, align: "right" });
   }
 

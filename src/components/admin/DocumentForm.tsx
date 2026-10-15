@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { convertSourcing, markDepositReceived, markPaid, saveDocument } from "@/app/admin/document-actions";
+import { closeProformaAction, convertSourcing, markDepositReceived, markPaid, proformaPaymentAction, saveDocument } from "@/app/admin/document-actions";
 import { ID_TYPES, KIND_LABEL, depositPct, docTotals, suggestedDeposit, usd, type Doc, type DocKind, type DocLine } from "@/lib/doc-labels";
 import { PAYMENT } from "@/lib/stock-labels";
 import { SerialWarning } from "./SerialCheck";
@@ -16,7 +16,7 @@ export type CustomerOption = { id: string; label: string; name: string | null; e
 export type StockOption = { id: string; sku: string; title: string; details: string; serial: string | null; price: number | null; cost?: number | null };
 
 const addDays = (iso: string, n: number) => new Date(new Date(`${iso}T12:00:00Z`).getTime() + n * 86_400_000).toISOString().slice(0, 10);
-const DUE_DAYS: Record<DocKind, number> = { quote: 7, memo: 14, invoice: 0, consignment: 90, purchase: 0, sourcing: 60 };
+const DUE_DAYS: Record<DocKind, number> = { quote: 7, memo: 14, invoice: 0, consignment: 90, purchase: 0, sourcing: 60, proforma: 14 };
 const noTax = (k: DocKind) => k === "memo" || k === "consignment" || k === "purchase" || k === "sourcing";
 
 export function DocumentForm({
@@ -88,7 +88,7 @@ export function DocumentForm({
         <label><span className={label}>Fecha</span><input name="issue_date" type="date" defaultValue={doc?.issue_date ?? today} className={field} /></label>
         {kind !== "purchase" ? (
           <label>
-            <span className={label}>{kind === "quote" ? "Válida hasta" : kind === "memo" ? "Devolver antes de" : kind === "consignment" ? "Vigente hasta" : sourcing ? "Plazo de búsqueda hasta" : "Vence"}</span>
+            <span className={label}>{kind === "quote" ? "Válida hasta" : kind === "memo" ? "Devolver antes de" : kind === "consignment" ? "Vigente hasta" : sourcing ? "Plazo de búsqueda hasta" : kind === "proforma" ? "Saldar antes de" : "Vence"}</span>
             <input name="due_date" type="date" value={due} onChange={(e) => setDue(e.target.value)} className={field} />
           </label>
         ) : (
@@ -290,6 +290,46 @@ export function SourcedForm({ id, stock, price }: { id: string; stock: StockOpti
         {pending ? "Creando…" : "Conseguido: facturar"}
       </button>
       {state && "error" in state && <p className="text-sm text-red-200/90 sm:col-span-3">{state.error}</p>}
+    </form>
+  );
+}
+
+// Proforma: depósito a cuenta
+export function ProformaPaymentForm({ id, today }: { id: string; today: string }) {
+  const [state, action, pending] = useActionState(proformaPaymentAction.bind(null, id), null);
+  return (
+    <form action={action} className="flex flex-wrap items-end gap-3">
+      <label><span className={label}>Depósito $</span><input name="amount" inputMode="decimal" required className={field} /></label>
+      <label><span className={label}>Fecha</span><input name="paid_at" type="date" defaultValue={today} className={field} /></label>
+      <label>
+        <span className={label}>Forma de pago</span>
+        <select name="payment_method" defaultValue="Transferencia" className={field}>
+          {Object.values(PAYMENT).map((p) => <option key={p} value={p}>{p}</option>)}
+        </select>
+      </label>
+      <button disabled={pending} className="bg-ivory px-5 py-2.5 text-[0.68rem] tracking-[0.22em] uppercase text-ink hover:bg-brass disabled:opacity-60">{pending ? "Guardando…" : "Registrar depósito"}</button>
+      {state && "error" in state && <p className="text-sm text-red-200/90">{state.error}</p>}
+      {state && "ok" in state && !pending && <p className="text-sm text-emerald-200/90">Depósito registrado</p>}
+    </form>
+  );
+}
+
+// Proforma saldada: el saldo como último pago → factura pagada
+export function CloseProformaForm({ id, today, balance }: { id: string; today: string; balance: number }) {
+  const [state, action, pending] = useActionState(closeProformaAction.bind(null, id), null);
+  return (
+    <form action={action} className="flex flex-wrap items-end gap-3">
+      <label><span className={label}>Fecha del pago final</span><input name="paid_at" type="date" defaultValue={today} className={field} /></label>
+      <label>
+        <span className={label}>Cómo pagó el saldo</span>
+        <select name="payment_method" defaultValue="Transferencia" className={field}>
+          {Object.values(PAYMENT).map((p) => <option key={p} value={p}>{p}</option>)}
+        </select>
+      </label>
+      <button disabled={pending} className="bg-ivory px-5 py-2.5 text-[0.68rem] tracking-[0.22em] uppercase text-ink hover:bg-brass disabled:opacity-60">
+        {pending ? "Generando…" : balance > 0 ? `Saldada (${usd(balance)}): generar factura` : "Generar factura"}
+      </button>
+      {state && "error" in state && <p className="text-sm text-red-200/90">{state.error}</p>}
     </form>
   );
 }

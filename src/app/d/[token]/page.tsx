@@ -1,10 +1,10 @@
-import { Suspense } from "react";
+import { Fragment, Suspense } from "react";
 import Image from "next/image";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { adminDb } from "@/lib/supabase";
 import { getDocSettings } from "@/lib/documents";
-import { PRINT, SIGNABLE, balanceDue, docTotals, maskedId, usd, type Doc } from "@/lib/doc-labels";
+import { PRINT, SIGNABLE, balanceDue, docTotals, maskedId, paidSoFar, usd, type Doc } from "@/lib/doc-labels";
 import { PrintButton } from "./PrintButton";
 import { SignaturePad } from "./SignaturePad";
 import { downloadPrivate } from "@/lib/private-files";
@@ -92,7 +92,7 @@ async function SharedDocument({ params, searchParams }: { params: Promise<{ toke
             </div>
           </div>
           <div className="w-full sm:w-auto sm:text-right">
-            <h1 className={`font-display font-light tracking-[0.06em] ${consign || sourcing ? "text-[1.7rem] leading-tight" : "text-4xl"}`}>{t[d.kind]}</h1>
+            <h1 className={`font-display font-light tracking-[0.06em] ${consign || sourcing || d.kind === "proforma" ? "text-[1.7rem] leading-tight" : "text-4xl"}`}>{t[d.kind]}</h1>
             <dl className="mt-3 grid grid-cols-[auto_auto] justify-start gap-x-4 gap-y-1 text-xs sm:justify-end">
               <dt className="text-[#5d625e]">{t.number}</dt><dd>{d.number}</dd>
               <dt className="text-[#5d625e]">{t.date}</dt><dd>{date(d.issue_date)}</dd>
@@ -163,10 +163,18 @@ async function SharedDocument({ params, searchParams }: { params: Promise<{ toke
                 <dd className="text-right tabular-nums">{usd(deposit)}</dd>
               </>
             )}
+            {d.kind === "proforma" && (
+              <>
+                {(d.payments ?? []).map((p, i) => (
+                  <Fragment key={i}><dt className="text-[#5d625e]">{t.paymentLine} {date(p.date)}{p.method ? ` · ${p.method}` : ""}</dt><dd className="text-right tabular-nums">−{usd(p.amount)}</dd></Fragment>
+                ))}
+                <dt className="font-display text-lg">{t.balance}</dt><dd className="text-right font-display text-lg tabular-nums">{usd(Math.max(0, Number(d.total) - paidSoFar(d)))}</dd>
+              </>
+            )}
             {d.kind === "invoice" && deposit > 0 && (
               <>
                 <dt className="text-[#5d625e]">{t.lessDeposit}</dt><dd className="text-right tabular-nums">−{usd(deposit)}</dd>
-                <dt className="font-display text-lg">{t.balance}</dt><dd className="text-right font-display text-lg tabular-nums">{usd(balanceDue(d))}</dd>
+                <dt className="font-display text-lg">{d.status === "paid" ? t.balancePaid : t.balance}</dt><dd className="text-right font-display text-lg tabular-nums">{usd(balanceDue(d))}</dd>
               </>
             )}
           </dl>

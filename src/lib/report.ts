@@ -25,7 +25,7 @@ export async function monthlyReport(month: string) {
     db.from("inventory_items").select("*").gte("owner_paid_at", start).lt("owner_paid_at", end).order("owner_paid_at"),
     db.from("documents").select("*").eq("kind", "invoice").eq("status", "paid").gte("paid_at", start).lt("paid_at", end).order("paid_at"),
     db.from("item_services").select("*, item:inventory_items(sku, brand, model)").gte("returned_at", start).lt("returned_at", end).order("returned_at"),
-    db.from("documents").select("*").eq("kind", "sourcing").not("deposit_paid_at", "is", null).lt("deposit_paid_at", end).order("deposit_paid_at"),
+    db.from("documents").select("*").in("kind", ["sourcing", "proforma"]).not("deposit_paid_at", "is", null).lt("deposit_paid_at", end).order("deposit_paid_at"),
   ]);
 
   const sales = ((sold.data ?? []) as Item[]).map((i) => {
@@ -60,7 +60,7 @@ export async function monthlyReport(month: string) {
     .filter((d) => d.deposit_paid_at! >= start || (d.status === "sent" && !d.refunded_at) || (d.refunded_at && d.refunded_at >= start && d.refunded_at < end))
     .map((d) => ({
       date: d.deposit_paid_at!, number: d.number, client: d.client_name, watch: d.items.map((l) => l.title).join(", "), method: d.deposit_method, amount: Number(d.deposit ?? 0),
-      state: d.refunded_at ? `Devuelto ${d.refunded_at}` : d.status === "converted" ? "Aplicado a factura" : d.status === "sent" ? "Retenido (pasivo)" : d.status,
+      state: `${d.kind === "proforma" ? "Proforma · " : "Encargo · "}${d.refunded_at ? `Devuelto ${d.refunded_at}` : d.status === "converted" ? "Aplicado a factura" : d.status === "sent" ? "Retenido (pasivo)" : d.status}`,
       held: d.status === "sent" && !d.refunded_at,
     }));
 
