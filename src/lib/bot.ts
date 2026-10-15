@@ -113,6 +113,9 @@ export async function handleMessage(msg: TgMessage) {
   // Encargo con anticipo a medias
   const { onSourcingText } = await import("./bot-sourcing");
   if (await onSourcingText(chatId, text)) return;
+  // Gasto del negocio a medias
+  const { onExpenseText } = await import("./bot-expense");
+  if (await onExpenseText(chatId, text)) return;
   // Recordatorio a medias
   const { onReminderText } = await import("./bot-reminders");
   if (await onReminderText(chatId, text)) return;
@@ -681,6 +684,7 @@ async function handleCommand(chatId: number, text: string, user: string) {
       await (await import("./bot-sale")).clearSale(chatId);
       await (await import("./bot-proforma")).clearProforma(chatId);
       await (await import("./bot-reminders")).clearReminder(chatId);
+      await (await import("./bot-expense")).clearExpense(chatId);
       return sendMessage(chatId, draft || flow ? "Cancelado." : "Listo: no queda nada en curso.");
     }
 

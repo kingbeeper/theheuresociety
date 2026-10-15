@@ -143,6 +143,15 @@ export async function buildDigest(now = Date.now()) {
 export async function sendDigest() {
   const text = await buildDigest();
   await notifyAdmins(text);
+  // Los lunes, además, el resumen de la semana
+  if (new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", weekday: "short" }).format(new Date()) === "Mon") {
+    try {
+      const { buildWeekly } = await import("./weekly");
+      await notifyAdmins(await buildWeekly());
+    } catch (e) {
+      console.error("Resumen semanal:", e);
+    }
+  }
   // Citas de ayer sin resultado: «¿cómo fue?» con botones, para empezar el seguimiento
   try {
     const { askYesterdayOutcomes } = await import("./bot-citas");

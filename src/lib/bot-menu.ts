@@ -62,6 +62,7 @@ export async function onMenuText(chatId: number, text: string, user: string) {
         reply_markup: keyboard([
           [{ text: "💵 Poner lo que costó un reloj", callback_data: "mcost:cost" }],
           [{ text: "🧾 Sumar un gasto (servicio, pulido…)", callback_data: "mcost:extra" }],
+          [{ text: "🏢 Gasto del negocio (renta, marketing…)", callback_data: "mbex:new" }],
         ]),
       });
       return true;
@@ -107,7 +108,7 @@ export async function onMenuText(chatId: number, text: string, user: string) {
   return false;
 }
 
-const MENU_ACTIONS = new Set(["mnew", "mopen", "mcost", "mlist", "mst", "mset", "mcase", "mdem", "mappr", "mdrop", "mvid", "msoc", "mcit", "mrem"]);
+const MENU_ACTIONS = new Set(["mnew", "mopen", "mcost", "mlist", "mst", "mset", "mcase", "mdem", "mappr", "mdrop", "mvid", "msoc", "mcit", "mrem", "mbex"]);
 export const isMenuAction = (action: string) => MENU_ACTIONS.has(action);
 
 type Watch = { id: string; brand: string; model: string; reference: string; status: string };
@@ -208,6 +209,10 @@ export async function onMenuCallback(chatId: number, cbId: string, messageId: nu
 
     case "msoc":
       return socialMenu(chatId, arg, user);
+
+    case "mbex":
+      await clearButtons();
+      return (await import("./bot-expense")).startExpense(chatId, user);
 
     case "mrem": {
       const r = await import("./bot-reminders");

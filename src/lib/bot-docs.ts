@@ -525,6 +525,9 @@ export async function onCallback(chatId: number, cbId: string, messageId: number
   const answer = (text?: string) => tg("answerCallbackQuery", { callback_query_id: cbId, ...(text && { text }) }).catch(() => {});
   const clearButtons = () => tg("editMessageReplyMarkup", { chat_id: chatId, message_id: messageId, reply_markup: keyboard([]) }).catch(() => {});
 
+  // Gasto general del negocio
+  if (action === "dbex") return (await import("./bot-expense")).onExpenseCallback(chatId, cbId, messageId, arg);
+
   // Recordatorios de clientes
   if (action === "drem") return (await import("./bot-reminders")).onReminderCallback(chatId, cbId, messageId, arg, user);
 

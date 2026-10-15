@@ -294,3 +294,18 @@ export async function deleteItem(id: string) {
   await adminDb().from("inventory_items").delete().eq("id", id);
   redirect("/admin/inventario");
 }
+
+// Revisar el precio de mercado ahora (si no, se revisa solo cada semana)
+export async function marketCheckAction(id: string) {
+  await requireAdmin("inventario");
+  const db = adminDb();
+  const { data: i } = await db.from("inventory_items").select("id, sku, brand, model, reference, condition, comes_with, papers_date, asking_price").eq("id", id).single();
+  if (!i) return;
+  const { checkMarket } = await import("@/lib/market");
+  const m = await checkMarket(i as never).catch(() => null);
+  await db
+    .from("inventory_items")
+    .update({ market_checked_at: new Date().toISOString(), ...(m && { market_low: m.low, market_typical: m.typical, market_high: m.high, market_listings: m.listings, market_note: m.note, market_sources: m.sources.slice(0, 3) }) })
+    .eq("id", id);
+  refresh();
+}

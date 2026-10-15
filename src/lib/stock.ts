@@ -47,6 +47,14 @@ export type Item = {
   location_note?: string | null;
   last_counted_at?: string | null;
   sold_by?: string | null;
+  // Precio de mercado (revisión semanal)
+  market_low?: number | null;
+  market_typical?: number | null;
+  market_high?: number | null;
+  market_listings?: number | null;
+  market_note?: string | null;
+  market_sources?: string[];
+  market_checked_at?: string | null;
   created_at: string;
 };
 

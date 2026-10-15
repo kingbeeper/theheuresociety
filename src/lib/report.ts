@@ -64,6 +64,10 @@ export async function monthlyReport(month: string) {
       held: d.status === "sent" && !d.refunded_at,
     }));
 
+  const { data: bizRows } = await db.from("business_expenses").select("spent_on, category, amount, note").gte("spent_on", start).lt("spent_on", end).order("spent_on");
+  const { EXPENSE_CATEGORY } = await import("./expenses");
+  const business = (bizRows ?? []).map((e) => ({ date: e.spent_on as string, category: EXPENSE_CATEGORY[e.category as string] ?? e.category, note: e.note as string | null, amount: Number(e.amount) }));
+
   const sum = <T,>(rows: T[], f: (r: T) => number | null) => rows.reduce((a, r) => a + (f(r) ?? 0), 0);
   return {
     month,
@@ -73,6 +77,7 @@ export async function monthlyReport(month: string) {
     taxes,
     repairs,
     deposits,
+    business,
     totals: {
       revenue: sum(sales, (s) => s.price),
       cogs: sum((sold.data ?? []) as Item[], (i) => totalCost(i)),
@@ -84,6 +89,7 @@ export async function monthlyReport(month: string) {
       exemptSales: sum(taxes, (t) => (t.tax > 0 ? 0 : t.taxable)),
       repairs: sum(repairs, (r) => r.cost),
       depositsReceived: sum(deposits, (d) => (d.date >= start ? d.amount : 0)),
+      businessExpenses: sum(business, (b) => b.amount),
       depositsHeld: sum(deposits, (d) => (d.held ? d.amount : 0)),
     },
   };

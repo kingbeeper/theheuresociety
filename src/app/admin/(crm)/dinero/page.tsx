@@ -5,7 +5,9 @@ import { adminDb } from "@/lib/supabase";
 import { summarize, type Item } from "@/lib/stock";
 import { balanceDue, paidSoFar, type Doc } from "@/lib/doc-labels";
 import { todayInMiami } from "@/lib/booking";
-import { Card, fmtDate, money, PageTitle, requestTime } from "@/components/admin/ui";
+import { Card, fieldClass, fmtDate, money, PageTitle, requestTime } from "@/components/admin/ui";
+import { EXPENSE_CATEGORY, expensesBetween, sumExpenses } from "@/lib/expenses";
+import { addExpenseAction, deleteExpenseAction } from "../../actions";
 
 export const metadata = { title: "Dinero" };
 
@@ -28,6 +30,8 @@ export default async function MoneyPage() {
     db.from("inventory_items").select("*"),
   ]);
   const docs = (openDocs ?? []) as Doc[];
+  const monthExpenses = await expensesBetween(monthStart).catch(() => []);
+  const spentMonth = sumExpenses(monthExpenses);
   const s = summarize((stock ?? []) as Item[], now);
 
   // Por cobrar: facturas emitidas (el saldo, si tenían anticipo) y saldo de las proformas
@@ -64,6 +68,8 @@ export default async function MoneyPage() {
     { label: "Vencido", value: money(overdue), sub: overdue ? "pasada la fecha de pago" : "nada vencido", tone: overdue ? "text-red-200" : undefined },
     { label: "Cobrado este mes", value: money(collectedMonth), sub: "facturas, depósitos y anticipos" },
     { label: "Ventas del mes", value: money(s.salesMonth), sub: `${s.soldMonthCount} reloj(es) · ganancia ${money(s.profitMonth)}` },
+    { label: "Gastos del negocio (mes)", value: money(spentMonth), sub: `${monthExpenses.length} gasto(s): renta, marketing…` },
+    { label: "Ganancia real del mes", value: money(s.profitMonth - spentMonth), sub: "ganancia de ventas − gastos del negocio", tone: s.profitMonth - spentMonth < 0 ? "text-red-200" : "text-emerald-200" },
     { label: "Anticipos y depósitos", value: money(held), sub: "de clientes; aún no son venta" },
     { label: "Debes a dueños", value: money(s.owedAmount), sub: `${s.owed.length} reloj(es) vendidos en consignación`, tone: s.owed.length ? "text-amber-200" : undefined },
     { label: "Capital en stock", value: money(s.capital), sub: `costo de ${s.inStock - s.consignedCount} reloj(es) propios` },
@@ -75,7 +81,7 @@ export default async function MoneyPage() {
     <>
       <PageTitle eyebrow="CRM" title="Dinero" action={<Link href="/admin/informes" className="border border-line px-4 py-2 text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">Informe del mes →</Link>} />
 
-      <div className="grid grid-cols-2 gap-px border border-line bg-line lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-px border border-line bg-line lg:grid-cols-5">
         {kpis.map((k) => (
           <div key={k.label} className="bg-forest px-5 py-5">
             <p className={`break-words font-display text-2xl font-light sm:text-3xl ${k.tone ?? ""}`}>{k.value}</p>
@@ -146,6 +152,32 @@ export default async function MoneyPage() {
             </ul>
           ) : (
             <p className="text-sm text-stone">Ninguno ahora mismo.</p>
+          )}
+        </Card>
+
+        <Card title={`Gastos del negocio este mes · ${money(spentMonth)}`} className="xl:col-span-2">
+          <form action={addExpenseAction} className="grid gap-2 sm:grid-cols-[130px_180px_1fr_140px_auto]">
+            <input name="spent_on" type="date" defaultValue={today} aria-label="Fecha" className={fieldClass} />
+            <select name="category" defaultValue="marketing" aria-label="Categoría" className={fieldClass}>
+              {Object.entries(EXPENSE_CATEGORY).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+            </select>
+            <input name="note" placeholder="Detalle (ej. anuncios de Instagram de octubre)" aria-label="Detalle" className={fieldClass} />
+            <input name="amount" inputMode="decimal" required placeholder="Importe $" aria-label="Importe" className={fieldClass} />
+            <button className="border border-line px-4 py-2 text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">Añadir</button>
+          </form>
+          <p className="mt-2 text-xs text-stone">Gastos que no son de un reloj concreto (los del reloj, como servicio o pulido, van en su ficha). También desde Telegram: 💵 Costos y gastos → 🏢 Gasto del negocio.</p>
+          {monthExpenses.length > 0 && (
+            <ul className="mt-3">
+              {monthExpenses.map((e) => (
+                <li key={e.id} className={row}>
+                  <span className="min-w-0">{EXPENSE_CATEGORY[e.category] ?? e.category}{e.note ? ` · ${e.note}` : ""}<span className="block text-xs text-stone">{day(e.spent_on)}{e.created_by ? ` · ${e.created_by.split("@")[0]}` : ""}</span></span>
+                  <span className="flex items-center gap-3">
+                    <span className="tabular-nums">{money(e.amount)}</span>
+                    <form action={deleteExpenseAction.bind(null, e.id)}><button className="text-xs text-stone underline hover:text-red-200">Quitar</button></form>
+                  </span>
+                </li>
+              ))}
+            </ul>
           )}
         </Card>
 

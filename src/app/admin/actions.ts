@@ -362,3 +362,20 @@ export async function setSocialBot(contactId: string, on: boolean) {
   }
   refresh();
 }
+
+// ───────────────────────────── Gastos generales del negocio ─────────────────────────────
+export async function addExpenseAction(form: FormData) {
+  const user = await requireAdmin("costos");
+  const amount = Number(String(form.get("amount") ?? "").replace(/[^\d.]/g, ""));
+  const date = text(form, "spent_on");
+  if (!amount || amount <= 0) return;
+  const { addExpense } = await import("@/lib/expenses");
+  await addExpense({ spent_on: date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : new Date().toISOString().slice(0, 10), category: text(form, "category") ?? "other", amount, note: text(form, "note") }, user);
+  refresh();
+}
+
+export async function deleteExpenseAction(id: string) {
+  await requireAdmin("costos");
+  await adminDb().from("business_expenses").delete().eq("id", id);
+  refresh();
+}

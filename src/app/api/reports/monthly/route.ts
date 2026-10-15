@@ -30,6 +30,8 @@ export async function GET(request: Request) {
     { k: "Compras de stock propio", v: t.bought },
     { k: "Pagado a dueños (consignación y memo)", v: t.ownerPaid },
     { k: "Gastos de relojero", v: t.repairs },
+    { k: "Gastos generales del negocio", v: t.businessExpenses },
+    { k: "Ganancia real (ganancia bruta − gastos generales)", v: t.profit - t.businessExpenses },
     { k: "Ventas con impuesto (base imponible)", v: t.taxableSales },
     { k: "Ventas exentas (facturas sin impuesto)", v: t.exemptSales },
     { k: "Impuesto de ventas cobrado", v: t.taxCollected },
@@ -45,6 +47,7 @@ export async function GET(request: Request) {
   sheet("Impuesto de ventas", [["Fecha de pago", "date", 14], ["Factura", "number", 16], ["Cliente", "client", 28], ["Base", "taxable", 14, true], ["%", "rate", 6], ["Impuesto", "tax", 14, true], ["Total", "total", 14, true]], r.taxes);
   sheet("Relojero", [["Fecha", "date", 12], ["SKU", "sku", 11], ["Reloj", "watch", 34], ["Relojero", "provider", 24], ["Trabajo", "work", 24], ["Costo", "cost", 14, true]], r.repairs);
 
+  sheet("Gastos del negocio", [["Fecha", "date", 12], ["Categoría", "category", 26], ["Detalle", "note", 40], ["Importe", "amount", 14, true]], r.business);
   sheet("Anticipos (pasivo)", [["Fecha", "date", 12], ["Documento", "number", 14], ["Cliente", "client", 26], ["Reloj buscado", "watch", 36], ["Pago", "method", 14], ["Anticipo", "amount", 14, true], ["Estado", "state", 22]], r.deposits);
 
   const commissions = await monthlyCommissions(month);

@@ -9,7 +9,8 @@ import { ACQUISITION, ITEM_STATUS, isOwnerStock } from "@/lib/stock-labels";
 import { Card, fieldClass, fmtDate, fmtDateTime, ghostButtonClass, money, PageTitle, requestTime } from "@/components/admin/ui";
 import { ItemForm, ReturnForm, SaleForm } from "@/components/admin/ItemForms";
 import { STATUS_LABEL, type DocKind, type DocStatus } from "@/lib/doc-labels";
-import { deleteItem, markCountedAction, markOwnerPaid, reopenItem, returnFromServiceAction, sendToServiceAction, setLocation, setReserved } from "../../../inventory-actions";
+import { priceVsMarket } from "@/lib/market";
+import { deleteItem, marketCheckAction, markCountedAction, markOwnerPaid, reopenItem, returnFromServiceAction, sendToServiceAction, setLocation, setReserved } from "../../../inventory-actions";
 import { itemServices, providers } from "@/lib/services";
 import { LOCATIONS, type Location } from "@/lib/locations";
 import { team } from "@/lib/team";
@@ -109,6 +110,39 @@ export default async function ItemPage({ params }: PageProps<"/admin/inventario/
           {item.status === "in_stock" && stripeConfigured() && (
             <Card title="💳 Depósito con tarjeta para reservar">
               <DepositForm itemId={item.id} customers={customerOptions} />
+            </Card>
+          )}
+
+          {available && (
+            <Card title="Precio de mercado">
+              {item.market_checked_at && (item.market_low || item.market_high) ? (
+                <div className="text-sm">
+                  <p className="font-display text-2xl">{money(item.market_low)} – {money(item.market_high)}</p>
+                  <p className="text-xs text-stone">
+                    Típico {money(item.market_typical)}{item.market_listings ? ` · ${item.market_listings} anuncio(s)` : ""} · revisado {fmtDate(item.market_checked_at)}
+                  </p>
+                  {(() => {
+                    const v = priceVsMarket({ asking_price: item.asking_price, market_low: item.market_low ?? null, market_high: item.market_high ?? null, market_typical: item.market_typical ?? null });
+                    if (!v) return null;
+                    return (
+                      <p className={`mt-2 text-sm ${v.state === "high" ? "text-amber-200" : v.state === "low" ? "text-sky-200" : "text-emerald-200"}`}>
+                        {v.state === "high" ? `⬆️ Tu precio (${money(item.asking_price)}) está por encima del mercado: ~${money(v.diff)} sobre el típico.` : v.state === "low" ? `⬇️ Tu precio (${money(item.asking_price)}) está por debajo del mercado: podrías pedir ~${money(v.diff)} más.` : `✓ Tu precio (${money(item.asking_price)}) está dentro del mercado.`}
+                      </p>
+                    );
+                  })()}
+                  {item.market_note && <p className="mt-2 text-xs text-stone">{item.market_note}</p>}
+                  {(item.market_sources ?? []).length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-3 text-xs">
+                      {(item.market_sources ?? []).map((u, k) => <a key={k} href={u} target="_blank" rel="noreferrer" className="text-brass underline hover:text-ivory">Fuente {k + 1}</a>)}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm text-stone">{item.market_checked_at ? "No se encontraron anuncios comparables." : "Aún sin revisar: se revisa solo cada semana."}</p>
+              )}
+              <form action={marketCheckAction.bind(null, item.id)} className="mt-3">
+                <button className="border border-line px-3 py-1.5 text-[0.62rem] tracking-[0.18em] uppercase text-stone hover:text-ivory">Revisar ahora (Chrono24, WatchCharts…)</button>
+              </form>
             </Card>
           )}
 
