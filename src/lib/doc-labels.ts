@@ -122,7 +122,7 @@ export const PRINT = {
     item: "Description", serial: "Serial", qty: "Qty", price: "Price", amount: "Amount", net: "Net to consignor",
     consignSign: ["Consignor — signature", "The Heure Society — signature"],
     subtotal: "Subtotal", discount: "Discount", tax: "Sales tax", shipping: "Shipping & insurance", total: "Total",
-    paid: "PAID", void: "VOID", payment: "Payment", notes: "Notes", terms: "Terms & conditions",
+    paid: "PAID IN FULL", void: "VOID", payment: "Payment", notes: "Notes", terms: "Terms & conditions",
     signature: "Received in good condition — signature", print: "Print / Save as PDF",
     netTotal: "Total net to consignor",
     signedBy: "Signed electronically by", acceptedBy: "Accepted and signed by",

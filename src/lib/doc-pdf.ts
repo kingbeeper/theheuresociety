@@ -112,7 +112,8 @@ export async function renderDocPdf(d: Doc, s: Required<DocSettings>) {
   const stamp = d.status === "void" ? t.void : d.status === "paid" && !consign ? t.paid : null;
   if (stamp) {
     const green = rgb(0.18, 0.42, 0.3);
-    page.drawText(stamp, { x: W - M - 150, y: y - 60, font: display, size: 30, color: green, opacity: 0.55, rotate: degrees(12) });
+    // Alineado a la derecha según su largo («PAID IN FULL» es más ancho que «PAGADA»)
+    page.drawText(stamp, { x: W - M - display.widthOfTextAtSize(stamp, 30) - 10, y: y - 60, font: display, size: 30, color: green, opacity: 0.55, rotate: degrees(12) });
   }
 
   // ── cliente ──
