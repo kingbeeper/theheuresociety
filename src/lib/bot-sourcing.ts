@@ -92,8 +92,7 @@ export async function onSourcingText(chatId: number, text: string) {
     f.details = rest.join(",").trim().slice(0, 500) || null;
     f.step = "client";
     await saveFlow(chatId, f);
-    await sendMessage(chatId, "👤 ¿Para qué cliente? Nombre y teléfono.\n<i>Ej.: Carlos Méndez 305 555 1234</i>
-📎 O compártelo desde tu agenda: clip → <b>Contacto</b>");
+    await sendMessage(chatId, "👤 ¿Para qué cliente? Nombre y teléfono.\n<i>Ej.: Carlos Méndez 305 555 1234</i>\n📎 O compártelo desde tu agenda: clip → <b>Contacto</b>");
     return true;
   }
   if (f.step === "client") {

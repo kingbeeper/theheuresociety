@@ -50,8 +50,7 @@ const rows3 = <T,>(xs: T[]) => xs.reduce<T[][]>((acc, x, i) => (i % 3 ? acc[acc.
 // ───────────────────────────── Agendar ─────────────────────────────
 export async function startCita(chatId: number, user: string) {
   await saveFlow(chatId, { step: "client", user });
-  return sendMessage(chatId, "📅 <b>Nueva cita</b>\n\n👤 ¿Para quién? Escribe nombre y teléfono.\n<i>Ej.: Carlos Méndez 305 555 1234</i>
-📎 O compártelo desde tu agenda: clip → <b>Contacto</b>\n\n/cancelar para salir.");
+  return sendMessage(chatId, "📅 <b>Nueva cita</b>\n\n👤 ¿Para quién? Escribe nombre y teléfono.\n<i>Ej.: Carlos Méndez 305 555 1234</i>\n📎 O compártelo desde tu agenda: clip → <b>Contacto</b>\n\n/cancelar para salir.");
 }
 
 async function askDay(chatId: number, f: CitaFlow) {

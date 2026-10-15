@@ -52,8 +52,7 @@ const miamiTime = (d: Date) => new Intl.DateTimeFormat("sv-SE", { timeZone: TIME
 // ───────────────────────────── Nuevo recordatorio ─────────────────────────────
 export async function startReminder(chatId: number, user: string) {
   await saveFlow(chatId, { step: "client", user, chatId });
-  return sendMessage(chatId, "⏰ <b>Nuevo recordatorio</b>\n\n👤 ¿Qué cliente? Escribe nombre y teléfono.\n<i>Ej.: Carlos Méndez 305 555 1234</i>
-📎 O compártelo desde tu agenda: clip → <b>Contacto</b>\n\n/cancelar para salir.");
+  return sendMessage(chatId, "⏰ <b>Nuevo recordatorio</b>\n\n👤 ¿Qué cliente? Escribe nombre y teléfono.\n<i>Ej.: Carlos Méndez 305 555 1234</i>\n📎 O compártelo desde tu agenda: clip → <b>Contacto</b>\n\n/cancelar para salir.");
 }
 
 async function askWhat(chatId: number, f: RemFlow) {
