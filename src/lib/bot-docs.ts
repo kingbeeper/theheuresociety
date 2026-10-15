@@ -479,7 +479,7 @@ export async function finish(chatId: number, flow: DocFlow) {
 export async function deliver(chatId: number, d: Doc) {
   const link = `${SITE_URL}/d/${d.token}`;
   const first = (d.client_name ?? "").split(" ")[0];
-  const label = d.lang === "es" ? KIND_LABEL[d.kind].toLowerCase() : { quote: "quotation", memo: "memorandum", invoice: "invoice", consignment: "consignment agreement", purchase: "bill of sale", sourcing: "sourcing agreement", proforma: "proforma invoice" }[d.kind];
+  const label = d.lang === "es" ? (d.kind === "proforma" ? "factura" : KIND_LABEL[d.kind].toLowerCase()) : { quote: "quotation", memo: "memorandum", invoice: "invoice", consignment: "consignment agreement", purchase: "bill of sale", sourcing: "sourcing agreement", proforma: "invoice" }[d.kind];
   const msg = d.lang === "es"
     ? `Hola ${first}, le comparto su ${label} ${d.number} de The Heure Society: ${link}`
     : `Hi ${first}, here is your ${label} ${d.number} from The Heure Society: ${link}`;

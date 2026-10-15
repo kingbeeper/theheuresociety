@@ -40,7 +40,7 @@ export default async function DocumentPage({ params }: PageProps<"/admin/documen
   const first = (d.client_name ?? "").split(" ")[0];
   const message =
     d.lang === "es"
-      ? `Hola ${first}, le comparto su ${KIND_LABEL[d.kind].toLowerCase()} ${d.number} de The Heure Society (${usd(d.total)}): ${link}`
+      ? `Hola ${first}, le comparto su ${d.kind === "proforma" ? "factura" : KIND_LABEL[d.kind].toLowerCase()} ${d.number} de The Heure Society (${usd(d.total)}): ${link}`
       : `Hi ${first}, here is your ${t[d.kind].toLowerCase()} ${d.number} from The Heure Society (${usd(d.total)}): ${link}`;
   const phone = d.client_phone?.replace(/\D/g, "");
   const button = "bg-ivory px-5 py-2.5 text-[0.68rem] tracking-[0.22em] uppercase text-ink hover:bg-brass";
@@ -58,7 +58,7 @@ export default async function DocumentPage({ params }: PageProps<"/admin/documen
             {d.id_photo_path && <a href={`/api/private/id/${d.id}`} target="_blank" rel="noreferrer" className={ghostButtonClass}>🪪 Identificación</a>}
             {d.kind === "invoice" && d.status !== "draft" && d.items.some((l) => l.item_id) && <a href={`/d/${d.token}/certificate`} target="_blank" rel="noreferrer" className={ghostButtonClass}>Certificado</a>}
             {phone && <a href={`https://wa.me/${phone}?text=${encodeURIComponent(message)}`} target="_blank" rel="noreferrer" className={ghostButtonClass}>Enviar por WhatsApp</a>}
-            {d.client_email && <a href={`mailto:${d.client_email}?subject=${encodeURIComponent(`${d.lang === "es" ? KIND_LABEL[d.kind] : t[d.kind]} ${d.number} · The Heure Society`)}&body=${encodeURIComponent(message)}`} className={ghostButtonClass}>Enviar por correo</a>}
+            {d.client_email && <a href={`mailto:${d.client_email}?subject=${encodeURIComponent(`${t[d.kind]} ${d.number} · The Heure Society`)}&body=${encodeURIComponent(message)}`} className={ghostButtonClass}>Enviar por correo</a>}
           </div>
         }
       />

@@ -110,7 +110,7 @@ export const usd = (n: number | null | undefined) =>
 // Textos del documento impreso (lo que ve el cliente), en inglés o español
 export const PRINT = {
   en: {
-    quote: "Quotation", memo: "Memorandum", invoice: "Invoice", consignment: "Consignment Agreement", purchase: "Bill of Sale", sourcing: "Sourcing Agreement", proforma: "Proforma Invoice",
+    quote: "Quotation", memo: "Memorandum", invoice: "Invoice", consignment: "Consignment Agreement", purchase: "Bill of Sale", sourcing: "Sourcing Agreement", proforma: "Invoice",
     number: "No.", date: "Date", due: { quote: "Valid until", memo: "Return by", invoice: "Due date", consignment: "Term ends", purchase: "", sourcing: "Search period ends", proforma: "Balance due by" },
     billTo: { quote: "Prepared for", memo: "Consignee", invoice: "Bill to", consignment: "Consignor", purchase: "Seller", sourcing: "Client", proforma: "Bill to" },
     paymentsReceived: "Payments received", paymentLine: "Payment",
@@ -128,7 +128,7 @@ export const PRINT = {
     signedBy: "Signed electronically by", acceptedBy: "Accepted and signed by",
   },
   es: {
-    quote: "Cotización", memo: "Memorándum", invoice: "Factura", consignment: "Contrato de consignación", purchase: "Contrato de compraventa", sourcing: "Acuerdo de búsqueda", proforma: "Factura proforma",
+    quote: "Cotización", memo: "Memorándum", invoice: "Factura", consignment: "Contrato de consignación", purchase: "Contrato de compraventa", sourcing: "Acuerdo de búsqueda", proforma: "Factura",
     number: "N.º", date: "Fecha", due: { quote: "Válida hasta", memo: "Devolver antes de", invoice: "Vencimiento", consignment: "Vigente hasta", purchase: "", sourcing: "Plazo de búsqueda hasta", proforma: "Saldar antes de" },
     billTo: { quote: "Preparada para", memo: "Recibe en memo", invoice: "Facturar a", consignment: "Consignante", purchase: "Vendedor", sourcing: "Cliente", proforma: "Facturar a" },
     paymentsReceived: "Pagos recibidos", paymentLine: "Pago",
