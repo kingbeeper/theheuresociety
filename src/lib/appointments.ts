@@ -71,3 +71,75 @@ export async function addAppointment(a: NewAppointment, user: string): Promise<{
   ).catch(() => {});
   return { ok: true, id: appt.id as string, startsAt };
 }
+
+// ───────────────────────────── Seguimiento de cada cita ─────────────────────────────
+export const OUTCOME_LABEL: Record<string, string> = {
+  bought: "Vino y compró",
+  thinking: "Vino, lo está pensando",
+  no_show: "No vino",
+  not_interested: "Vino, no le interesa",
+  other: "Otro",
+};
+
+export type FollowUp = { id: string; kind: "note" | "call" | "appointment" | "outcome"; body: string | null; due_at: string | null; done_at: string | null; new_appointment_id: string | null; created_by: string | null; created_at: string };
+
+async function apptCustomer(appointmentId: string) {
+  const { data } = await adminDb().from("appointments").select("id, customer_id, name, starts_at, kind, phone").eq("id", appointmentId).single();
+  return data as { id: string; customer_id: string | null; name: string | null; starts_at: string; kind: string; phone: string | null } | null;
+}
+
+export async function followupsFor(appointmentIds: string[]) {
+  if (!appointmentIds.length) return new Map<string, FollowUp[]>();
+  const { data } = await adminDb().from("appointment_followups").select("*").in("appointment_id", appointmentIds).order("created_at");
+  const out = new Map<string, FollowUp[]>();
+  for (const f of (data ?? []) as (FollowUp & { appointment_id: string })[]) out.set(f.appointment_id, [...(out.get(f.appointment_id) ?? []), f]);
+  return out;
+}
+
+export async function addFollowupNote(appointmentId: string, body: string, user: string) {
+  const a = await apptCustomer(appointmentId);
+  if (!a) return;
+  await adminDb().from("appointment_followups").insert({ appointment_id: a.id, customer_id: a.customer_id, kind: "note", body, created_by: user });
+  if (a.customer_id) await addEvent(a.customer_id, "note", `Seguimiento de la cita: ${body}`, { appointment: a.id }, user);
+}
+
+// Llamada programada: también queda como «seguimiento» del cliente (resumen de las 8:00 y «Clientes de hoy»)
+export async function scheduleCall(appointmentId: string, date: string, note: string | null, user: string) {
+  const a = await apptCustomer(appointmentId);
+  if (!a || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
+  const db = adminDb();
+  await db.from("appointment_followups").insert({ appointment_id: a.id, customer_id: a.customer_id, kind: "call", body: note, due_at: date, created_by: user });
+  if (a.customer_id) {
+    const followNote = `Llamar (cita del ${whenText(new Date(a.starts_at))})${note ? `: ${note}` : ""}`.slice(0, 300);
+    await db.from("customers").update({ follow_up_at: date, follow_up_note: followNote, last_activity_at: new Date().toISOString() }).eq("id", a.customer_id);
+    await addEvent(a.customer_id, "follow_up", `Llamada programada para el ${date}${note ? `: ${note}` : ""}`, { appointment: a.id }, user);
+  }
+}
+
+export async function completeCall(followupId: string, result: string | null, user: string) {
+  const db = adminDb();
+  const { data: f } = await db.from("appointment_followups").update({ done_at: new Date().toISOString(), ...(result && { body: result }) }).eq("id", followupId).select("appointment_id, customer_id, due_at, body").single();
+  if (f?.customer_id) {
+    await db.from("customers").update({ follow_up_at: null, follow_up_note: null, last_activity_at: new Date().toISOString() }).eq("id", f.customer_id).eq("follow_up_at", f.due_at);
+    await addEvent(f.customer_id, "follow_up", `Llamada hecha${result ? `: ${result}` : ""}`, { appointment: f.appointment_id }, user);
+  }
+}
+
+export async function setOutcome(appointmentId: string, outcome: string, user: string) {
+  if (!OUTCOME_LABEL[outcome]) return;
+  const a = await apptCustomer(appointmentId);
+  if (!a) return;
+  const db = adminDb();
+  await db.from("appointments").update({ outcome }).eq("id", a.id);
+  await db.from("appointment_followups").insert({ appointment_id: a.id, customer_id: a.customer_id, kind: "outcome", body: OUTCOME_LABEL[outcome], created_by: user });
+  if (a.customer_id) await addEvent(a.customer_id, "appointment", `Resultado de la cita: ${OUTCOME_LABEL[outcome]}`, { appointment: a.id, outcome }, user);
+}
+
+// Otra cita para el mismo cliente, enlazada a esta
+export async function followupAppointment(appointmentId: string, n: Omit<NewAppointment, "customerId" | "name" | "phone">, user: string) {
+  const a = await apptCustomer(appointmentId);
+  if (!a) return { error: "La cita ya no existe." };
+  const r = await addAppointment({ ...n, customerId: a.customer_id, name: a.customer_id ? null : a.name, phone: a.customer_id ? null : a.phone }, user);
+  if ("ok" in r) await adminDb().from("appointment_followups").insert({ appointment_id: a.id, customer_id: a.customer_id, kind: "appointment", body: whenText(r.startsAt), new_appointment_id: r.id, created_by: user });
+  return r;
+}

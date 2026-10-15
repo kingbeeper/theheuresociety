@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { createAppointment, rescheduleAppointment } from "@/app/admin/actions";
+import { apptCallAction, apptCallDoneAction, apptNextAction, apptNoteAction, apptOutcomeAction, createAppointment, rescheduleAppointment } from "@/app/admin/actions";
 import { SOURCE_LABEL } from "@/lib/crm-labels";
 
 const field =
@@ -101,6 +101,84 @@ export function RescheduleForm({ id, date, time }: { id: string; date: string; t
         <button disabled={pending} className="border border-line px-3 py-1.5 text-[0.62rem] tracking-[0.18em] uppercase text-stone hover:text-ivory">{pending ? "…" : "Guardar"}</button>
         {state && "error" in state && <span className="text-xs text-red-200/90">{state.error}</span>}
       </form>
+    </details>
+  );
+}
+
+// Seguimiento de una cita: resultado, notas, llamadas programadas y otra cita para el mismo cliente
+type FollowUp = { id: string; kind: string; body: string | null; due_at: string | null; done_at: string | null; created_by: string | null; created_at: string };
+const small = "border border-line bg-ink/60 px-2 py-1.5 text-sm";
+const mini = "border border-line px-3 py-1.5 text-[0.62rem] tracking-[0.18em] uppercase text-stone hover:text-ivory";
+const KIND_ICON: Record<string, string> = { note: "📝", call: "📞", appointment: "📅", outcome: "🏁" };
+
+export function AppointmentFollowUp({ id, followups, outcome, outcomes, today, open }: { id: string; followups: FollowUp[]; outcome: string | null; outcomes: [string, string][]; today: string; open?: boolean }) {
+  const [state, action, pending] = useActionState(apptNextAction.bind(null, id), null);
+  const pendingCalls = followups.filter((f) => f.kind === "call" && !f.done_at);
+  const day = (iso: string) => new Intl.DateTimeFormat("es-ES", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "America/New_York" }).format(new Date(iso));
+  return (
+    <details open={open} className="mt-2 border-l border-brass/40 pl-3 text-sm">
+      <summary className="cursor-pointer text-xs text-brass hover:text-ivory">
+        Seguimiento{followups.length ? ` (${followups.length})` : ""}{outcome ? ` · ${outcomes.find(([k]) => k === outcome)?.[1] ?? outcome}` : ""}{pendingCalls.length ? ` · 📞 llamada el ${pendingCalls[0].due_at}` : ""}
+      </summary>
+      <div className="mt-3 grid gap-4">
+        <div>
+          <p className="mb-1.5 text-[0.6rem] tracking-[0.18em] uppercase text-stone">¿Cómo fue?</p>
+          <div className="flex flex-wrap gap-1.5">
+            {outcomes.map(([k, l]) => (
+              <form key={k} action={apptOutcomeAction.bind(null, id, k)}>
+                <button className={`${mini} ${outcome === k ? "border-brass text-brass" : ""}`}>{l}</button>
+              </form>
+            ))}
+          </div>
+        </div>
+
+        {followups.length > 0 && (
+          <ul className="space-y-1.5 text-xs">
+            {followups.map((f) => (
+              <li key={f.id}>
+                <span className="text-stone">{day(f.created_at)}</span> · {KIND_ICON[f.kind] ?? "•"}{" "}
+                {f.kind === "call" ? `Llamar el ${f.due_at}${f.body ? `: ${f.body}` : ""}${f.done_at ? " · ✓ hecha" : ""}` : f.kind === "appointment" ? `Nueva cita: ${f.body}` : f.kind === "outcome" ? `Resultado: ${f.body}` : f.body}
+                {f.created_by ? <span className="text-stone"> · {f.created_by.split("@")[0]}</span> : null}
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {pendingCalls.map((c) => (
+          <form key={c.id} action={apptCallDoneAction.bind(null, c.id)} className="flex flex-wrap items-center gap-2 text-xs">
+            <span className={c.due_at && c.due_at <= today ? "text-amber-200" : "text-stone"}>📞 Llamada del {c.due_at}:</span>
+            <input name="result" placeholder="¿Qué dijo? (opcional)" className={`${small} min-w-0 flex-1`} />
+            <button className={mini}>Hecha</button>
+          </form>
+        ))}
+
+        <form action={apptNoteAction.bind(null, id)} className="flex flex-wrap gap-2">
+          <input name="body" required placeholder="Añadir nota: qué le gustó, presupuesto, próximos pasos…" className={`${small} min-w-0 flex-1`} />
+          <button className={mini}>Guardar nota</button>
+        </form>
+
+        <form action={apptCallAction.bind(null, id)} className="flex flex-wrap items-center gap-2">
+          <span className="text-xs text-stone">📞 Programar llamada</span>
+          <input name="date" type="date" required min={today} className={small} />
+          <input name="note" placeholder="Para qué (opcional)" className={`${small} min-w-0 flex-1`} />
+          <button className={mini}>Programar</button>
+        </form>
+
+        <form action={action} className="flex flex-wrap items-center gap-2">
+          <span className="text-xs text-stone">📅 Otra cita</span>
+          <input name="date" type="date" required min={today} className={small} />
+          <input name="time" type="time" step={900} required className={small} />
+          <select name="kind" defaultValue="office" className={small}>
+            <option value="office">Oficina</option>
+            <option value="video">Videollamada</option>
+          </select>
+          <input name="note" placeholder="Nota (opcional)" className={`${small} min-w-0 flex-1`} />
+          {state && "clash" in state && <label className="flex items-center gap-1 text-xs text-amber-200"><input name="force" type="checkbox" /> Igualmente</label>}
+          <button disabled={pending} className={mini}>{pending ? "…" : "Agendar"}</button>
+          {state && "error" in state && <span className="w-full text-xs text-red-200/90">{state.error}</span>}
+          {state && "ok" in state && !pending && <span className="w-full text-xs text-emerald-200/90">Cita agendada para el mismo cliente.</span>}
+        </form>
+      </div>
     </details>
   );
 }

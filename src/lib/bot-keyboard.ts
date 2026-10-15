@@ -31,7 +31,7 @@ Usa los botones de abajo:
 🧾 <b>Documentos</b> — factura, memo, consignación, cotización o compra, en PDF al momento
 💵 <b>Costos y gastos</b> — lo que costó cada reloj y sus gastos (para el margen)
 ⌚ <b>Inventario</b> — marcar vendido o reservado, ver lo publicado, el estuche…
-📅 <b>Citas</b> — agendar, ver las de hoy y de la semana, confirmar, cambiar o cancelar
+📅 <b>Citas</b> — agendar, ver las de hoy y de la semana, confirmar, cambiar o cancelar, y el seguimiento (cómo fue, notas, llamadas)
 👥 <b>Clientes de hoy</b> — a quién escribir hoy, con el mensaje ya preparado
 📣 <b>Redes</b> — cómo van, ideas para publicar con el texto listo, comentarios y competencia
 ❓ <b>Ayuda</b> — esta explicación

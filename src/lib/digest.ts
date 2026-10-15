@@ -140,6 +140,13 @@ export async function buildDigest(now = Date.now()) {
 export async function sendDigest() {
   const text = await buildDigest();
   await notifyAdmins(text);
+  // Citas de ayer sin resultado: «¿cómo fue?» con botones, para empezar el seguimiento
+  try {
+    const { askYesterdayOutcomes } = await import("./bot-citas");
+    await askYesterdayOutcomes();
+  } catch (e) {
+    console.error("Seguimiento de citas:", e);
+  }
   // Redes: recordatorio de lo que toca publicar hoy y, si están flojas, ideas nuevas (una vez por semana)
   try {
     const { remindToday } = await import("./social-ideas");

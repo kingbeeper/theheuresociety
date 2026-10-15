@@ -3,16 +3,20 @@ import { adminDb } from "./supabase";
 import { booking } from "./site";
 import { addEvent, normalizePhone } from "./crm";
 import { clashes, miamiToUtc, slotClash, todayInMiami, TIME_ZONE } from "./booking";
-import { addAppointment, clashText, whenText } from "./appointments";
+import { addAppointment, addFollowupNote, clashText, followupAppointment, followupsFor, OUTCOME_LABEL, scheduleCall, setOutcome, whenText } from "./appointments";
 import { escapeHtml as h, keyboard, sendMessage, tg, type InlineButton } from "./telegram";
 
 // Citas por Telegram: agendar (cliente → día → hora → oficina o video → nota), ver las de hoy y de la
-// semana, y confirmar, cambiar de hora o cancelar. Usa la misma lógica que el CRM (lib/appointments).
+// semana, confirmar, cambiar de hora o cancelar, y el seguimiento de cada cita (resultado, notas,
+// llamadas y otra cita para el mismo cliente). Usa la misma lógica que el CRM (lib/appointments).
 
 type CitaFlow = {
-  step: "client" | "day" | "time" | "kind" | "note" | "confirm";
+  step: "client" | "day" | "time" | "kind" | "note" | "confirm" | "fnote" | "fcall";
   user: string;
   rescheduleId?: string; // cambiando la hora de una cita existente
+  noteFor?: string; // nota de seguimiento de esta cita
+  callFor?: string; // llamada de seguimiento de esta cita (día → para qué)
+  nextFor?: string; // otra cita para el mismo cliente, que sale de esta
   customerId?: string | null;
   name?: string | null;
   phone?: string | null;
@@ -53,7 +57,8 @@ async function askDay(chatId: number, f: CitaFlow) {
   const today = todayInMiami();
   const days = Array.from({ length: 9 }, (_, i) => addDays(today, i));
   const buttons = days.map((d, i) => ({ text: i === 0 ? "Hoy" : i === 1 ? "Mañana" : dayLabel(d), callback_data: `dapt:day|${d}` }));
-  return sendMessage(chatId, `📆 ¿Qué día${f.rescheduleId ? " es ahora" : ""}? O escribe la fecha (ej. <code>25/10</code>).`, { reply_markup: keyboard(rows3(buttons)) });
+  const q = f.callFor ? "📞 ¿Qué día lo llamas?" : f.nextFor ? "📅 ¿Qué día es la nueva cita?" : `📆 ¿Qué día${f.rescheduleId ? " es ahora" : ""}?`;
+  return sendMessage(chatId, `${q} O escribe la fecha (ej. <code>25/10</code>).`, { reply_markup: keyboard(rows3(buttons)) });
 }
 
 async function askTime(chatId: number, f: CitaFlow) {
@@ -108,10 +113,9 @@ async function summary(chatId: number, f: CitaFlow) {
 }
 
 async function create(chatId: number, f: CitaFlow, confirmed: boolean, force = false) {
-  const r = await addAppointment(
-    { customerId: f.customerId, name: f.name, phone: f.phone, source: "walk_in", date: f.date!, time: f.time!, kind: f.kind ?? "office", note: f.note, confirmed, force, via: "Telegram" },
-    f.user
-  );
+  const n = { source: "walk_in", date: f.date!, time: f.time!, kind: f.kind ?? "office", note: f.note, confirmed, force, via: "Telegram" } as const;
+  // Si sale del seguimiento de otra cita, queda enlazada a ella
+  const r = f.nextFor ? await followupAppointment(f.nextFor, n, f.user) : await addAppointment({ ...n, customerId: f.customerId, name: f.name, phone: f.phone }, f.user);
   if ("error" in r) {
     if (r.clash) return sendMessage(chatId, `⚠️ ${h(r.error)}`, { reply_markup: keyboard([[{ text: "Agendar igual", callback_data: `dapt:force|${confirmed ? 1 : 0}` }, { text: "Elegir otra hora", callback_data: "dapt:retime|1" }]]) });
     await clearCita(chatId);
@@ -138,6 +142,21 @@ async function reschedule(chatId: number, f: CitaFlow, force = false) {
   const msg = `Hola ${String(data?.name ?? "").split(" ")[0]}, le confirmamos el cambio de su cita en The Heure Society: ${whenText(start)}. ¡Le esperamos!`;
   return sendMessage(chatId, `🔁 <b>Cita cambiada</b> · ${h(whenText(start))} · ${h(String(data?.name ?? ""))}`, {
     reply_markup: wa ? keyboard([[{ text: "📲 Avisar al cliente por WhatsApp", url: `https://wa.me/${wa}?text=${encodeURIComponent(msg)}` }]]) : undefined,
+  });
+}
+
+// ───────────────────────────── Seguimiento ─────────────────────────────
+async function askCallNote(chatId: number, f: CitaFlow) {
+  f.step = "fcall";
+  await saveFlow(chatId, f);
+  return sendMessage(chatId, `📞 Llamada el <b>${h(dayLabel(f.date!))}</b>. ¿Para qué? (ej. «ver si se decidió por el Daytona»)`, { reply_markup: keyboard([[{ text: "Sin nota", callback_data: "dapt:callnote|-" }]]) });
+}
+
+async function saveCall(chatId: number, f: CitaFlow, note: string | null) {
+  await scheduleCall(f.callFor!, f.date!, note, f.user);
+  await clearCita(chatId);
+  return sendMessage(chatId, `📞 <b>Llamada programada</b> para el ${h(dayLabel(f.date!))}. Ese día te sale en el resumen de las 8:00 y en «👥 Clientes de hoy».`, {
+    reply_markup: keyboard([[{ text: "Ver la cita", callback_data: `dapx:show|${f.callFor}` }]]),
   });
 }
 
@@ -192,7 +211,18 @@ export async function onCitaText(chatId: number, text: string) {
     const d = parseDate(text);
     if (!d) return sendMessage(chatId, "No entendí la fecha. Escríbela así: <code>25/10</code>.").then(() => true);
     f.date = d;
-    await askTime(chatId, f);
+    if (f.callFor) await askCallNote(chatId, f);
+    else await askTime(chatId, f);
+    return true;
+  }
+  if (f.step === "fnote") {
+    await addFollowupNote(f.noteFor!, text.slice(0, 1000), f.user);
+    await clearCita(chatId);
+    await sendMessage(chatId, "📝 Nota guardada en la cita y en la ficha del cliente.", { reply_markup: keyboard([[{ text: "Ver la cita", callback_data: `dapx:show|${f.noteFor}` }]]) });
+    return true;
+  }
+  if (f.step === "fcall") {
+    await saveCall(chatId, f, text.slice(0, 300));
     return true;
   }
   if (f.step === "time") {
@@ -213,6 +243,27 @@ export async function onCitaText(chatId: number, text: string) {
 }
 
 // ───────────────────────────── Ver citas ─────────────────────────────
+// Citas de los últimos 14 días sin resultado: para hacer el seguimiento
+export async function listPastCitas(chatId: number) {
+  const today = todayInMiami();
+  const { data } = await adminDb()
+    .from("appointments")
+    .select("id, starts_at, name, outcome")
+    .neq("status", "cancelled")
+    .gte("starts_at", miamiToUtc(addDays(today, -14), "00:00").toISOString())
+    .lt("starts_at", new Date().toISOString())
+    .order("starts_at", { ascending: false })
+    .limit(20);
+  const list = data ?? [];
+  if (!list.length) return sendMessage(chatId, "No hay citas en los últimos 14 días.");
+  const fmt = (iso: string) => new Intl.DateTimeFormat("es-ES", { timeZone: TIME_ZONE, weekday: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(iso));
+  return sendMessage(chatId, `🕘 <b>Citas pasadas</b> (14 días)
+Toca una para anotar cómo fue, añadir notas, programar una llamada u otra cita.
+${list.filter((a) => !a.outcome).length ? "❔ = sin resultado todavía" : ""}`, {
+    reply_markup: keyboard(list.map((a) => [{ text: `${a.outcome ? "🏁" : "❔"} ${fmt(a.starts_at)} · ${a.name ?? ""}`.slice(0, 60), callback_data: `dapx:show|${a.id}` }])),
+  });
+}
+
 export async function listCitas(chatId: number, range: "today" | "week") {
   const today = todayInMiami();
   const { data } = await adminDb()
@@ -237,15 +288,28 @@ export async function listCitas(chatId: number, range: "today" | "week") {
 async function showCita(chatId: number, id: string) {
   const { data: a } = await adminDb().from("appointments").select("*").eq("id", id).maybeSingle();
   if (!a) return sendMessage(chatId, "Esa cita ya no existe.");
+  const follow = (await followupsFor([id])).get(id) ?? [];
   const wa = (a.phone as string | null)?.replace(/\D/g, "");
   const rows: InlineButton[][] = [];
-  if (a.status === "requested") rows.push([{ text: "✅ Confirmar", callback_data: `dapx:ok|${id}` }]);
-  rows.push([{ text: "🔁 Cambiar día u hora", callback_data: `dapx:move|${id}` }, { text: "❌ Cancelar cita", callback_data: `dapx:cancel|${id}` }]);
+  const past = new Date(a.starts_at).getTime() < Date.now();
+  if (a.status === "requested" && !past) rows.push([{ text: "✅ Confirmar", callback_data: `dapx:ok|${id}` }]);
+  if (past) rows.push([{ text: "🏁 ¿Cómo fue?", callback_data: `dapx:res|${id}` }]);
+  rows.push([{ text: "📝 Añadir nota", callback_data: `dapx:note|${id}` }, { text: "📞 Programar llamada", callback_data: `dapx:call|${id}` }]);
+  rows.push([{ text: "📅 Otra cita para este cliente", callback_data: `dapx:next|${id}` }]);
+  if (!past) rows.push([{ text: "🔁 Cambiar día u hora", callback_data: `dapx:move|${id}` }, { text: "❌ Cancelar cita", callback_data: `dapx:cancel|${id}` }]);
   if (wa) rows.push([{ text: "📲 Escribir por WhatsApp", url: `https://wa.me/${wa}` }]);
   if (a.customer_id) rows.push([{ text: "Ficha en el CRM", url: `${process.env.NEXT_PUBLIC_SITE_URL ?? "https://theheuresociety.vercel.app"}/admin/leads/${a.customer_id}` }]);
   return sendMessage(
     chatId,
-    [`📅 <b>${h(whenText(new Date(a.starts_at)))}</b>`, `👤 ${h(a.name ?? "")}${a.phone ? ` · ${h(a.phone)}` : ""}`, a.kind === "video" ? "🎥 Videollamada" : "🏛 En la oficina", a.status === "requested" ? "🕓 Pendiente de confirmar" : "✅ Confirmada", a.note ? `📝 ${h(a.note)}` : ""].filter(Boolean).join("\n"),
+    [
+      `📅 <b>${h(whenText(new Date(a.starts_at)))}</b>`,
+      `👤 ${h(a.name ?? "")}${a.phone ? ` · ${h(a.phone)}` : ""}`,
+      a.kind === "video" ? "🎥 Videollamada" : "🏛 En la oficina",
+      a.status === "cancelled" ? "❌ Cancelada" : a.status === "requested" ? "🕓 Pendiente de confirmar" : "✅ Confirmada",
+      a.outcome ? `🏁 ${h(OUTCOME_LABEL[a.outcome] ?? a.outcome)}` : "",
+      a.note ? `📝 ${h(a.note)}` : "",
+      ...(follow.length ? ["", "<b>Seguimiento</b>", ...follow.map((x) => `• ${x.kind === "call" ? `📞 Llamar el ${x.due_at}${x.body ? `: ${h(x.body)}` : ""}${x.done_at ? " ✓" : ""}` : x.kind === "appointment" ? `📅 Nueva cita: ${h(x.body ?? "")}` : x.kind === "outcome" ? `🏁 ${h(x.body ?? "")}` : `📝 ${h(x.body ?? "")}`}`)] : []),
+    ].filter((l) => l !== "").join("\n"),
     { reply_markup: keyboard(rows) }
   );
 }
@@ -279,6 +343,27 @@ export async function onCitaCallback(chatId: number, cbId: string, messageId: nu
       await clearButtons();
       return askDay(chatId, { step: "day", user, rescheduleId: value });
     }
+    if (what === "res") {
+      return sendMessage(chatId, "🏁 ¿Cómo fue la cita?", { reply_markup: keyboard(Object.entries(OUTCOME_LABEL).map(([k, l]) => [{ text: l, callback_data: `dapx:out|${value}.${k}` }])) });
+    }
+    if (what === "out") {
+      await clearButtons();
+      const [apptId, outcome] = value.split(".");
+      await setOutcome(apptId, outcome, user);
+      const tips: Record<string, string> = { thinking: "¿Le programas una llamada para dentro de unos días?", no_show: "¿Le escribes para buscar otra fecha?", bought: "¡Enhorabuena! Recuerda emitir la factura." };
+      return sendMessage(chatId, `🏁 Resultado guardado: <b>${h(OUTCOME_LABEL[outcome] ?? outcome)}</b>${tips[outcome] ? `\n${tips[outcome]}` : ""}`, {
+        reply_markup: keyboard([[{ text: "📞 Programar llamada", callback_data: `dapx:call|${apptId}` }, { text: "📅 Otra cita", callback_data: `dapx:next|${apptId}` }]]),
+      });
+    }
+    if (what === "note") {
+      await saveFlow(chatId, { step: "fnote", user, noteFor: value });
+      return sendMessage(chatId, "📝 Escribe la nota (qué le gustó, presupuesto, próximos pasos…).");
+    }
+    if (what === "call") return askDay(chatId, { step: "day", user, callFor: value });
+    if (what === "next") {
+      const { data: a } = await db.from("appointments").select("customer_id, name, phone").eq("id", value).single();
+      return askDay(chatId, { step: "day", user, nextFor: value, customerId: a?.customer_id ?? null, name: a?.name ?? null, phone: a?.phone ?? null });
+    }
     return;
   }
 
@@ -301,7 +386,7 @@ export async function onCitaCallback(chatId: number, cbId: string, messageId: nu
       return askDay(chatId, f);
     case "day":
       f.date = value;
-      return askTime(chatId, f);
+      return f.callFor ? askCallNote(chatId, f) : askTime(chatId, f);
     case "time":
       f.time = value;
       return f.rescheduleId ? reschedule(chatId, f) : askKind(chatId, f);
@@ -313,6 +398,8 @@ export async function onCitaCallback(chatId: number, cbId: string, messageId: nu
     case "note":
       f.note = null;
       return summary(chatId, f);
+    case "callnote":
+      return saveCall(chatId, f, null);
     case "ok":
       return create(chatId, f, value === "1");
     case "force":
@@ -320,5 +407,25 @@ export async function onCitaCallback(chatId: number, cbId: string, messageId: nu
     case "no":
       await clearCita(chatId);
       return sendMessage(chatId, "Cita descartada. No se agendó nada.");
+  }
+}
+
+// Resumen de las 8:00: por cada cita de ayer sin resultado, «¿cómo fue?» con los botones
+export async function askYesterdayOutcomes() {
+  const today = todayInMiami();
+  const { data } = await adminDb()
+    .from("appointments")
+    .select("id, starts_at, name, kind")
+    .neq("status", "cancelled")
+    .is("outcome", null)
+    .gte("starts_at", miamiToUtc(addDays(today, -1), "00:00").toISOString())
+    .lt("starts_at", miamiToUtc(today, "00:00").toISOString())
+    .order("starts_at");
+  const { notifyAdmins } = await import("./telegram");
+  for (const a of data ?? []) {
+    await notifyAdmins(`🏁 <b>¿Cómo fue la cita de ayer?</b>
+${h(a.name ?? "")} · ${timeLabel(new Date(a.starts_at))} · ${a.kind === "video" ? "🎥" : "🏛"}`, {
+      reply_markup: keyboard([...Object.entries(OUTCOME_LABEL).map(([k, l]) => [{ text: l, callback_data: `dapx:out|${a.id}.${k}` }]), [{ text: "Ver la cita", callback_data: `dapx:show|${a.id}` }]]),
+    });
   }
 }

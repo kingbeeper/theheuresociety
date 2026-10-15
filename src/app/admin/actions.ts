@@ -8,7 +8,7 @@ import { addEvent, normalizePhone, STAGES, STAGE_LABEL, upsertLead, type Stage }
 import { reactivateBot } from "@/lib/wa-bot";
 import { createStockItem, itemForRequest } from "@/lib/stock";
 import { miamiToUtc, slotClash } from "@/lib/booking";
-import { addAppointment, clashText, whenText } from "@/lib/appointments";
+import { addAppointment, addFollowupNote, clashText, completeCall, followupAppointment, scheduleCall, setOutcome, whenText } from "@/lib/appointments";
 
 // Acciones del CRM. Cada una comprueba primero que quien la ejecuta es un usuario autorizado.
 
@@ -168,6 +168,46 @@ export async function createAppointment(_: unknown, form: FormData) {
       confirmed: form.get("confirmed") === "on",
       force: form.get("force") === "on",
     },
+    user
+  );
+  if ("error" in r) return r;
+  refresh();
+  return { ok: true };
+}
+
+// ───────────────────────────── Seguimiento de una cita ─────────────────────────────
+export async function apptNoteAction(id: string, form: FormData) {
+  const user = await requireAdmin("citas");
+  const body = text(form, "body");
+  if (body) await addFollowupNote(id, body.slice(0, 1000), user);
+  refresh();
+}
+
+export async function apptCallAction(id: string, form: FormData) {
+  const user = await requireAdmin("citas");
+  const date = text(form, "date");
+  if (date) await scheduleCall(id, date, text(form, "note"), user);
+  refresh();
+}
+
+export async function apptCallDoneAction(followupId: string, form: FormData) {
+  const user = await requireAdmin("citas");
+  await completeCall(followupId, text(form, "result"), user);
+  refresh();
+}
+
+export async function apptOutcomeAction(id: string, outcome: string) {
+  const user = await requireAdmin("citas");
+  await setOutcome(id, outcome, user);
+  refresh();
+}
+
+// Otra cita (o llamada por video) para el mismo cliente, enlazada a esta
+export async function apptNextAction(id: string, _: unknown, form: FormData) {
+  const user = await requireAdmin("citas");
+  const r = await followupAppointment(
+    id,
+    { date: text(form, "date") ?? "", time: text(form, "time") ?? "", kind: text(form, "kind") === "video" ? "video" : "office", note: text(form, "note"), confirmed: true, force: form.get("force") === "on" },
     user
   );
   if ("error" in r) return r;

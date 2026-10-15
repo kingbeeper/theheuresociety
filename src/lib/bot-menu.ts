@@ -32,6 +32,7 @@ export async function onMenuText(chatId: number, text: string, user: string) {
         reply_markup: keyboard([
           [{ text: "➕ Agendar cita", callback_data: "mcit:new" }],
           [{ text: "📅 Hoy", callback_data: "mcit:today" }, { text: "📆 Próximos 7 días", callback_data: "mcit:week" }],
+          [{ text: "🕘 Seguimiento de citas pasadas", callback_data: "mcit:past" }],
         ]),
       });
       return true;
@@ -208,6 +209,7 @@ export async function onMenuCallback(chatId: number, cbId: string, messageId: nu
         await clearFlow(chatId);
         return c.startCita(chatId, user);
       }
+      if (arg === "past") return c.listPastCitas(chatId);
       return c.listCitas(chatId, arg === "week" ? "week" : "today");
     }
 
