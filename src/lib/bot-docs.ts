@@ -618,7 +618,8 @@ export async function onCallback(chatId: number, cbId: string, messageId: number
     }
     if (action === "dpaid") {
       await answer();
-      return sendMessage(chatId, `💰 ¿Cómo pagó ${h(d.client_name ?? "el cliente")} la factura ${h(d.number)} (${usd(d.total)})?`, {
+      const due = Math.max(0, Number(d.total) - Number(d.deposit ?? 0));
+      return sendMessage(chatId, `💰 ¿Cómo pagó ${h(d.client_name ?? "el cliente")} la factura ${h(d.number)} (${usd(due)}${Number(d.deposit ?? 0) > 0 ? ` de saldo; ${usd(d.deposit ?? 0)} ya pagados de anticipo` : ""})?`, {
         reply_markup: keyboard(Object.entries(PAYMENT).filter(([k]) => k !== "other").reduce<InlineButton[][]>((rows, [k, l], i) => {
           if (i % 3 === 0) rows.push([]);
           rows[rows.length - 1].push({ text: l, callback_data: `dpm:${d.id}|${k}` });
