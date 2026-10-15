@@ -100,7 +100,15 @@ export async function sellStock(d: Doc, user: string) {
   const items = await stockFor(d);
   for (const line of d.items) {
     const item = items.find((i) => i.id === line.item_id);
-    if (!item || item.status === "sold" || item.status === "returned") continue;
+    if (!item || item.status === "returned") continue;
+    if (item.status === "sold") {
+      // Ya estaba vendido sin comprador (p. ej. marcado vendido antes de cobrar la factura): queda a nombre del cliente
+      if (!item.buyer_customer_id && d.customer_id) {
+        await adminDb().from("inventory_items").update({ buyer_customer_id: d.customer_id, buyer_name: item.buyer_name ?? d.client_name, updated_at: new Date().toISOString() }).eq("id", item.id);
+        await logItem(item.id, "sale", `Comprador: ${d.client_name ?? "cliente"} · ${docLabel(d)}`, user, { document: d.id });
+      }
+      continue;
+    }
     const amount = line.qty * line.price;
     const price = Math.round((amount - (subtotal ? (discount * amount) / subtotal : 0)) * 100) / 100;
     const saleDate = d.paid_at ?? new Date().toISOString().slice(0, 10);
