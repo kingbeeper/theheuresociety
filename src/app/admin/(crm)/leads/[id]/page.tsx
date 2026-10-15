@@ -6,11 +6,13 @@ import { requireAdmin } from "@/lib/admin-auth";
 import type { Customer } from "@/lib/crm";
 import { ago, Card, fmtDate, fmtDateTime, ghostButtonClass, money, SourceTag, StageBadge, requestTime } from "@/components/admin/ui";
 import { LeadForm } from "@/components/admin/LeadForm";
-import { addNote, addReminderAction, completeFollowUp, completeTaskAction, reminderDoneAction, setBot, setSocialBot, toggleAlert } from "../../../actions";
+import { addNote, addReminderAction, mergeAction, toggleTagAction, completeFollowUp, completeTaskAction, reminderDoneAction, setBot, setSocialBot, toggleAlert } from "../../../actions";
 import { customerTasks, taskMessage, TASK_LABEL, waLink } from "@/lib/tasks";
 import { customerValues } from "@/lib/customer-value";
 import { getDocSettings } from "@/lib/documents";
 import { todayInMiami } from "@/lib/booking";
+import { CUSTOMER_TAGS, hasTag } from "@/lib/crm-labels";
+import { duplicatesOf } from "@/lib/merge";
 import { STATUS_LABEL, type DocKind, type DocStatus } from "@/lib/doc-labels";
 
 export const metadata = { title: "Cliente" };
@@ -43,6 +45,7 @@ export default async function LeadPage({ params }: PageProps<"/admin/leads/[id]"
   const [tasks, docSettings, values] = await Promise.all([customerTasks(id).catch(() => []), getDocSettings(), customerValues([id])]);
   const value = values.get(id);
   const { data: docs } = await db.from("documents").select("id, kind, number, status, total").eq("customer_id", id).order("created_at", { ascending: false });
+  const dupes = await duplicatesOf(id);
   const { data: reminders } = await db.from("reminders").select("id, body, due_at, all_day, done_at").eq("customer_id", id).order("due_at", { ascending: false }).limit(20);
   const [events, alerts, appts, sells, wa, msgs] = await Promise.all([
     db.from("customer_events").select("*").eq("customer_id", id).order("created_at", { ascending: false }).limit(200),
@@ -98,6 +101,32 @@ export default async function LeadPage({ params }: PageProps<"/admin/leads/[id]"
           {c.email && <a href={`mailto:${c.email}`} className={ghostButtonClass}>Correo</a>}
         </div>
       </div>
+
+      {/* Etiquetas rápidas (VIP, Dealer…) y posibles fichas duplicadas */}
+      <div className="mb-6 flex flex-wrap items-center gap-2">
+        {[...CUSTOMER_TAGS, ...c.tags.filter((t) => !CUSTOMER_TAGS.some((x) => x.toLowerCase() === t.toLowerCase()))].map((t) => {
+          const on = hasTag(c.tags, t);
+          return (
+            <form key={t} action={toggleTagAction.bind(null, c.id, t)}>
+              <button className={`border px-3 py-1 text-[0.62rem] tracking-[0.16em] uppercase ${on ? "border-brass bg-brass/15 text-brass" : "border-line text-stone hover:text-ivory"}`}>{on ? "✓ " : "+ "}{t}</button>
+            </form>
+          );
+        })}
+      </div>
+      {dupes.length > 0 && (
+        <div className="mb-6 border border-amber-300/50 bg-amber-300/5 p-4 text-sm">
+          <p>⚠️ <b>Puede que este cliente esté duplicado</b> (mismo teléfono, correo o nombre):</p>
+          <ul className="mt-2 space-y-1.5">
+            {dupes.map((d) => (
+              <li key={d.id} className="flex flex-wrap items-center gap-3">
+                <Link href={`/admin/leads/${d.id}`} className="text-brass hover:text-ivory">{d.name ?? "Sin nombre"}</Link>
+                <span className="text-xs text-stone">{[d.phone, d.email].filter(Boolean).join(" · ")}</span>
+                <form action={mergeAction.bind(null, c.id, d.id)}><button className="border border-line px-2.5 py-1 text-[0.6rem] tracking-[0.14em] uppercase text-stone hover:text-ivory">Fusionar en esta ficha</button></form>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
         <div className="space-y-6">

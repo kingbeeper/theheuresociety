@@ -28,9 +28,11 @@ export async function recentWatches(days = 30) {
 
 // Clientes con correo que no se han dado de baja. Con marcas: solo a quien le interesan
 // (por lo que busca, sus avisos o lo que ya compró).
-export async function audience(brands: string[] | null) {
+export async function audience(brands: string[] | null, tags: string[] = []) {
   const db = adminDb();
-  const { data } = await db.from("customers").select("id, name, email, lang, interests").not("email", "is", null).eq("email_opt_out", false);
+  let q = db.from("customers").select("id, name, email, lang, interests").not("email", "is", null).eq("email_opt_out", false);
+  if (tags.length) q = q.overlaps("tags", tags); // solo los que tengan alguna de estas etiquetas (VIP, Dealer…)
+  const { data } = await q;
   let people = (data ?? []) as (Recipient & { interests: string | null })[];
   if (brands?.length) {
     const want = brands.map((b) => b.toLowerCase());

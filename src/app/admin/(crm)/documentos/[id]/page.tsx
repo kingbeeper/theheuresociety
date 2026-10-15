@@ -158,6 +158,11 @@ export default async function DocumentPage({ params }: PageProps<"/admin/documen
         {sourcing && d.deposit_paid_at && <p className="mt-3 text-sm text-emerald-200">💵 Anticipo de {usd(deposit)} recibido el {fmtDate(`${d.deposit_paid_at}T12:00:00`)}{d.deposit_method ? ` · ${d.deposit_method}` : ""}{d.refunded_at ? ` · devuelto el ${fmtDate(`${d.refunded_at}T12:00:00`)}` : ""}</p>}
         {sourcing && d.status === "sent" && (
           <div className="mt-5 border-t border-line pt-5">
+            <Link href={`/admin/dealers?encargo=${d.id}`} className="inline-block border border-emerald-300/40 px-4 py-2 text-[0.66rem] tracking-[0.2em] uppercase text-emerald-200 hover:bg-emerald-300/10">🤝 Pedir este reloj a mis dealers</Link>
+          </div>
+        )}
+        {sourcing && d.status === "sent" && (
+          <div className="mt-5 border-t border-line pt-5">
             <SourcedForm id={d.id} stock={stock} price={Number(d.total)} />
             <p className="mt-2 text-xs text-stone">Se crea la factura con el reloj y {d.deposit_paid_at ? `el anticipo de ${usd(deposit)} descontado del saldo` : "sin anticipo (no consta como pagado)"}. Si el reloj ya está en el inventario, elígelo: quedará reservado al emitirla y vendido al pagarla.</p>
           </div>

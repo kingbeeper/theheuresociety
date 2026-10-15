@@ -26,3 +26,7 @@ export const SOURCE_LABEL: Record<string, string> = {
 };
 
 export const INTENT_LABEL: Record<string, string> = { buy: "Comprar", sell: "Vender", consign: "Consignar", trade: "Intercambiar" };
+
+// Etiquetas rápidas de cliente (además de las que se escriban a mano en su ficha)
+export const CUSTOMER_TAGS = ["VIP", "Dealer", "Coleccionista", "Mayorista", "Inversor"] as const;
+export const hasTag = (tags: string[] | null | undefined, tag: string) => (tags ?? []).some((t) => t.toLowerCase() === tag.toLowerCase());

@@ -7,6 +7,7 @@ import { ago, buttonClass, fieldClass, labelClass, money, PageTitle, SourceTag, 
 import { StageSelect } from "@/components/admin/StageSelect";
 import { createLead } from "../../actions";
 import { todayInMiami } from "@/lib/booking";
+import { CUSTOMER_TAGS } from "@/lib/crm-labels";
 import { customerValues } from "@/lib/customer-value";
 
 export const metadata = { title: "Leads" };
@@ -24,11 +25,13 @@ export default async function LeadsPage({ searchParams }: PageProps<"/admin/lead
   const withAlerts = one(sp.alerts) === "1";
   const followOnly = one(sp.follow) === "1";
   const vipOnly = one(sp.vip) === "1";
+  const tag = one(sp.etiqueta);
 
   const db = adminDb();
   let query = db.from("customers").select("*").order("last_activity_at", { ascending: false }).limit(300);
   if (stage && STAGES.includes(stage)) query = query.eq("stage", stage);
   if (source) query = query.eq("source", source);
+  if (tag) query = query.contains("tags", [tag]);
   if (q) {
     const safe = q.replace(/[,()"%]/g, " ");
     query = query.or(`name.ilike.%${safe}%,phone.ilike.%${safe}%,email.ilike.%${safe}%,interests.ilike.%${safe}%`);
@@ -83,6 +86,8 @@ export default async function LeadsPage({ searchParams }: PageProps<"/admin/lead
         action={
           <div className="flex flex-wrap items-start gap-2">
           <Link href="/admin/leads/embudo" className="border border-line px-4 py-2.5 text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">Embudo</Link>
+          <Link href="/admin/dealers" className="border border-line px-4 py-2.5 text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">Dealers</Link>
+          <Link href="/admin/leads/duplicados" className="border border-line px-4 py-2.5 text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">Duplicados</Link>
           <details className="group relative">
             <summary className={`${buttonClass} cursor-pointer list-none`}>+ Nuevo lead</summary>
             <form action={createLead} className="absolute right-0 z-20 mt-2 grid w-[min(92vw,420px)] gap-4 border border-line bg-forest p-5 shadow-2xl">
@@ -127,7 +132,10 @@ export default async function LeadsPage({ searchParams }: PageProps<"/admin/lead
         </select>
         <button className="border border-line px-4 text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">Filtrar</button>
         <Link href="/admin/leads?vip=1" className={`self-center text-xs underline ${vipOnly ? "text-brass" : "text-stone hover:text-ivory"}`}>⭐ Mejores clientes</Link>
-        {(q || source || botOff || withAlerts || followOnly || vipOnly) && (
+        {CUSTOMER_TAGS.map((t) => (
+          <Link key={t} href={`/admin/leads?etiqueta=${encodeURIComponent(t)}`} className={`self-center border px-2.5 py-1 text-[0.6rem] tracking-[0.14em] uppercase ${tag === t ? "border-brass text-brass" : "border-line text-stone hover:text-ivory"}`}>{t}</Link>
+        ))}
+        {(q || source || botOff || withAlerts || followOnly || vipOnly || tag) && (
           <Link href="/admin/leads" className="self-center text-xs text-stone underline hover:text-ivory">Quitar filtros</Link>
         )}
       </form>

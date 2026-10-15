@@ -1,3 +1,4 @@
+import { CUSTOMER_TAGS } from "@/lib/crm-labels";
 import { connection } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 import { audience, buildEmail, defaultIntro, emailConfigured, recentWatches } from "@/lib/newsletter";
@@ -16,7 +17,8 @@ export default async function NewsletterPage({ searchParams }: PageProps<"/admin
   const selected = watches.filter((w) => chosen.includes(w.id));
   const byBrand = sp.w ? sp.marca === "1" : true;
   const lang = sp.idioma === "en" ? "en" : "es";
-  const people = await audience(byBrand ? [...new Set(selected.map((w) => w.brand))] : null);
+  const tags = (Array.isArray(sp.etiqueta) ? sp.etiqueta : sp.etiqueta ? [sp.etiqueta] : []).filter((t) => (CUSTOMER_TAGS as readonly string[]).includes(t));
+  const people = await audience(byBrand ? [...new Set(selected.map((w) => w.brand))] : null, tags);
   const configured = emailConfigured();
   const preview = buildEmail(selected, { id: "00000000-0000-0000-0000-000000000000", name: lang === "es" ? "Cliente" : "Client", lang }, defaultIntro(lang === "es"));
 
@@ -50,6 +52,12 @@ export default async function NewsletterPage({ searchParams }: PageProps<"/admin
                 <label className="mt-2 flex items-center gap-2 text-sm text-stone">
                   <input type="checkbox" name="marca" value="1" defaultChecked={byBrand} className="h-4 w-4" /> Solo a clientes interesados en estas marcas
                 </label>
+                <div className="flex flex-wrap items-center gap-3 text-sm text-stone">
+                  <span>Solo a clientes con la etiqueta:</span>
+                  {CUSTOMER_TAGS.map((t) => (
+                    <label key={t} className="flex items-center gap-1.5"><input type="checkbox" name="etiqueta" value={t} defaultChecked={tags.includes(t)} className="h-4 w-4" />{t}</label>
+                  ))}
+                </div>
                 <input type="hidden" name="idioma" value={lang} />
                 <button className="mt-2 justify-self-start border border-line px-4 py-2 text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">Actualizar</button>
               </form>
@@ -60,14 +68,14 @@ export default async function NewsletterPage({ searchParams }: PageProps<"/admin
 
           <Card title={`2 · Destinatarios · ${people.length}`}>
             <p className="text-sm text-stone">
-              Clientes con correo que no se han dado de baja{byBrand ? `, interesados en ${[...new Set(selected.map((w) => w.brand))].join(", ") || "—"}` : ""}
+              Clientes con correo que no se han dado de baja{tags.length ? `, con la etiqueta ${tags.join(" o ")}` : ""}{byBrand ? `, interesados en ${[...new Set(selected.map((w) => w.brand))].join(", ") || "—"}` : ""}
               {byBrand ? " (por lo que buscan, sus avisos o lo que compraron)" : ""}.
             </p>
             {people.length > 0 && <p className="mt-2 text-xs text-stone">{people.slice(0, 15).map((p) => p.name ?? p.email).join(" · ")}{people.length > 15 ? ` · y ${people.length - 15} más` : ""}</p>}
           </Card>
 
           <Card title="3 · Enviar">
-            <NewsletterSend ids={selected.map((w) => w.id)} byBrand={byBrand} count={people.length} introEn={defaultIntro(false)} introEs={defaultIntro(true)} configured={configured} />
+            <NewsletterSend ids={selected.map((w) => w.id)} tags={tags} byBrand={byBrand} count={people.length} introEn={defaultIntro(false)} introEs={defaultIntro(true)} configured={configured} />
           </Card>
         </div>
 

@@ -205,6 +205,19 @@ export async function onSourcingCallback(chatId: number, cbId: string, messageId
     await answer("Este encargo ya está cerrado.");
     return clearButtons();
   }
+  // Pedirlo a los dealers: se registra el pedido y llega un botón de WhatsApp por dealer, con el mensaje escrito
+  if (action === "dsdl") {
+    await answer();
+    const { dealers, askDealers, dealerMessage, waLink } = await import("./dealers");
+    const list = (await dealers()).filter((x) => x.wa_id || x.phone);
+    if (!list.length) return sendMessage(chatId, "Aún no tienes dealers con teléfono. En el CRM, abre la ficha de cada uno y pulsa la etiqueta «Dealer».");
+    const line = d.items[0];
+    const query = [line?.title, line?.details].filter(Boolean).join(", ");
+    await askDealers(query, Number(d.total) || null, list.map((x) => x.id), d.id, user);
+    const rows = list.slice(0, 20).map((x) => [{ text: `📲 ${x.name ?? x.phone ?? "Dealer"}`.slice(0, 60), url: waLink(x, dealerMessage(query, Number(d.total) || null, x.name))! }]);
+    return sendMessage(chatId, `🤝 <b>Pedido a ${list.length} dealer(s)</b>: ${h(query)}${Number(d.total) ? ` · hasta ${usd(d.total)}` : ""}\nToca cada uno para enviarle el mensaje por WhatsApp. Anota sus respuestas en CRM → Dealers.`, { reply_markup: keyboard(rows) });
+  }
+
   // Anticipo recibido: primero la forma de pago
   if (action === "dsdp") {
     if (d.deposit_paid_at) return answer("El anticipo ya consta como recibido");
@@ -235,11 +248,12 @@ export async function onSourcingCallback(chatId: number, cbId: string, messageId
   }
 }
 
-export const SOURCING_ACTIONS = new Set(["dsx", "dsdp", "dsdm", "dsrf"]);
+export const SOURCING_ACTIONS = new Set(["dsx", "dsdp", "dsdm", "dsrf", "dsdl"]);
 
 // Botones de un encargo abierto (en el PDF que llega por Telegram)
 export const sourcingButtons = (d: { id: string; deposit_paid_at?: string | null }) => [
   ...(!d.deposit_paid_at ? [[{ text: "💵 Anticipo recibido", callback_data: `dsdp:${d.id}` }]] : []),
+  [{ text: "🤝 Pedir a mis dealers", callback_data: `dsdl:${d.id}` }],
   [{ text: "✅ Conseguido: facturar (en el CRM)", url: `${SITE_URL}/admin/documentos/${d.id}` }],
   [{ text: "↩️ No se consiguió: cerrar", callback_data: `dsrf:${d.id}` }],
 ];

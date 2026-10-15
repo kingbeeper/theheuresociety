@@ -7,12 +7,13 @@ const field =
   "w-full border border-line bg-ink/60 px-3 py-2.5 text-sm text-ivory placeholder:text-stone/50 outline-none transition-colors focus:border-brass/70";
 const label = "mb-1.5 block text-[0.62rem] tracking-[0.22em] uppercase text-stone";
 
-export function NewsletterSend({ ids, byBrand, count, introEn, introEs, configured }: { ids: string[]; byBrand: boolean; count: number; introEn: string; introEs: string; configured: boolean }) {
+export function NewsletterSend({ ids, tags = [], byBrand, count, introEn, introEs, configured }: { ids: string[]; tags?: string[]; byBrand: boolean; count: number; introEn: string; introEs: string; configured: boolean }) {
   const [state, action, pending] = useActionState(sendNewsletterAction, null);
   return (
     <form action={action} className="grid gap-4">
       {ids.map((id) => <input key={id} type="hidden" name="w" value={id} />)}
       <input type="hidden" name="marca" value={byBrand ? "1" : "0"} />
+      {tags.map((t) => <input key={t} type="hidden" name="etiqueta" value={t} />)}
       <div className="grid gap-4 sm:grid-cols-2">
         <label><span className={label}>Asunto (español)</span><input name="subject_es" defaultValue="Nuevas llegadas · The Heure Society" className={field} /></label>
         <label><span className={label}>Asunto (inglés)</span><input name="subject_en" defaultValue="New arrivals · The Heure Society" className={field} /></label>

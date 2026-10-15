@@ -379,3 +379,54 @@ export async function deleteExpenseAction(id: string) {
   await adminDb().from("business_expenses").delete().eq("id", id);
   refresh();
 }
+
+// ───────────────────────────── Etiquetas, duplicados y dealers ─────────────────────────────
+export async function toggleTagAction(id: string, tag: string) {
+  const user = await requireAdmin("leads");
+  const db = adminDb();
+  const { data } = await db.from("customers").select("tags").eq("id", id).single();
+  const tags = (data?.tags ?? []) as string[];
+  const on = tags.some((t) => t.toLowerCase() === tag.toLowerCase());
+  const next = on ? tags.filter((t) => t.toLowerCase() !== tag.toLowerCase()) : [...tags, tag];
+  await db.from("customers").update({ tags: next, updated_at: new Date().toISOString() }).eq("id", id);
+  await addEvent(id, "tag", `${on ? "Quitada" : "Añadida"} la etiqueta «${tag}»`, {}, user);
+  refresh();
+}
+
+export async function mergeAction(keepId: string, dropId: string) {
+  const user = await requireAdmin("leads");
+  const { mergeCustomers } = await import("@/lib/merge");
+  await mergeCustomers(keepId, dropId, user);
+  refresh();
+}
+
+export async function askDealersAction(_: unknown, form: FormData) {
+  const user = await requireAdmin("leads");
+  const query = text(form, "query");
+  if (!query) return { error: "Escribe qué reloj buscas." };
+  const ids = form.getAll("dealer").map(String).filter(Boolean);
+  if (!ids.length) return { error: "Elige al menos un dealer." };
+  const budget = Number(String(form.get("budget") ?? "").replace(/[^\d.]/g, "")) || null;
+  const { askDealers } = await import("@/lib/dealers");
+  await askDealers(query.slice(0, 300), budget, ids, text(form, "document_id"), user);
+  refresh();
+  return { ok: true };
+}
+
+export async function answerDealerAction(id: string, form: FormData) {
+  const user = await requireAdmin("leads");
+  const status = text(form, "status") as "has" | "no" | "offered" | "asked" | null;
+  if (!status) return;
+  const price = Number(String(form.get("price") ?? "").replace(/[^\d.]/g, "")) || null;
+  const { answerDealer } = await import("@/lib/dealers");
+  await answerDealer(id, price && status === "has" ? "offered" : status, price, text(form, "note"), user);
+  refresh();
+}
+
+// Conservar una ficha y fusionar en ella las demás del grupo de duplicados
+export async function mergeGroupAction(keepId: string, dropIds: string[]) {
+  const user = await requireAdmin("leads");
+  const { mergeCustomers } = await import("@/lib/merge");
+  for (const id of dropIds) if (id !== keepId) await mergeCustomers(keepId, id, user);
+  refresh();
+}
