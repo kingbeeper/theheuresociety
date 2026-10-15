@@ -6,7 +6,7 @@ import { requireAdmin } from "@/lib/admin-auth";
 import type { Customer } from "@/lib/crm";
 import { ago, Card, fmtDate, fmtDateTime, ghostButtonClass, money, SourceTag, StageBadge, requestTime } from "@/components/admin/ui";
 import { LeadForm } from "@/components/admin/LeadForm";
-import { addNote, completeFollowUp, completeTaskAction, setBot, setSocialBot, toggleAlert } from "../../../actions";
+import { addNote, addReminderAction, completeFollowUp, completeTaskAction, reminderDoneAction, setBot, setSocialBot, toggleAlert } from "../../../actions";
 import { customerTasks, taskMessage, TASK_LABEL, waLink } from "@/lib/tasks";
 import { customerValues } from "@/lib/customer-value";
 import { getDocSettings } from "@/lib/documents";
@@ -43,6 +43,7 @@ export default async function LeadPage({ params }: PageProps<"/admin/leads/[id]"
   const [tasks, docSettings, values] = await Promise.all([customerTasks(id).catch(() => []), getDocSettings(), customerValues([id])]);
   const value = values.get(id);
   const { data: docs } = await db.from("documents").select("id, kind, number, status, total").eq("customer_id", id).order("created_at", { ascending: false });
+  const { data: reminders } = await db.from("reminders").select("id, body, due_at, all_day, done_at").eq("customer_id", id).order("due_at", { ascending: false }).limit(20);
   const [events, alerts, appts, sells, wa, msgs] = await Promise.all([
     db.from("customer_events").select("*").eq("customer_id", id).order("created_at", { ascending: false }).limit(200),
     db.from("watch_alerts").select("*").eq("customer_id", id).order("created_at", { ascending: false }),
@@ -178,6 +179,29 @@ export default async function LeadPage({ params }: PageProps<"/admin/leads/[id]"
               </Card>
             );
           })}
+
+          <Card title="Recordatorios">
+            {reminders?.length ? (
+              <ul className="mb-4 space-y-2 text-sm">
+                {reminders.map((r) => (
+                  <li key={r.id as string} className="flex items-start justify-between gap-3 border-b border-line/60 pb-2">
+                    <span className={r.done_at ? "text-stone line-through" : ""}>
+                      <span className="text-xs text-stone">{r.all_day ? fmtDate(r.due_at as string) : fmtDateTime(r.due_at as string)}</span> · {r.body as string}
+                    </span>
+                    {!r.done_at && <form action={reminderDoneAction.bind(null, r.id as string)}><button className="text-xs text-stone underline hover:text-ivory">Hecho</button></form>}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mb-3 text-sm text-stone">Sin recordatorios. También se crean desde Telegram (⏰ Recordatorios).</p>
+            )}
+            <form action={addReminderAction.bind(null, c.id)} className="grid gap-2 sm:grid-cols-[1fr_auto_auto_auto]">
+              <input name="body" required placeholder="Qué quiere o qué hacer (ej. busca Daytona panda)" className="min-w-0 border border-line bg-ink/60 px-2 py-1.5 text-sm" />
+              <input name="date" type="date" required min={todayInMiami(new Date(now))} className="border border-line bg-ink/60 px-2 py-1.5 text-sm" />
+              <input name="time" type="time" step={900} aria-label="Hora (opcional)" className="border border-line bg-ink/60 px-2 py-1.5 text-sm" />
+              <button className={ghostButtonClass}>Recordar</button>
+            </form>
+          </Card>
 
           <Card title="Búsquedas («avísenme»)">
             {alerts.data?.length ? (

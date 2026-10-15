@@ -112,6 +112,9 @@ export async function handleMessage(msg: TgMessage) {
   // Encargo con anticipo a medias
   const { onSourcingText } = await import("./bot-sourcing");
   if (await onSourcingText(chatId, text)) return;
+  // Recordatorio a medias
+  const { onReminderText } = await import("./bot-reminders");
+  if (await onReminderText(chatId, text)) return;
   // Importe de un depósito de proforma
   const { onProformaText } = await import("./bot-proforma");
   if (await onProformaText(chatId, text)) return;
@@ -647,6 +650,10 @@ async function handleCommand(chatId: number, text: string, user: string) {
   if (FLOW_COMMANDS[command]) return startFlow(chatId, FLOW_COMMANDS[command], arg, user);
 
   switch (command) {
+    case "/recordatorio":
+      return (await import("./bot-reminders")).startReminder(chatId, user);
+    case "/recordatorios":
+      return (await import("./bot-reminders")).listReminders(chatId);
     case "/cita":
       return (await import("./bot-citas")).startCita(chatId, user);
     case "/citas":
@@ -709,6 +716,7 @@ async function handleCommand(chatId: number, text: string, user: string) {
       await (await import("./bot-citas")).clearCita(chatId);
       await (await import("./bot-sale")).clearSale(chatId);
       await (await import("./bot-proforma")).clearProforma(chatId);
+      await (await import("./bot-reminders")).clearReminder(chatId);
       return sendMessage(chatId, draft || flow ? "Cancelado." : "Listo: no queda nada en curso.");
     }
 

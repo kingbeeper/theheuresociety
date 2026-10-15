@@ -179,7 +179,7 @@ async function saveCall(chatId: number, f: CitaFlow, note: string | null) {
 }
 
 // «25/10», «25/10/2026» o «2026-10-25» → AAAA-MM-DD (si el día ya pasó este año, el año que viene)
-function parseDate(text: string) {
+export function parseDate(text: string) {
   const iso = text.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
   if (iso) return `${iso[1]}-${iso[2].padStart(2, "0")}-${iso[3].padStart(2, "0")}`;
   const m = text.match(/(\d{1,2})[/.-](\d{1,2})(?:[/.-](\d{2,4}))?/);
@@ -192,7 +192,7 @@ function parseDate(text: string) {
   return Number(m[2]) >= 1 && Number(m[2]) <= 12 && Number(m[1]) >= 1 && Number(m[1]) <= 31 ? out : null;
 }
 // «15:30», «3:30 pm», «15», «3pm» → HH:MM
-function parseTime(text: string) {
+export function parseTime(text: string) {
   const m = text.toLowerCase().match(/(\d{1,2})(?:[:.h](\d{2}))?\s*(am|pm|a\.m\.|p\.m\.)?/);
   if (!m) return null;
   let hh = Number(m[1]);
@@ -460,4 +460,10 @@ export async function askYesterdayOutcomes() {
       reply_markup: keyboard([...Object.entries(OUTCOME_LABEL).map(([k, l]) => [{ text: l, callback_data: `dapx:out|${a.id}.${k}` }]), [{ text: "Ver la cita", callback_data: `dapx:show|${a.id}` }]]),
     });
   }
+}
+
+// Agendar con el cliente ya elegido (p. ej. al cerrar un recordatorio)
+export async function startCitaFor(chatId: number, user: string, c: { customerId: string | null; name: string | null; phone: string | null }) {
+  await sendMessage(chatId, `📅 <b>Nueva cita</b> · ${h(c.name ?? "")}`);
+  return askDay(chatId, { step: "day", user, customerId: c.customerId, name: c.name, phone: c.phone });
 }

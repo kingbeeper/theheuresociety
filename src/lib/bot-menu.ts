@@ -27,6 +27,11 @@ export async function onMenuText(chatId: number, text: string, user: string) {
       await (await import("./bot-sourcing")).clearSourcing(chatId);
       await sendMessage(chatId, "📸 <b>Publicar un reloj</b>\n\n1. Envíame las fotos (de 1 a 10).\n2. Después escríbeme la referencia, el precio y los extras.\n<i>Ej.: Rolex 126610LN, 14500, caja y papeles</i>\n\nPrepararé la ficha y te la enseño antes de publicarla.");
       return true;
+    case MENU.reminders:
+      await sendMessage(chatId, "⏰ <b>Recordatorios</b>\nPara no olvidar lo que te pidió un cliente: te aviso a la hora con lo que quiere.", {
+        reply_markup: keyboard([[{ text: "➕ Nuevo recordatorio", callback_data: "mrem:new" }], [{ text: "📋 Pendientes", callback_data: "mrem:list" }]]),
+      });
+      return true;
     case MENU.citas:
       await sendMessage(chatId, "📅 <b>Citas</b>", {
         reply_markup: keyboard([
@@ -102,7 +107,7 @@ export async function onMenuText(chatId: number, text: string, user: string) {
   return false;
 }
 
-const MENU_ACTIONS = new Set(["mnew", "mopen", "mcost", "mlist", "mst", "mset", "mcase", "mdem", "mappr", "mdrop", "mvid", "msoc", "mcit"]);
+const MENU_ACTIONS = new Set(["mnew", "mopen", "mcost", "mlist", "mst", "mset", "mcase", "mdem", "mappr", "mdrop", "mvid", "msoc", "mcit", "mrem"]);
 export const isMenuAction = (action: string) => MENU_ACTIONS.has(action);
 
 type Watch = { id: string; brand: string; model: string; reference: string; status: string };
@@ -203,6 +208,16 @@ export async function onMenuCallback(chatId: number, cbId: string, messageId: nu
 
     case "msoc":
       return socialMenu(chatId, arg, user);
+
+    case "mrem": {
+      const r = await import("./bot-reminders");
+      if (arg === "new") {
+        await clearButtons();
+        await clearFlow(chatId);
+        return r.startReminder(chatId, user);
+      }
+      return r.listReminders(chatId);
+    }
 
     case "mcit": {
       const c = await import("./bot-citas");

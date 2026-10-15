@@ -215,6 +215,30 @@ export async function apptNextAction(id: string, _: unknown, form: FormData) {
   return { ok: true };
 }
 
+// ───────────────────────────── Recordatorios de un cliente ─────────────────────────────
+export async function addReminderAction(customerId: string, form: FormData) {
+  const user = await requireAdmin("leads");
+  const body = text(form, "body");
+  const date = text(form, "date");
+  if (!body || !date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
+  const time = text(form, "time");
+  const allDay = !time;
+  const due = miamiToUtc(date, time ?? "09:00");
+  const db = adminDb();
+  const { data: r } = await db.from("reminders").insert({ customer_id: customerId, body: body.slice(0, 500), due_at: due.toISOString(), all_day: allDay, created_by: user }).select("id").single();
+  await db.from("customers").update({ follow_up_at: date, follow_up_note: `⏰ ${body}`.slice(0, 300), last_activity_at: new Date().toISOString() }).eq("id", customerId);
+  await addEvent(customerId, "follow_up", `Recordatorio para el ${date}${time ? ` a las ${time}` : ""}: ${body}`, { reminder: r?.id }, user);
+  refresh();
+}
+
+export async function reminderDoneAction(id: string) {
+  const user = await requireAdmin("leads");
+  const db = adminDb();
+  const { data: r } = await db.from("reminders").update({ done_at: new Date().toISOString() }).eq("id", id).select("customer_id, body").single();
+  if (r?.customer_id) await addEvent(r.customer_id, "follow_up", `Recordatorio hecho: ${r.body}`, { reminder: id }, user);
+  refresh();
+}
+
 // Cambiar día u hora de una cita (sigue bloqueando un solo horario)
 export async function rescheduleAppointment(id: string, _: unknown, form: FormData) {
   const user = await requireAdmin("citas");

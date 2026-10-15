@@ -9,14 +9,16 @@ export const MENU = {
   help: "❓ Ayuda",
   social: "📣 Redes",
   citas: "📅 Citas",
+  reminders: "⏰ Recordatorios",
 } as const;
 
 export const mainKeyboard = {
   keyboard: [
     [{ text: MENU.publish }, { text: MENU.docs }],
     [{ text: MENU.money }, { text: MENU.stock }],
-    [{ text: MENU.citas }, { text: MENU.clients }],
-    [{ text: MENU.social }, { text: MENU.help }],
+    [{ text: MENU.citas }, { text: MENU.reminders }],
+    [{ text: MENU.clients }, { text: MENU.social }],
+    [{ text: MENU.help }],
   ],
   resize_keyboard: true,
   is_persistent: true,
@@ -32,6 +34,7 @@ Usa los botones de abajo:
 💵 <b>Costos y gastos</b> — lo que costó cada reloj y sus gastos (para el margen)
 ⌚ <b>Inventario</b> — marcar vendido o reservado, ver lo publicado, el estuche…
 📅 <b>Citas</b> — agendar, ver las de hoy y de la semana, confirmar, cambiar o cancelar, y el seguimiento (cómo fue, notas, llamadas)
+⏰ <b>Recordatorios</b> — lo que quiere un cliente y cuándo darle seguimiento; te aviso a la hora
 👥 <b>Clientes de hoy</b> — a quién escribir hoy, con el mensaje ya preparado
 📣 <b>Redes</b> — cómo van, ideas para publicar con el texto listo, comentarios y competencia
 ❓ <b>Ayuda</b> — esta explicación

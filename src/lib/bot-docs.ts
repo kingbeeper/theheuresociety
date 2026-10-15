@@ -33,6 +33,7 @@ export type DocFlow = {
   draftId?: string; // reloj nuevo (fotos → ficha de la IA)
   watch?: { title: string; details: string; suggested: number | null };
   serial?: string | null; // número de serie del reloj nuevo (historial)
+  presetCustomerId?: string | null; // cliente ya elegido (p. ej. desde un recordatorio): se salta la pregunta
   customerId?: string | null;
   client?: { name: string | null; phone: string | null; email: string | null };
   sellerId?: { type: string | null; number: string } | null; // compra: identificación del vendedor
@@ -77,14 +78,14 @@ export async function clearFlow(chatId: number) {
 }
 
 // ───────────────────────────── Inicio ─────────────────────────────
-export async function startFlow(chatId: number, kind: FlowKind, arg: string, user: string) {
+export async function startFlow(chatId: number, kind: FlowKind, arg: string, user: string, presetCustomerId: string | null = null) {
   const settings = await getDocSettings();
   // Un borrador de publicación a medias se descarta: las fotos que lleguen ahora son para este documento
   const { data: open } = await adminDb().from("bot_drafts").select("id").eq("chat_id", chatId).in("status", ["collecting", "analyzing", "ready"]);
   for (const d of open ?? []) await updateDraft(d.id as string, { status: "cancelled", awaiting: null });
 
   await clearAppraise(chatId);
-  const flow: DocFlow = { kind, step: "watch", user, lang: "en", tax: kind === "invoice" || kind === "proforma" ? Number(settings.doc_tax_rate) || 0 : 0 };
+  const flow: DocFlow = { kind, step: "watch", user, lang: "en", tax: kind === "invoice" || kind === "proforma" ? Number(settings.doc_tax_rate) || 0 : 0, presetCustomerId };
   await saveFlow(chatId, flow);
   if (kind === "purchase") {
     return sendMessage(chatId, `${ICON.purchase} <b>Compra de un reloj</b>\n\nEnvíame las fotos del reloj (de 1 a 10) y después la referencia y los extras.\n<i>Ej.: Rolex 126610LN, caja y papeles, excelente estado</i>\n\n/cancelar para salir.`);
@@ -249,7 +250,14 @@ function watchSummary(w: WatchDraft) {
 }
 
 // ───────────────────────────── Cliente ─────────────────────────────
-function askClient(chatId: number, head: string, flow: DocFlow) {
+async function askClient(chatId: number, head: string, flow: DocFlow) {
+  // Cliente ya elegido: se usa directamente (una sola vez; «Cambiar cliente» vuelve a preguntar)
+  if (flow.presetCustomerId) {
+    const id = flow.presetCustomerId;
+    flow.presetCustomerId = null;
+    await sendMessage(chatId, head);
+    return chooseClient(chatId, id, flow);
+  }
   const who = flow.kind === "consignment" ? "¿Quién es el dueño del reloj?" : flow.kind === "purchase" ? "¿A quién se lo compraste?" : flow.kind === "memo" ? "¿A quién se lo entregas en memo?" : "¿Para qué cliente?";
   return sendMessage(chatId, `${head}\n\n👤 ${who}\nEscribe nombre, teléfono y/o correo, o comparte un contacto (📎 → Contacto).`, {
     reply_markup: flow.kind === "purchase" ? keyboard([[{ text: "Omitir", callback_data: "dcli:skip" }]]) : undefined,
@@ -517,6 +525,9 @@ export async function deliver(chatId: number, d: Doc) {
 export async function onCallback(chatId: number, cbId: string, messageId: number, action: string, arg: string, user: string) {
   const answer = (text?: string) => tg("answerCallbackQuery", { callback_query_id: cbId, ...(text && { text }) }).catch(() => {});
   const clearButtons = () => tg("editMessageReplyMarkup", { chat_id: chatId, message_id: messageId, reply_markup: keyboard([]) }).catch(() => {});
+
+  // Recordatorios de clientes
+  if (action === "drem") return (await import("./bot-reminders")).onReminderCallback(chatId, cbId, messageId, arg, user);
 
   // Proforma: depósitos y cierre
   if (action === "dpf") return (await import("./bot-proforma")).onProformaCallback(chatId, cbId, messageId, arg, user);

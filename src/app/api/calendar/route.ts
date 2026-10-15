@@ -70,8 +70,29 @@ export async function GET(request: Request) {
     ];
   });
 
+  const { data: rems } = await adminDb().from("reminders").select("id, body, due_at, all_day, customer_id, customer:customers(name, phone)").is("done_at", null).gte("due_at", since);
+  type Rem = { id: string; body: string; due_at: string; all_day: boolean; customer_id: string | null; customer: { name: string | null; phone: string | null } | null };
+  const clientReminders = ((rems ?? []) as unknown as Rem[]).flatMap((r) => {
+    const start = new Date(r.due_at);
+    const day = new Intl.DateTimeFormat("sv-SE", { timeZone: "America/New_York" }).format(start);
+    const d = day.replace(/-/g, "");
+    const next = new Date(Date.UTC(+day.slice(0, 4), +day.slice(5, 7) - 1, +day.slice(8, 10) + 1)).toISOString().slice(0, 10).replace(/-/g, "");
+    const details = [r.body, r.customer?.phone && `Tel: ${r.customer.phone}`, r.customer_id && `${SITE_URL}/admin/leads/${r.customer_id}`].filter(Boolean).join("\n");
+    return [
+      "BEGIN:VEVENT",
+      `UID:rem-${r.id}@theheuresociety`,
+      `DTSTAMP:${now}`,
+      r.all_day ? `DTSTART;VALUE=DATE:${d}` : `DTSTART:${stamp(start)}`,
+      r.all_day ? `DTEND;VALUE=DATE:${next}` : `DTEND:${stamp(new Date(start.getTime() + 15 * 60_000))}`,
+      `SUMMARY:${esc(`⏰ ${r.customer?.name ?? "Cliente"}: ${r.body.slice(0, 60)}`)}`,
+      `DESCRIPTION:${esc(details)}`,
+      "BEGIN:VALARM", r.all_day ? "TRIGGER:PT9H" : "TRIGGER:PT0M", "ACTION:DISPLAY", "DESCRIPTION:Recordatorio de cliente", "END:VALARM",
+      "END:VEVENT",
+    ];
+  });
+
   const body = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//The Heure Society//CRM//ES", "CALSCALE:GREGORIAN", "METHOD:PUBLISH",
     "X-WR-CALNAME:Citas · The Heure Society", "X-WR-TIMEZONE:America/New_York", "REFRESH-INTERVAL;VALUE=DURATION:PT15M", "X-PUBLISHED-TTL:PT15M",
-    ...events, ...reminders, "END:VCALENDAR"].join("\r\n");
+    ...events, ...reminders, ...clientReminders, "END:VCALENDAR"].join("\r\n");
   return new Response(body, { headers: { "Content-Type": "text/calendar; charset=utf-8", "Cache-Control": "no-store" } });
 }

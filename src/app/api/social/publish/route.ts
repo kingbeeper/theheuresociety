@@ -1,11 +1,13 @@
 import { publishDue } from "@/lib/ig-publish";
+import { sendDueReminders } from "@/lib/bot-reminders";
 
-// Publica en Instagram las ideas aprobadas cuya hora ya llegó. La llama Supabase (pg_cron) cada
-// 10 minutos con Authorization: Bearer CRON_SECRET.
+// Pasada de cada 10 minutos (Supabase pg_cron, Authorization: Bearer CRON_SECRET): avisa de los
+// recordatorios de clientes que ya tocan y publica en Instagram las ideas aprobadas cuya hora llegó.
 export const maxDuration = 300;
 
 export async function GET(request: Request) {
   const secret = process.env.CRON_SECRET;
   if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) return new Response("Unauthorized", { status: 401 });
-  return Response.json({ ok: true, results: await publishDue() });
+  const reminders = await sendDueReminders().catch((e) => `error: ${(e as Error).message}`);
+  return Response.json({ ok: true, reminders, results: await publishDue() });
 }
