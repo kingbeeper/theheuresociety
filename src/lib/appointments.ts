@@ -117,24 +117,9 @@ export async function scheduleCall(appointmentId: string, date: string, note: st
     await db.from("customers").update({ follow_up_at: date, follow_up_note: followNote, last_activity_at: new Date().toISOString() }).eq("id", a.customer_id);
     await addEvent(a.customer_id, "follow_up", `Seguimiento programado para el ${date}${due_time ? ` a las ${due_time}` : ""}${note ? `: ${note}` : ""}`, { appointment: a.id }, user);
   }
-  return { name: a.name, phone: a.phone, customerId: a.customer_id, link: googleCalendarLink(`📞 Seguimiento: ${a.name ?? "cliente"}`, date, due_time, [note, a.phone && `Tel: ${a.phone}`].filter(Boolean).join("\n")) };
+  return { name: a.name, phone: a.phone, customerId: a.customer_id };
 }
 
-// Enlace para añadir el recordatorio a Google Calendar al momento (hora de Miami; sin hora = todo el día)
-export function googleCalendarLink(title: string, date: string, time: string | null, details = "") {
-  const d = date.replace(/-/g, "");
-  let dates: string;
-  if (time) {
-    const [hh, mm] = time.split(":").map(Number);
-    const end = hh * 60 + mm + 15;
-    dates = `${d}T${time.replace(":", "")}00/${d}T${String(Math.floor(end / 60) % 24).padStart(2, "0")}${String(end % 60).padStart(2, "0")}00`;
-  } else {
-    const next = new Date(Date.UTC(+date.slice(0, 4), +date.slice(5, 7) - 1, +date.slice(8, 10) + 1)).toISOString().slice(0, 10).replace(/-/g, "");
-    dates = `${d}/${next}`;
-  }
-  const q = new URLSearchParams({ action: "TEMPLATE", text: title, dates, ctz: TIME_ZONE, details });
-  return `https://calendar.google.com/calendar/render?${q}`;
-}
 
 export async function completeCall(followupId: string, result: string | null, user: string) {
   const db = adminDb();

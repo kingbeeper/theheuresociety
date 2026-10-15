@@ -108,24 +108,11 @@ export function RescheduleForm({ id, date, time }: { id: string; date: string; t
 // Seguimiento de una cita: resultado, notas, llamadas programadas y otra cita para el mismo cliente
 type FollowUp = { id: string; kind: string; body: string | null; due_at: string | null; due_time?: string | null; done_at: string | null; created_by: string | null; created_at: string };
 
-// Enlace para añadir un recordatorio a Google Calendar (hora de Miami; sin hora = todo el día)
-function googleLink(title: string, date: string, time?: string | null, details = "") {
-  const d = date.replace(/-/g, "");
-  let dates: string;
-  if (time) {
-    const [hh, mm] = time.split(":").map(Number);
-    const end = hh * 60 + mm + 15;
-    dates = `${d}T${time.replace(":", "")}00/${d}T${String(Math.floor(end / 60) % 24).padStart(2, "0")}${String(end % 60).padStart(2, "0")}00`;
-  } else {
-    dates = `${d}/${new Date(Date.UTC(+date.slice(0, 4), +date.slice(5, 7) - 1, +date.slice(8, 10) + 1)).toISOString().slice(0, 10).replace(/-/g, "")}`;
-  }
-  return `https://calendar.google.com/calendar/render?${new URLSearchParams({ action: "TEMPLATE", text: title, dates, ctz: "America/New_York", details })}`;
-}
 const small = "border border-line bg-ink/60 px-2 py-1.5 text-sm";
 const mini = "border border-line px-3 py-1.5 text-[0.62rem] tracking-[0.18em] uppercase text-stone hover:text-ivory";
 const KIND_ICON: Record<string, string> = { note: "📝", call: "⏰", appointment: "📅", outcome: "🔔" };
 
-export function AppointmentFollowUp({ id, name, followups, outcome, outcomes, today, open }: { id: string; name: string; followups: FollowUp[]; outcome: string | null; outcomes: [string, string][]; today: string; open?: boolean }) {
+export function AppointmentFollowUp({ id, followups, outcome, outcomes, today, open }: { id: string; followups: FollowUp[]; outcome: string | null; outcomes: [string, string][]; today: string; open?: boolean }) {
   const [state, action, pending] = useActionState(apptNextAction.bind(null, id), null);
   const pendingCalls = followups.filter((f) => f.kind === "call" && !f.done_at);
   const day = (iso: string) => new Intl.DateTimeFormat("es-ES", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "America/New_York" }).format(new Date(iso));
@@ -163,7 +150,6 @@ export function AppointmentFollowUp({ id, name, followups, outcome, outcomes, to
             <span className={c.due_at && c.due_at <= today ? "text-amber-200" : "text-stone"}>⏰ Seguimiento del {c.due_at}{c.due_time ? ` ${c.due_time}` : ""}:</span>
             <input name="result" placeholder="¿Qué respondió? (opcional)" className={`${small} min-w-0 flex-1`} />
             <button className={mini}>Hecho</button>
-            {c.due_at && <a href={googleLink(`📞 Seguimiento: ${name}`, c.due_at, c.due_time, c.body ?? "")} target="_blank" rel="noreferrer" className="text-brass underline hover:text-ivory">Añadir a Google Calendar</a>}
           </form>
         ))}
 

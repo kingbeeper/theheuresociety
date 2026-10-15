@@ -8,6 +8,8 @@ import { team } from "@/lib/team";
 import { todayInMiami } from "@/lib/booking";
 import { buttonClass, Card, fieldClass, fmtDate, labelClass, PageTitle, requestTime } from "@/components/admin/ui";
 import { completeStaffTaskAction, createStaffTask } from "../../task-actions";
+import { reminderDoneAction, snoozeReminderAction } from "../../actions";
+import { hour12, monthFirst } from "@/lib/dates";
 
 export const metadata = { title: "Tareas" };
 
@@ -18,6 +20,15 @@ export default async function TasksPage({ searchParams }: PageProps<"/admin/tare
   const manager = can(user, "usuarios");
   const view = manager && sp.ver === "todas" ? "all" : "mine";
   const today = todayInMiami(new Date(requestTime()));
+  // Recordatorios de clientes (Telegram o ficha del cliente): todos los pendientes, del equipo entero
+  const { data: remRows } = await adminDb().from("reminders").select("id, body, due_at, all_day, created_by, customer:customers(id, name, phone, wa_id)").is("done_at", null).order("due_at").limit(100);
+  type Rem = { id: string; body: string; due_at: string; all_day: boolean; created_by: string | null; customer: { id: string; name: string | null; phone: string | null; wa_id: string | null } | null };
+  const reminders = (remRows ?? []) as unknown as Rem[];
+  const nowMs = requestTime();
+  const remWhen = (r: Rem) => {
+    const d = new Date(r.due_at);
+    return `${monthFirst(new Intl.DateTimeFormat("sv-SE", { timeZone: "America/New_York" }).format(d))}${r.all_day ? "" : ` · ${hour12(d)}`}`;
+  };
   const [tasks, members, customers, items] = await Promise.all([
     openTasks(view === "mine" ? user.email : undefined),
     team(),
@@ -32,6 +43,41 @@ export default async function TasksPage({ searchParams }: PageProps<"/admin/tare
     <>
       <PageTitle eyebrow="CRM" title="Tareas" />
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
+        <Card title={`⏰ Recordatorios de clientes · ${reminders.length}`} className="xl:col-span-2">
+          {reminders.length ? (
+            <ul className="divide-y divide-line/60">
+              {reminders.map((r) => {
+                const late = new Date(r.due_at).getTime() < nowMs;
+                const wa = r.customer?.wa_id ?? r.customer?.phone?.replace(/\D/g, "");
+                return (
+                  <li key={r.id} className="flex flex-wrap items-start justify-between gap-3 py-3">
+                    <div className="min-w-0 flex-1 text-sm">
+                      <p>{r.body}</p>
+                      <p className={`text-xs ${late ? "text-red-200" : "text-stone"}`}>
+                        {late ? "⚠️ Vencido · " : ""}{remWhen(r)}{r.created_by ? ` · de ${name(r.created_by)}` : ""}
+                      </p>
+                      <div className="mt-1 flex flex-wrap gap-3 text-xs">
+                        {r.customer && <Link href={`/admin/leads/${r.customer.id}`} className="text-brass hover:text-ivory">👤 {r.customer.name ?? "Cliente"}{r.customer.phone ? ` · ${r.customer.phone}` : ""}</Link>}
+                        {wa && <a href={`https://wa.me/${wa}`} target="_blank" rel="noreferrer" className="text-brass hover:text-ivory">📲 WhatsApp</a>}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <form action={snoozeReminderAction.bind(null, r.id, 1)}>
+                        <button className="whitespace-nowrap border border-line px-3 py-1.5 text-[0.62rem] tracking-[0.18em] uppercase text-stone hover:text-ivory">Mañana</button>
+                      </form>
+                      <form action={reminderDoneAction.bind(null, r.id)}>
+                        <button className="whitespace-nowrap border border-line px-3 py-1.5 text-[0.62rem] tracking-[0.18em] uppercase text-stone hover:text-ivory">✓ Hecho</button>
+                      </form>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <p className="text-sm text-stone">No hay recordatorios pendientes. Se crean desde Telegram (⏰ Recordatorios) o en la ficha de cada cliente.</p>
+          )}
+        </Card>
+
         <Card title={view === "all" ? `Todas las tareas · ${tasks.length}` : `Mis tareas · ${tasks.length}`}>
           {manager && (
             <div className="mb-4 flex gap-3 text-[0.62rem] tracking-[0.18em] uppercase">

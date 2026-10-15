@@ -2,7 +2,6 @@ import "server-only";
 import { adminDb } from "./supabase";
 import { addEvent, normalizePhone, upsertLead } from "./crm";
 import { miamiToUtc, todayInMiami, TIME_ZONE } from "./booking";
-import { googleCalendarLink } from "./appointments";
 import { parseDate, parseTime } from "./bot-citas";
 import { hour12, monthFirst } from "./dates";
 import { escapeHtml as h, keyboard, notifyAdmins, sendMessage, tg, type InlineButton } from "./telegram";
@@ -47,7 +46,6 @@ const whenLabel = (d: Date, allDay: boolean) => {
   return `${weekday}, ${monthFirst(day, false)}${allDay ? "" : ` · ${hour12(d)}`}`;
 };
 const rows3 = <T,>(xs: T[]) => xs.reduce<T[][]>((acc, x, i) => (i % 3 ? acc[acc.length - 1].push(x) : acc.push([x]), acc), []);
-const miamiTime = (d: Date) => new Intl.DateTimeFormat("sv-SE", { timeZone: TIME_ZONE, hour: "2-digit", minute: "2-digit", hour12: false }).format(d);
 
 // ───────────────────────────── Nuevo recordatorio ─────────────────────────────
 export async function startReminder(chatId: number, user: string) {
@@ -102,11 +100,9 @@ async function save(chatId: number, f: RemFlow, time: string | null) {
   const dueDay = new Intl.DateTimeFormat("sv-SE", { timeZone: TIME_ZONE }).format(due);
   await db.from("customers").update({ follow_up_at: dueDay, follow_up_note: `⏰ ${f.body}`.slice(0, 300), last_activity_at: new Date().toISOString() }).eq("id", customerId);
   await addEvent(customerId, "follow_up", `Recordatorio para el ${whenLabel(due, allDay)}: ${f.body}`, { reminder: r.id }, f.user);
-  const link = googleCalendarLink(`⏰ ${f.name ?? "Cliente"}: ${(f.body ?? "").slice(0, 60)}`, dueDay, allDay ? null : miamiTime(due), [f.body, f.phone && `Tel: ${f.phone}`].filter(Boolean).join("\n"));
   return sendMessage(chatId, `✅ <b>Recordatorio guardado</b>\n👤 ${h(f.name ?? "")}${f.phone ? ` · ${h(f.phone)}` : ""}\n📝 ${h(f.body ?? "")}\n⏰ ${h(whenLabel(due, allDay))}${allDay ? " (aviso a las 9:00)" : ""}\n\nTe aviso aquí a esa hora. También sale en tu calendario de citas y en «👥 Clientes de hoy».`, {
     reply_markup: keyboard([
       [{ text: "🔔 Avisarme si entra una pieza así", callback_data: `drem:alert|${r.id}` }],
-      [{ text: "📅 Añadir a Google Calendar", url: link }],
     ]),
   });
 }

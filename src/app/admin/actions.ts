@@ -231,11 +231,27 @@ export async function addReminderAction(customerId: string, form: FormData) {
   refresh();
 }
 
+export async function snoozeReminderAction(id: string, days: number) {
+  await requireAdmin("leads");
+  const db = adminDb();
+  const { data: r } = await db.from("reminders").select("due_at, customer_id").eq("id", id).single();
+  if (!r) return;
+  const next = new Date(Math.max(Date.now(), new Date(r.due_at).getTime()) + days * 86_400_000);
+  await db.from("reminders").update({ due_at: next.toISOString(), notified_at: null }).eq("id", id);
+  if (r.customer_id) await db.from("customers").update({ follow_up_at: new Intl.DateTimeFormat("sv-SE", { timeZone: "America/New_York" }).format(next) }).eq("id", r.customer_id);
+  refresh();
+}
+
 export async function reminderDoneAction(id: string) {
   const user = await requireAdmin("leads");
   const db = adminDb();
-  const { data: r } = await db.from("reminders").update({ done_at: new Date().toISOString() }).eq("id", id).select("customer_id, body").single();
-  if (r?.customer_id) await addEvent(r.customer_id, "follow_up", `Recordatorio hecho: ${r.body}`, { reminder: id }, user);
+  const { data: r } = await db.from("reminders").update({ done_at: new Date().toISOString() }).eq("id", id).select("customer_id, body, due_at").single();
+  if (r?.customer_id) {
+    // El seguimiento del cliente de ese día queda hecho (igual que al cerrarlo en Telegram)
+    const day = new Intl.DateTimeFormat("sv-SE", { timeZone: "America/New_York" }).format(new Date(r.due_at));
+    await db.from("customers").update({ follow_up_at: null, follow_up_note: null }).eq("id", r.customer_id).eq("follow_up_at", day);
+    await addEvent(r.customer_id, "follow_up", `Recordatorio hecho: ${r.body}`, { reminder: id }, user);
+  }
   refresh();
 }
 

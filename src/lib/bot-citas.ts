@@ -170,7 +170,6 @@ async function saveCall(chatId: number, f: CitaFlow, note: string | null) {
   await clearCita(chatId);
   const when = `${dayLabel(f.date!)}${f.time ? ` a las ${f.time}` : ""}`;
   const rows: InlineButton[][] = [];
-  if (r?.link) rows.push([{ text: "📅 Añadir a Google Calendar", url: r.link }]);
   rows.push([{ text: "Ver la cita", callback_data: `dapx:show|${f.callFor}` }]);
   return sendMessage(
     chatId,
