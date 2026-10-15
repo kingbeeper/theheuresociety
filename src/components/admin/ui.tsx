@@ -37,9 +37,9 @@ export function PageTitle({ eyebrow, title, action }: { eyebrow?: string; title:
   );
 }
 
-export function Card({ title, children, href, className = "" }: { title?: string; children: React.ReactNode; href?: string; className?: string }) {
+export function Card({ title, children, href, className = "", id }: { title?: string; children: React.ReactNode; href?: string; className?: string; id?: string }) {
   return (
-    <section className={`border border-line bg-forest/60 p-5 ${className}`}>
+    <section id={id} className={`scroll-mt-6 border border-line bg-forest/60 p-5 ${className}`}>
       {title && (
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-[0.66rem] tracking-[0.24em] uppercase text-stone">{title}</h2>

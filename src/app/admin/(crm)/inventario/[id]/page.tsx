@@ -22,11 +22,13 @@ export const metadata = { title: "Reloj del inventario" };
 
 const EVENT_ICON: Record<string, string> = { service: "🔧", entry: "⇢", price: "$", cost: "$", status: "•", sale: "✓", return: "↩", owed: "⏳", owner_paid: "💵", import: "⇣" };
 
-export default async function ItemPage({ params }: PageProps<"/admin/inventario/[id]">) {
+export default async function ItemPage({ params, searchParams }: PageProps<"/admin/inventario/[id]">) {
   await connection();
   const user = await requireUser("inventario");
   const showCosts = can(user, "costos");
   const { id } = await params;
+  const accion = (await searchParams).accion;
+  const focus = "ring-2 ring-brass/60";
   const db = adminDb();
   const { data } = await db.from("inventory_items").select("*").eq("id", id).maybeSingle();
   if (!data) notFound();
@@ -228,7 +230,7 @@ export default async function ItemPage({ params }: PageProps<"/admin/inventario/
             )}
           </Card>
 
-          {available && <Card title="Registrar venta"><SaleForm item={item} customers={customerOptions} today={today} sellers={(await team()).map((m) => ({ email: m.email, label: m.name ?? m.email }))} me={user.email} taxRate={taxRate} openInvoice={openInvoice ? { id: openInvoice.id, number: openInvoice.number, total: Number(openInvoice.total) } : null} /></Card>}
+          {available && <Card id="venta" title="Registrar venta" className={accion === "vender" ? focus : ""}><SaleForm item={item} customers={customerOptions} today={today} sellers={(await team()).map((m) => ({ email: m.email, label: m.name ?? m.email }))} me={user.email} taxRate={taxRate} openInvoice={openInvoice ? { id: openInvoice.id, number: openInvoice.number, total: Number(openInvoice.total) } : null} /></Card>}
 
           {item.status === "sold" && (
             <Card title="Venta">
@@ -260,7 +262,7 @@ export default async function ItemPage({ params }: PageProps<"/admin/inventario/
           )}
 
           {available && (
-            <Card title={owner ? `Devolver ${item.acquisition === "consignment" ? "al consignatario" : "al dealer"}` : "Devolución"}>
+            <Card id="devolucion" title={owner ? `Devolver ${item.acquisition === "consignment" ? "al consignatario" : "al dealer"}` : "Devolución"} className={accion === "devolver" ? focus : ""}>
               {item.acquisition === "memo" && item.memo_due && <p className="mb-3 text-sm text-stone">Memo: devolver antes del {fmtDate(item.memo_due)}.</p>}
               <ReturnForm item={item} today={today} />
             </Card>

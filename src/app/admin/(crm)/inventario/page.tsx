@@ -12,6 +12,18 @@ import { LOCATIONS, type Location } from "@/lib/locations";
 
 export const metadata = { title: "Inventario" };
 
+// Accesos rápidos desde el listado: llevan a la ficha, directo al formulario de venta o de devolución
+function QuickActions({ id, status, owner }: { id: string; status: string; owner: boolean }) {
+  if (status !== "in_stock" && status !== "reserved") return null;
+  const btn = "whitespace-nowrap border px-2.5 py-1 text-[0.6rem] tracking-[0.16em] uppercase";
+  return (
+    <div className="flex gap-1.5">
+      <Link href={`/admin/inventario/${id}?accion=vender#venta`} className={`${btn} border-emerald-300/40 text-emerald-200 hover:bg-emerald-300/10`}>Vender</Link>
+      <Link href={`/admin/inventario/${id}?accion=devolver#devolucion`} className={`${btn} border-line text-stone hover:text-ivory`}>{owner ? "Devolver al dueño" : "Devolver"}</Link>
+    </div>
+  );
+}
+
 const STATUS_STYLE: Record<string, string> = {
   in_stock: "text-emerald-200",
   reserved: "text-amber-200",
@@ -158,6 +170,7 @@ export default async function InventarioPage({ searchParams }: PageProps<"/admin
                       </span>
                     </p>
                   </Link>
+                  <div className="pb-3"><QuickActions id={i.id} status={i.status} owner={isOwnerStock(i.acquisition)} /></div>
                 </li>
               );
             })}
@@ -166,7 +179,7 @@ export default async function InventarioPage({ searchParams }: PageProps<"/admin
 
         {list.length ? (
           <div className="hidden overflow-x-auto md:block">
-            <table className="w-full min-w-[900px] text-sm">
+            <table className="w-full min-w-[1080px] text-sm">
               <thead className="text-left text-[0.6rem] tracking-[0.16em] uppercase text-stone">
                 <tr>
                   <th className="pb-2 font-normal">SKU</th>
@@ -178,6 +191,7 @@ export default async function InventarioPage({ searchParams }: PageProps<"/admin
                   <th className="pb-2 text-right font-normal">Venta</th>
                   {showCosts && <th className="pb-2 text-right font-normal">Margen</th>}
                   <th className="pb-2 pl-4 font-normal">Estado</th>
+                  <th className="pb-2 pl-3 font-normal"><span className="sr-only">Acciones</span></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line/60">
@@ -210,6 +224,9 @@ export default async function InventarioPage({ searchParams }: PageProps<"/admin
                         {ITEM_STATUS[i.status]}
                         {i.status === "sold" && isOwnerStock(i.acquisition) && !i.owner_paid_at && <span className="block text-amber-200">dueño sin pagar</span>}
                         {i.status === "sold" && i.buyer_name && <span className="block text-stone">{i.buyer_name}</span>}
+                      </td>
+                      <td className="py-2.5 pl-3">
+                        <QuickActions id={i.id} status={i.status} owner={isOwnerStock(i.acquisition)} />
                       </td>
                     </tr>
                   );
