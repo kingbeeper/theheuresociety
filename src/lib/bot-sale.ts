@@ -65,7 +65,8 @@ export async function startSale(chatId: number, itemId: string, user: string) {
     });
   }
   await saveFlow(chatId, { step: "client", user, itemId, title, asking: i.asking_price == null ? null : Number(i.asking_price), lang: "en" });
-  return sendMessage(chatId, `✅ <b>Vender ${h(title)}</b>\nPara cerrar la venta hago la factura pagada. Necesito unos datos.\n\n👤 ¿Quién lo compró? Nombre y teléfono.\n<i>Ej.: Carlos Méndez 305 555 1234</i>\n\n/cancelar para salir.`);
+  return sendMessage(chatId, `✅ <b>Vender ${h(title)}</b>\nPara cerrar la venta hago la factura pagada. Necesito unos datos.\n\n👤 ¿Quién lo compró? Nombre y teléfono.\n<i>Ej.: Carlos Méndez 305 555 1234</i>
+📎 O compártelo desde tu agenda: clip → <b>Contacto</b>\n\n/cancelar para salir.`);
 }
 
 async function askPrice(chatId: number, f: SaleFlow) {

@@ -4,6 +4,7 @@ import { addEvent, normalizePhone, upsertLead } from "./crm";
 import { miamiToUtc, todayInMiami, TIME_ZONE } from "./booking";
 import { googleCalendarLink } from "./appointments";
 import { parseDate, parseTime } from "./bot-citas";
+import { hour12, monthFirst } from "./dates";
 import { escapeHtml as h, keyboard, notifyAdmins, sendMessage, tg, type InlineButton } from "./telegram";
 
 // Recordatorios de clientes por Telegram: «un cliente me escribió que le interesa una pieza» →
@@ -38,16 +39,21 @@ const saveFlow = (chatId: number, f: RemFlow) =>
 export const clearReminder = (chatId: number) => adminDb().from("integration_settings").delete().eq("key", key(chatId));
 
 const addDays = (iso: string, n: number) => new Date(Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10) + n)).toISOString().slice(0, 10);
-const dayLabel = (iso: string) => new Intl.DateTimeFormat("es-ES", { timeZone: "UTC", weekday: "short", day: "numeric", month: "short" }).format(new Date(`${iso}T12:00:00Z`));
-const whenLabel = (d: Date, allDay: boolean) =>
-  new Intl.DateTimeFormat("es-ES", { timeZone: TIME_ZONE, weekday: "long", day: "numeric", month: "long", ...(!allDay && { hour: "2-digit", minute: "2-digit" }) }).format(d);
+const dayLabel = (iso: string) => monthFirst(iso);
+// «jueves, oct 15 · 3:30 p. m.» (hora de Miami)
+const whenLabel = (d: Date, allDay: boolean) => {
+  const day = new Intl.DateTimeFormat("sv-SE", { timeZone: TIME_ZONE }).format(d);
+  const weekday = new Intl.DateTimeFormat("es-ES", { timeZone: TIME_ZONE, weekday: "long" }).format(d);
+  return `${weekday}, ${monthFirst(day, false)}${allDay ? "" : ` · ${hour12(d)}`}`;
+};
 const rows3 = <T,>(xs: T[]) => xs.reduce<T[][]>((acc, x, i) => (i % 3 ? acc[acc.length - 1].push(x) : acc.push([x]), acc), []);
 const miamiTime = (d: Date) => new Intl.DateTimeFormat("sv-SE", { timeZone: TIME_ZONE, hour: "2-digit", minute: "2-digit", hour12: false }).format(d);
 
 // ───────────────────────────── Nuevo recordatorio ─────────────────────────────
 export async function startReminder(chatId: number, user: string) {
   await saveFlow(chatId, { step: "client", user, chatId });
-  return sendMessage(chatId, "⏰ <b>Nuevo recordatorio</b>\n\n👤 ¿Qué cliente? Escribe nombre y teléfono.\n<i>Ej.: Carlos Méndez 305 555 1234</i>\n\n/cancelar para salir.");
+  return sendMessage(chatId, "⏰ <b>Nuevo recordatorio</b>\n\n👤 ¿Qué cliente? Escribe nombre y teléfono.\n<i>Ej.: Carlos Méndez 305 555 1234</i>
+📎 O compártelo desde tu agenda: clip → <b>Contacto</b>\n\n/cancelar para salir.");
 }
 
 async function askWhat(chatId: number, f: RemFlow) {
@@ -61,17 +67,17 @@ async function askDay(chatId: number, f: RemFlow) {
   await saveFlow(chatId, f);
   const today = todayInMiami();
   const opts: [string, string][] = [["Hoy", today], ["Mañana", addDays(today, 1)], ["En 2 días", addDays(today, 2)], ["En 3 días", addDays(today, 3)], ["En 1 semana", addDays(today, 7)], ["En 2 semanas", addDays(today, 14)]];
-  return sendMessage(chatId, "📅 ¿Cuándo te lo recuerdo? O escribe la fecha (ej. <code>25/10</code>).", { reply_markup: keyboard(rows3(opts.map(([t, d]) => ({ text: t, callback_data: `drem:day|${d}` })))) });
+  return sendMessage(chatId, "📅 ¿Cuándo te lo recuerdo? O escribe la fecha, mes primero (ej. <code>10/25</code>).", { reply_markup: keyboard(rows3(opts.map(([t, d]) => ({ text: t, callback_data: `drem:day|${d}` })))) });
 }
 
 async function askTime(chatId: number, f: RemFlow) {
   f.step = "time";
   await saveFlow(chatId, f);
   const times = ["10:00", "12:00", "15:00", "17:00", "19:00"];
-  const rows: InlineButton[][] = rows3(times.map((t) => ({ text: t, callback_data: `drem:time|${t}` })));
+  const rows: InlineButton[][] = rows3(times.map((t) => ({ text: hour12(miamiToUtc(f.date!, t)), callback_data: `drem:time|${t}` })));
   if (f.date === todayInMiami()) rows.unshift([{ text: "En 1 hora", callback_data: "drem:time|1h" }, { text: "En 3 horas", callback_data: "drem:time|3h" }]);
   rows.push([{ text: "Sin hora (aviso a las 9:00)", callback_data: "drem:time|-" }]);
-  return sendMessage(chatId, `🕒 <b>${h(dayLabel(f.date!))}</b> · ¿a qué hora? O escríbela (ej. <code>4:30 pm</code>).`, { reply_markup: keyboard(rows) });
+  return sendMessage(chatId, `🕒 <b>${h(dayLabel(f.date!))}</b> · ¿a qué hora? O escríbela (ej. <code>4:30 pm</code>; «4:30» sin am/pm es por la tarde).`, { reply_markup: keyboard(rows) });
 }
 
 async function save(chatId: number, f: RemFlow, time: string | null) {
@@ -136,7 +142,7 @@ export async function onReminderText(chatId: number, text: string) {
   }
   if (f.step === "day") {
     const d = parseDate(text);
-    if (!d) return sendMessage(chatId, "No entendí la fecha. Escríbela así: <code>25/10</code>.").then(() => true);
+    if (!d) return sendMessage(chatId, "No entendí la fecha. Escríbela con el mes primero: <code>10/25</code>.").then(() => true);
     f.date = d;
     await askTime(chatId, f);
     return true;
@@ -196,7 +202,10 @@ export async function listReminders(chatId: number) {
   const add = [{ text: "➕ Nuevo recordatorio", callback_data: "mrem:new" }];
   if (!list.length) return sendMessage(chatId, "No tienes recordatorios pendientes.", { reply_markup: keyboard([add]) });
   const now = Date.now();
-  const fmt = (r: Reminder) => new Intl.DateTimeFormat("es-ES", { timeZone: TIME_ZONE, weekday: "short", day: "numeric", month: "short", ...(!r.all_day && { hour: "2-digit", minute: "2-digit" }) }).format(new Date(r.due_at));
+  const fmt = (r: Reminder) => {
+    const d = new Date(r.due_at);
+    return `${monthFirst(new Intl.DateTimeFormat("sv-SE", { timeZone: TIME_ZONE }).format(d))}${r.all_day ? "" : ` ${hour12(d)}`}`;
+  };
   return sendMessage(chatId, `⏰ <b>Recordatorios pendientes</b> (${list.length})\n⚠️ = ya pasó la hora · toca uno para verlo`, {
     reply_markup: keyboard([
       ...list.map((r) => [{ text: `${new Date(r.due_at).getTime() < now ? "⚠️ " : ""}${fmt(r)} · ${r.customer?.name ?? ""} · ${r.body}`.slice(0, 62), callback_data: `drem:show|${r.id}` }]),

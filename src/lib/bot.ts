@@ -97,7 +97,9 @@ export async function handleMessage(msg: TgMessage) {
 
   if (msg.photo?.length) return handlePhoto(msg);
 
-  const text = (msg.text ?? "").trim();
+  // Contacto compartido desde la agenda (📎 → Contacto): cuenta como «nombre y teléfono» escritos
+  const shared = msg.contact ? `${[msg.contact.first_name, msg.contact.last_name].filter(Boolean).join(" ")} ${msg.contact.phone_number.startsWith("+") ? "" : "+"}${msg.contact.phone_number}`.trim() : "";
+  const text = (msg.text ?? shared).trim();
   if (text.startsWith("/")) return handleCommand(chatId, text, await userLabel(msg.from));
   if (text && (await onMenuText(chatId, text, await userLabel(msg.from)))) return;
   // Nota de la tasación (después de las fotos)

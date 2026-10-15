@@ -8,7 +8,7 @@ import { escapeHtml, notifyAdmins } from "./telegram";
 // ocupado para todos los canales, y la cita sale en el panel, la ficha del cliente, el resumen y el calendario.
 
 export const whenText = (d: Date) =>
-  new Intl.DateTimeFormat("es-ES", { timeZone: TIME_ZONE, weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" }).format(d);
+  new Intl.DateTimeFormat("es-US", { timeZone: TIME_ZONE, weekday: "long", day: "numeric", month: "long", hour: "numeric", minute: "2-digit", hour12: true }).format(d);
 export const clashText = (c: { name: string; starts_at: string }) =>
   `Ese horario choca con la cita de ${c.name} (${new Intl.DateTimeFormat("es-ES", { timeZone: TIME_ZONE, hour: "2-digit", minute: "2-digit" }).format(new Date(c.starts_at))}).`;
 

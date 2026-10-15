@@ -3,6 +3,7 @@ import { adminDb } from "./supabase";
 import { booking } from "./site";
 import { addEvent, normalizePhone } from "./crm";
 import { clashes, miamiToUtc, slotClash, todayInMiami, TIME_ZONE } from "./booking";
+import { hour12, monthFirst } from "./dates";
 import { addAppointment, addFollowupNote, clashText, followupAppointment, followupsFor, OUTCOME_LABEL, scheduleCall, setOutcome, whenText } from "./appointments";
 import { escapeHtml as h, keyboard, sendMessage, tg, type InlineButton } from "./telegram";
 
@@ -41,15 +42,16 @@ const saveFlow = (chatId: number, f: CitaFlow) =>
 export const clearCita = (chatId: number) => adminDb().from("integration_settings").delete().eq("key", key(chatId));
 
 const addDays = (iso: string, n: number) => new Date(Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10) + n)).toISOString().slice(0, 10);
-const dayLabel = (iso: string) =>
-  new Intl.DateTimeFormat("es-ES", { timeZone: "UTC", weekday: "short", day: "numeric", month: "short" }).format(new Date(`${iso}T12:00:00Z`));
-const timeLabel = (d: Date) => new Intl.DateTimeFormat("es-ES", { timeZone: TIME_ZONE, hour: "2-digit", minute: "2-digit" }).format(d);
+// Mes primero: «oct 25 · dom»
+const dayLabel = (iso: string) => monthFirst(iso);
+const timeLabel = (d: Date) => hour12(d);
 const rows3 = <T,>(xs: T[]) => xs.reduce<T[][]>((acc, x, i) => (i % 3 ? acc[acc.length - 1].push(x) : acc.push([x]), acc), []);
 
 // ───────────────────────────── Agendar ─────────────────────────────
 export async function startCita(chatId: number, user: string) {
   await saveFlow(chatId, { step: "client", user });
-  return sendMessage(chatId, "📅 <b>Nueva cita</b>\n\n👤 ¿Para quién? Escribe nombre y teléfono.\n<i>Ej.: Carlos Méndez 305 555 1234</i>\n\n/cancelar para salir.");
+  return sendMessage(chatId, "📅 <b>Nueva cita</b>\n\n👤 ¿Para quién? Escribe nombre y teléfono.\n<i>Ej.: Carlos Méndez 305 555 1234</i>
+📎 O compártelo desde tu agenda: clip → <b>Contacto</b>\n\n/cancelar para salir.");
 }
 
 async function askDay(chatId: number, f: CitaFlow) {
@@ -59,7 +61,7 @@ async function askDay(chatId: number, f: CitaFlow) {
   const days = Array.from({ length: 9 }, (_, i) => addDays(today, i));
   const buttons = days.map((d, i) => ({ text: i === 0 ? "Hoy" : i === 1 ? "Mañana" : dayLabel(d), callback_data: `dapt:day|${d}` }));
   const q = f.callFor ? "🔔 ¿Qué día le das seguimiento?" : f.nextFor ? "📅 ¿Qué día es la nueva cita?" : `📆 ¿Qué día${f.rescheduleId ? " es ahora" : ""}?`;
-  return sendMessage(chatId, `${q} O escribe la fecha (ej. <code>25/10</code>).`, { reply_markup: keyboard(rows3(buttons)) });
+  return sendMessage(chatId, `${q} O escribe la fecha, mes primero (ej. <code>10/25</code>).`, { reply_markup: keyboard(rows3(buttons)) });
 }
 
 async function askTime(chatId: number, f: CitaFlow) {
@@ -81,7 +83,7 @@ async function askTime(chatId: number, f: CitaFlow) {
   return sendMessage(
     chatId,
     `🕒 <b>${h(dayLabel(date))}</b> · ¿a qué hora?${free.length ? "" : "\nEse día no queda ningún hueco del horario habitual."}${busy}\nO escribe otra hora (ej. <code>15:30</code> o <code>3:30 pm</code>).`,
-    free.length ? { reply_markup: keyboard(rows3(free.map((t) => ({ text: t, callback_data: `dapt:time|${t}` })))) } : {}
+    free.length ? { reply_markup: keyboard(rows3(free.map((t) => ({ text: hour12(miamiToUtc(date, t)), callback_data: `dapt:time|${t}` })))) } : {}
   );
 }
 
@@ -152,7 +154,7 @@ async function askCallTime(chatId: number, f: CitaFlow) {
   await saveFlow(chatId, f);
   const times = ["10:00", "12:00", "15:00", "17:00", "19:00"];
   return sendMessage(chatId, `🕒 <b>${h(dayLabel(f.date!))}</b> · ¿a qué hora te lo recuerdo? O escribe la hora (ej. <code>4:30 pm</code>).`, {
-    reply_markup: keyboard([...rows3(times.map((t) => ({ text: t, callback_data: `dapt:ctime|${t}` }))), [{ text: "Sin hora (todo el día)", callback_data: "dapt:ctime|-" }]]),
+    reply_markup: keyboard([...rows3(times.map((t) => ({ text: hour12(miamiToUtc(f.date!, t)), callback_data: `dapt:ctime|${t}` }))), [{ text: "Sin hora (todo el día)", callback_data: "dapt:ctime|-" }]]),
   });
 }
 
@@ -178,27 +180,31 @@ async function saveCall(chatId: number, f: CitaFlow, note: string | null) {
   );
 }
 
-// «25/10», «25/10/2026» o «2026-10-25» → AAAA-MM-DD (si el día ya pasó este año, el año que viene)
+// Mes primero, como en EE. UU.: «10/25», «10/25/2026» o «2026-10-25» → AAAA-MM-DD
+// (si ese día ya pasó este año, el año que viene)
 export function parseDate(text: string) {
   const iso = text.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
   if (iso) return `${iso[1]}-${iso[2].padStart(2, "0")}-${iso[3].padStart(2, "0")}`;
   const m = text.match(/(\d{1,2})[/.-](\d{1,2})(?:[/.-](\d{2,4}))?/);
   if (!m) return null;
+  const [month, day] = [Number(m[1]), Number(m[2])];
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
   const today = todayInMiami();
   let y = m[3] ? (m[3].length === 2 ? 2000 + Number(m[3]) : Number(m[3])) : Number(today.slice(0, 4));
-  const d = `${y}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
-  if (!m[3] && d < today) y += 1;
-  const out = `${y}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
-  return Number(m[2]) >= 1 && Number(m[2]) <= 12 && Number(m[1]) >= 1 && Number(m[1]) <= 31 ? out : null;
+  const key = (yy: number) => `${yy}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  if (!m[3] && key(y) < today) y += 1;
+  return key(y);
 }
-// «15:30», «3:30 pm», «15», «3pm» → HH:MM
+// «15:30», «3:30 pm», «15», «3pm» → HH:MM. Sin am/pm, de la 1 a las 7 se entiende por la tarde
+// (horario de la tienda): «3:30» = 15:30.
 export function parseTime(text: string) {
-  const m = text.toLowerCase().match(/(\d{1,2})(?:[:.h](\d{2}))?\s*(am|pm|a\.m\.|p\.m\.)?/);
+  const m = text.toLowerCase().match(/(\d{1,2})(?:[:.h](\d{2}))?\s*(am|pm|a\.\s?m\.?|p\.\s?m\.?)?/);
   if (!m) return null;
   let hh = Number(m[1]);
   const mm = Number(m[2] ?? 0);
   if (m[3]?.startsWith("p") && hh < 12) hh += 12;
   if (m[3]?.startsWith("a") && hh === 12) hh = 0;
+  if (!m[3] && hh >= 1 && hh <= 7) hh += 12;
   return hh <= 23 && mm <= 59 ? `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}` : null;
 }
 
@@ -227,7 +233,7 @@ export async function onCitaText(chatId: number, text: string) {
   }
   if (f.step === "day") {
     const d = parseDate(text);
-    if (!d) return sendMessage(chatId, "No entendí la fecha. Escríbela así: <code>25/10</code>.").then(() => true);
+    if (!d) return sendMessage(chatId, "No entendí la fecha. Escríbela con el mes primero: <code>10/25</code>.").then(() => true);
     f.date = d;
     if (f.callFor) await askCallTime(chatId, f);
     else await askTime(chatId, f);
