@@ -112,6 +112,9 @@ export async function handleMessage(msg: TgMessage) {
   // Encargo con anticipo a medias
   const { onSourcingText } = await import("./bot-sourcing");
   if (await onSourcingText(chatId, text)) return;
+  // Cita a medias
+  const { onCitaText } = await import("./bot-citas");
+  if (await onCitaText(chatId, text)) return;
   // Respuesta a «¿número de serie?»
   const { onSerialText } = await import("./bot-serial");
   if (await onSerialText(chatId, text)) return;
@@ -638,6 +641,10 @@ async function handleCommand(chatId: number, text: string, user: string) {
   if (FLOW_COMMANDS[command]) return startFlow(chatId, FLOW_COMMANDS[command], arg, user);
 
   switch (command) {
+    case "/cita":
+      return (await import("./bot-citas")).startCita(chatId, user);
+    case "/citas":
+      return (await import("./bot-citas")).listCitas(chatId, arg === "semana" ? "week" : "today");
     case "/serial":
       return (await import("./bot-serial")).serialCommand(chatId, arg);
     case "/encargo": {
@@ -693,6 +700,7 @@ async function handleCommand(chatId: number, text: string, user: string) {
       await clearAppraise(chatId);
       const { clearSourcing } = await import("./bot-sourcing");
       await clearSourcing(chatId);
+      await (await import("./bot-citas")).clearCita(chatId);
       return sendMessage(chatId, draft || flow ? "Cancelado." : "Listo: no queda nada en curso.");
     }
 

@@ -7,8 +7,8 @@ import { adminDb } from "@/lib/supabase";
 import { addEvent, normalizePhone, STAGES, STAGE_LABEL, upsertLead, type Stage } from "@/lib/crm";
 import { reactivateBot } from "@/lib/wa-bot";
 import { createStockItem, itemForRequest } from "@/lib/stock";
-import { miamiToUtc, slotClash, TIME_ZONE } from "@/lib/booking";
-import { escapeHtml, notifyAdmins } from "@/lib/telegram";
+import { miamiToUtc, slotClash } from "@/lib/booking";
+import { addAppointment, clashText, whenText } from "@/lib/appointments";
 
 // Acciones del CRM. Cada una comprueba primero que quien la ejecuta es un usuario autorizado.
 
@@ -150,63 +150,27 @@ export async function setAppointmentStatus(id: string, status: "requested" | "co
 }
 
 // ───────────────────────────── Citas manuales ─────────────────────────────
-// Misma tabla que las de la web y los bots: el horario queda ocupado para todos los canales,
-// y la cita aparece en el panel, en la ficha del cliente, en el resumen diario y en el calendario.
-const whenText = (d: Date) =>
-  new Intl.DateTimeFormat("es-ES", { timeZone: TIME_ZONE, weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" }).format(d);
-const clashText = (c: { name: string; starts_at: string }) =>
-  `Ese horario choca con la cita de ${c.name} (${new Intl.DateTimeFormat("es-ES", { timeZone: TIME_ZONE, hour: "2-digit", minute: "2-digit" }).format(new Date(c.starts_at))}).`;
-
+// La lógica es la misma que en Telegram (lib/appointments): horario ocupado para todos los canales.
 export async function createAppointment(_: unknown, form: FormData) {
   const user = await requireAdmin("citas");
-  const db = adminDb();
-  const date = text(form, "date");
-  const time = text(form, "time");
-  const kind = text(form, "kind") === "video" ? "video" : "office";
-  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date) || !time || !/^\d{2}:\d{2}$/.test(time)) return { error: "Falta la fecha o la hora." };
-  const startsAt = miamiToUtc(date, time);
-  const clash = await slotClash(startsAt);
-  if (clash && form.get("force") !== "on") return { error: clashText(clash), clash: true };
-
-  // Cliente: uno del CRM o uno nuevo (se crea como lead con la etapa «Cita»)
-  let customerId = text(form, "customer_id");
-  let c: { name: string | null; phone: string | null; email: string | null; stage: string } | null = null;
-  if (customerId) {
-    const { data } = await db.from("customers").select("name, phone, email, stage").eq("id", customerId).single();
-    c = data;
-    if (c && ["new", "contacted", "qualified"].includes(c.stage)) {
-      await db.from("customers").update({ stage: "appointment", last_activity_at: new Date().toISOString() }).eq("id", customerId);
-      await addEvent(customerId, "stage", `Etapa: ${STAGE_LABEL.appointment}`, { from: c.stage, to: "appointment" }, user);
-    }
-  } else {
-    if (!text(form, "name")) return { error: "Falta el nombre del cliente." };
-    const lead = await upsertLead({
-      name: text(form, "name"), phone: text(form, "phone"), email: text(form, "email"),
-      source: text(form, "source") ?? "other", intent: "buy", stage: "appointment", notify: false,
-    });
-    customerId = lead.id;
-    c = lead;
-  }
-  const name = c?.name ?? text(form, "name") ?? "Cliente";
-  const pieces = form.getAll("pieces").map(String).filter(Boolean);
-  const note = text(form, "note");
-  const status = form.get("confirmed") === "on" ? "confirmed" : "requested";
-
-  const { data: appt, error } = await db
-    .from("appointments")
-    .insert({ kind, starts_at: startsAt.toISOString(), name, phone: c?.phone ?? null, email: c?.email ?? null, pieces, note, source: "manual", status, customer_id: customerId })
-    .select("id")
-    .single();
-  if (error?.code === "23505") return { error: "Ya hay otra cita exactamente a esa hora." };
-  if (error) return { error: error.message };
-
-  const label = kind === "office" ? "oficina" : "videollamada";
-  await addEvent(customerId!, "appointment", `Cita ${status === "confirmed" ? "confirmada" : "pendiente"} (${label}) el ${whenText(startsAt)}${note ? ` · ${note}` : ""}`, { appointment: appt.id, pieces }, user);
-  await notifyAdmins(
-    [`📅 <b>Cita añadida en el CRM</b> por ${escapeHtml(user)}`, `${kind === "office" ? "🏛 En la oficina" : "🎥 Videollamada"} · <b>${escapeHtml(whenText(startsAt))}</b>`, escapeHtml(name), note ? `Nota: ${escapeHtml(note)}` : ""]
-      .filter(Boolean)
-      .join("\n")
-  ).catch(() => {});
+  const r = await addAppointment(
+    {
+      customerId: text(form, "customer_id"),
+      name: text(form, "name"),
+      phone: text(form, "phone"),
+      email: text(form, "email"),
+      source: text(form, "source"),
+      date: text(form, "date") ?? "",
+      time: text(form, "time") ?? "",
+      kind: text(form, "kind") === "video" ? "video" : "office",
+      note: text(form, "note"),
+      pieces: form.getAll("pieces").map(String).filter(Boolean),
+      confirmed: form.get("confirmed") === "on",
+      force: form.get("force") === "on",
+    },
+    user
+  );
+  if ("error" in r) return r;
   refresh();
   return { ok: true };
 }

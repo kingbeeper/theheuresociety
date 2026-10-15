@@ -513,6 +513,10 @@ export async function onCallback(chatId: number, cbId: string, messageId: number
   const answer = (text?: string) => tg("answerCallbackQuery", { callback_query_id: cbId, ...(text && { text }) }).catch(() => {});
   const clearButtons = () => tg("editMessageReplyMarkup", { chat_id: chatId, message_id: messageId, reply_markup: keyboard([]) }).catch(() => {});
 
+  // Citas: agendar y gestionar
+  const citas = await import("./bot-citas");
+  if (citas.CITA_ACTIONS.has(action)) return citas.onCitaCallback(chatId, cbId, messageId, action, arg, user);
+
   // «Omitir» el número de serie tras publicar un reloj
   if (action === "dsno") {
     await answer();

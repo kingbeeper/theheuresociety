@@ -8,14 +8,15 @@ export const MENU = {
   clients: "👥 Clientes de hoy",
   help: "❓ Ayuda",
   social: "📣 Redes",
+  citas: "📅 Citas",
 } as const;
 
 export const mainKeyboard = {
   keyboard: [
     [{ text: MENU.publish }, { text: MENU.docs }],
     [{ text: MENU.money }, { text: MENU.stock }],
-    [{ text: MENU.clients }, { text: MENU.social }],
-    [{ text: MENU.help }],
+    [{ text: MENU.citas }, { text: MENU.clients }],
+    [{ text: MENU.social }, { text: MENU.help }],
   ],
   resize_keyboard: true,
   is_persistent: true,
@@ -30,6 +31,7 @@ Usa los botones de abajo:
 🧾 <b>Documentos</b> — factura, memo, consignación, cotización o compra, en PDF al momento
 💵 <b>Costos y gastos</b> — lo que costó cada reloj y sus gastos (para el margen)
 ⌚ <b>Inventario</b> — marcar vendido o reservado, ver lo publicado, el estuche…
+📅 <b>Citas</b> — agendar, ver las de hoy y de la semana, confirmar, cambiar o cancelar
 👥 <b>Clientes de hoy</b> — a quién escribir hoy, con el mensaje ya preparado
 📣 <b>Redes</b> — cómo van, ideas para publicar con el texto listo, comentarios y competencia
 ❓ <b>Ayuda</b> — esta explicación
