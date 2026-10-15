@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { kindOf } from "@/lib/clients";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { adminDb } from "@/lib/supabase";
@@ -76,13 +77,15 @@ export default async function LeadPage({ params }: PageProps<"/admin/leads/[id]"
     })),
   ].sort((a, b) => b.at.localeCompare(a.at));
 
+  const kind = await kindOf(c.id, c.stage, c.tags);
+  const back = kind === "client" ? { href: "/admin/clientes", label: "Clientes" } : kind === "dealer" ? { href: `/admin/dealers/${c.id}`, label: "Ficha de dealer" } : { href: "/admin/leads", label: "Leads" };
   const now = requestTime();
   const waNumber = c.wa_id ?? c.phone?.replace(/\D/g, "");
   const botPaused = wa.data?.mode === "human" && wa.data.human_until && new Date(wa.data.human_until) > new Date(now);
 
   return (
     <>
-      <Link href="/admin/leads" className="text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">← Leads</Link>
+      <Link href={back.href} className="text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">← {back.label}</Link>
       <div className="mt-4 mb-8 flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="font-display text-3xl font-light sm:text-4xl">{c.name ?? "Sin nombre"}</h1>

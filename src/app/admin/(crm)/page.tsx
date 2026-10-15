@@ -150,7 +150,7 @@ export default async function Dashboard({ searchParams }: PageProps<"/admin">) {
           )}
         </Card>
 
-        <Card title="Mejores clientes" href="/admin/leads?vip=1">
+        <Card title="Mejores clientes" href="/admin/clientes?vip=1">
           {best.length ? (
             <ul className="space-y-2.5 text-sm">
               {best.map((b, i) => (

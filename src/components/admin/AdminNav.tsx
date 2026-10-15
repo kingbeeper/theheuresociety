@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  AtSign, CalendarDays, Wallet, Handshake, ListTodo, ChartColumn, FileText, HandCoins, LayoutDashboard, Mail, TrendingUp, UserCog, Users, Watch, type LucideIcon,
+  AtSign, CalendarDays, Wallet, Handshake, ListTodo, ChartColumn, FileText, HandCoins, LayoutDashboard, Mail, TrendingUp, UserCog, UserCheck, Users, Watch, type LucideIcon,
 } from "lucide-react";
 import type { Section } from "@/lib/crm-perms";
 
@@ -11,6 +11,7 @@ import type { Section } from "@/lib/crm-perms";
 const ITEMS: { href: string; label: string; icon: LucideIcon; section?: Section }[] = [
   { href: "/admin", label: "Panel", icon: LayoutDashboard },
   { href: "/admin/tareas", label: "Tareas", icon: ListTodo },
+  { href: "/admin/clientes", label: "Clientes", icon: UserCheck, section: "leads" },
   { href: "/admin/leads", label: "Leads", icon: Users, section: "leads" },
   { href: "/admin/dealers", label: "Dealers", icon: Handshake, section: "leads" },
   { href: "/admin/citas", label: "Citas", icon: CalendarDays, section: "citas" },

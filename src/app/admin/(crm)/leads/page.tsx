@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { connection } from "next/server";
+import { redirect } from "next/navigation";
 import { adminDb } from "@/lib/supabase";
 import { requireAdmin } from "@/lib/admin-auth";
 import { followUpsDue, INTENT_LABEL, SOURCE_LABEL, STAGES, STAGE_LABEL, type Customer, type Stage } from "@/lib/crm";
@@ -9,6 +10,7 @@ import { createLead } from "../../actions";
 import { todayInMiami } from "@/lib/booking";
 import { CUSTOMER_TAGS } from "@/lib/crm-labels";
 import { customerValues } from "@/lib/customer-value";
+import { classify } from "@/lib/clients";
 
 export const metadata = { title: "Leads" };
 
@@ -27,8 +29,13 @@ export default async function LeadsPage({ searchParams }: PageProps<"/admin/lead
   const vipOnly = one(sp.vip) === "1";
   const tag = one(sp.etiqueta);
 
+  // Leads = prospectos: quien ya compró (o vendió/consignó) está en Clientes y los dealers en Dealers
+  if (vipOnly) redirect("/admin/clientes?vip=1");
+  const { clients, dealers } = await classify();
+  const notLead = [...clients, ...dealers];
   const db = adminDb();
-  let query = db.from("customers").select("*").order("last_activity_at", { ascending: false }).limit(300);
+  let query = db.from("customers").select("*").neq("stage", "won").order("last_activity_at", { ascending: false }).limit(300);
+  if (notLead.length) query = query.not("id", "in", `(${notLead.join(",")})`);
   if (stage && STAGES.includes(stage)) query = query.eq("stage", stage);
   if (source) query = query.eq("source", source);
   if (tag) query = query.contains("tags", [tag]);
@@ -45,22 +52,19 @@ export default async function LeadsPage({ searchParams }: PageProps<"/admin/lead
     const { data } = await db.from("watch_alerts").select("customer_id").eq("active", true);
     query = query.in("id", [...new Set((data ?? []).map((r) => r.customer_id as string))]);
   }
-  if (vipOnly) {
-    const all = await customerValues();
-    query = query.in("id", [...all.entries()].filter(([, v]) => v.vip).map(([id]) => id));
-  }
   if (followOnly) {
     const due = await followUpsDue(requestTime(), todayInMiami(new Date(requestTime())));
     query = query.in("id", due.map((f) => f.id));
   }
-  const [{ data: rows }, { data: counts }] = await Promise.all([query, db.from("customers").select("stage")]);
+  const [{ data: rows }, { data: counts }] = await Promise.all([query, db.from("customers").select("id, stage")]);
   const leads = (rows ?? []) as Customer[];
   const values = await customerValues(leads.map((c) => c.id));
   const spent = (id: string) => {
     const v = values.get(id);
     return v && v.purchases ? `${v.vip ? "⭐ " : ""}${money(v.spent)} · ${v.purchases} compra${v.purchases > 1 ? "s" : ""}` : null;
   };
-  const count = (s: string) => (counts ?? []).filter((c) => c.stage === s).length;
+  const leadRows = (counts ?? []).filter((c) => c.stage !== "won" && !clients.has(c.id) && !dealers.has(c.id));
+  const count = (s: string) => leadRows.filter((c) => c.stage === s).length;
   const now = requestTime();
 
   const tab = (s: string, label: string, n: number) => {
@@ -85,6 +89,7 @@ export default async function LeadsPage({ searchParams }: PageProps<"/admin/lead
         title="Leads"
         action={
           <div className="flex flex-wrap items-start gap-2">
+          <Link href="/admin/clientes" className="border border-line px-4 py-2.5 text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">Clientes</Link>
           <Link href="/admin/leads/embudo" className="border border-line px-4 py-2.5 text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">Embudo</Link>
           <Link href="/admin/dealers" className="border border-line px-4 py-2.5 text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">Dealers</Link>
           <Link href="/admin/leads/duplicados" className="border border-line px-4 py-2.5 text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">Duplicados</Link>
@@ -119,8 +124,8 @@ export default async function LeadsPage({ searchParams }: PageProps<"/admin/lead
       />
 
       <div className="mb-5 flex gap-1 overflow-x-auto border-b border-line">
-        {tab("", "Todos", counts?.length ?? 0)}
-        {STAGES.map((s) => tab(s, STAGE_LABEL[s], count(s)))}
+        {tab("", "Todos", leadRows.length)}
+        {STAGES.filter((s) => s !== "won").map((s) => tab(s, STAGE_LABEL[s], count(s)))}
       </div>
 
       <form className="mb-6 flex flex-wrap gap-3" action="/admin/leads">
@@ -131,11 +136,10 @@ export default async function LeadsPage({ searchParams }: PageProps<"/admin/lead
           {Object.entries(SOURCE_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
         </select>
         <button className="border border-line px-4 text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">Filtrar</button>
-        <Link href="/admin/leads?vip=1" className={`self-center text-xs underline ${vipOnly ? "text-brass" : "text-stone hover:text-ivory"}`}>⭐ Mejores clientes</Link>
-        {CUSTOMER_TAGS.map((t) => (
+        {CUSTOMER_TAGS.filter((t) => t !== "Dealer").map((t) => (
           <Link key={t} href={`/admin/leads?etiqueta=${encodeURIComponent(t)}`} className={`self-center border px-2.5 py-1 text-[0.6rem] tracking-[0.14em] uppercase ${tag === t ? "border-brass text-brass" : "border-line text-stone hover:text-ivory"}`}>{t}</Link>
         ))}
-        {(q || source || botOff || withAlerts || followOnly || vipOnly || tag) && (
+        {(q || source || botOff || withAlerts || followOnly || tag) && (
           <Link href="/admin/leads" className="self-center text-xs text-stone underline hover:text-ivory">Quitar filtros</Link>
         )}
       </form>
@@ -196,7 +200,7 @@ export default async function LeadsPage({ searchParams }: PageProps<"/admin/lead
           </table>
         </div>
       ) : (
-        <p className="border border-line bg-forest/60 p-8 text-center text-sm text-stone">No hay leads con estos filtros.</p>
+        <p className="border border-line bg-forest/60 p-8 text-center text-sm text-stone">No hay leads con estos filtros. Quien ya te compró está en <Link href="/admin/clientes" className="underline hover:text-ivory">Clientes</Link>.</p>
       )}
     </>
   );

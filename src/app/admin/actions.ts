@@ -441,14 +441,8 @@ export async function addDealerAction(_: unknown, form: FormData) {
   if (!name) return { error: "Escribe el nombre del dealer." };
   if (!phone && !email) return { error: "Pon al menos el teléfono (WhatsApp) o el correo." };
   if (phone && !normalizePhone(phone)) return { error: "El teléfono no parece válido. Escríbelo con código de país, p. ej. +1 305 555 1234." };
-  const c = await upsertLead({ name, phone, email, source: "other", stage: "contacted", notify: false });
-  const db = adminDb();
-  const tags = (c.tags ?? []) as string[];
-  const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
-  if (!tags.some((t) => t.toLowerCase() === "dealer")) patch.tags = [...tags, "Dealer"];
-  if (company && !(c.notes ?? "").includes(company)) patch.notes = c.notes ? `${c.notes}\nEmpresa: ${company}` : `Empresa: ${company}`;
-  await db.from("customers").update(patch).eq("id", c.id);
-  await addEvent(c.id, "tag", "Añadida la etiqueta «Dealer»", {}, user);
+  const { addDealer } = await import("@/lib/dealers");
+  const c = await addDealer({ name, phone, email, company }, user);
   refresh();
   return { ok: c.name ?? name };
 }

@@ -100,6 +100,9 @@ export async function onMenuText(chatId: number, text: string, user: string) {
         ]),
       });
       return true;
+    case MENU.dealers:
+      await (await import("./bot-dealers")).dealersMenu(chatId);
+      return true;
     case MENU.help:
       await showMenu(chatId);
       return true;

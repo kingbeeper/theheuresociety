@@ -2,28 +2,108 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { requireUser } from "@/lib/admin-auth";
 import { adminDb } from "@/lib/supabase";
-import { dealerMessage, dealers, REQUEST_STATUS, waLink, type DealerRequest } from "@/lib/dealers";
+import { companyOf, dealers, statsFor, type DealerRequest } from "@/lib/dealers";
 import { Card, fmtDate, PageTitle } from "@/components/admin/ui";
 import { DealerAsk } from "@/components/admin/DealerAsk";
 import { DealerAdd } from "@/components/admin/DealerAdd";
-import { answerDealerAction } from "../../actions";
+import { DealerRequestRow } from "@/components/admin/DealerRequestRow";
 
 export const metadata = { title: "Dealers" };
 
-// Red de dealers: pedirles una pieza (suelta o de un encargo) y anotar quién la tiene y a qué precio.
+const money = (n: number | string) => `$${Math.round(Number(n)).toLocaleString("en-US")}`;
+const tab = (on: boolean) => `border-b-2 px-1 pb-2 text-[0.68rem] tracking-[0.22em] uppercase ${on ? "border-brass text-ivory" : "border-transparent text-stone hover:text-ivory"}`;
+
+// Red de dealers: pestaña «Pedir una pieza» (pedidos y respuestas) y pestaña «Mis dealers» (directorio
+// con el resumen de cada uno; al tocarlo se abre su ficha con todo su historial).
 export default async function DealersPage({ searchParams }: PageProps<"/admin/dealers">) {
   await connection();
   await requireUser("leads");
   const sp = await searchParams;
+  const view = sp.ver === "dealers" ? "dealers" : "pedir";
   const encargo = typeof sp.encargo === "string" ? sp.encargo : null;
+  const q = typeof sp.q === "string" ? sp.q.trim().toLowerCase() : "";
   const db = adminDb();
   const [list, { data: reqRows }, { data: doc }] = await Promise.all([
     dealers(),
-    db.from("dealer_requests").select("*").order("asked_at", { ascending: false }).limit(200),
+    db.from("dealer_requests").select("*").order("asked_at", { ascending: false }).limit(500),
     encargo ? db.from("documents").select("id, number, items, total, client_name").eq("id", encargo).maybeSingle() : Promise.resolve({ data: null }),
   ]);
   const requests = (reqRows ?? []) as DealerRequest[];
   const byId = new Map(list.map((d) => [d.id, d]));
+  const pending = requests.filter((r) => r.status === "asked").length;
+
+  return (
+    <>
+      <Link href="/admin/leads" className="text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">← Leads</Link>
+      <PageTitle eyebrow="CRM" title="Dealers" />
+      <nav className="mb-6 flex gap-6 border-b border-line">
+        <Link href="/admin/dealers" className={tab(view === "pedir")}>🔎 Pedir una pieza{pending ? ` · ${pending} sin respuesta` : ""}</Link>
+        <Link href="/admin/dealers?ver=dealers" className={tab(view === "dealers")}>🤝 Mis dealers · {list.length}</Link>
+      </nav>
+
+      {view === "dealers" ? (
+        <DealerDirectory list={list} requests={requests} q={q} />
+      ) : (
+        <AskView list={list} requests={requests} byId={byId} doc={doc} />
+      )}
+    </>
+  );
+}
+
+function DealerDirectory({ list, requests, q }: { list: Awaited<ReturnType<typeof dealers>>; requests: DealerRequest[]; q: string }) {
+  const rows = list
+    .map((d) => ({ d, company: companyOf(d.notes), s: statsFor(requests.filter((r) => r.dealer_id === d.id)) }))
+    .filter(({ d, company }) => !q || [d.name, d.phone, d.email, company].some((v) => v?.toLowerCase().includes(q)));
+  return (
+    <div className="grid gap-6">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <form className="flex gap-2">
+          <input type="hidden" name="ver" value="dealers" />
+          <input name="q" defaultValue={q} placeholder="Buscar por nombre, empresa o teléfono" className="w-72 border border-line bg-ink/60 px-3 py-2 text-sm" />
+          <button className="border border-line px-3 py-2 text-[0.62rem] tracking-[0.18em] uppercase text-stone hover:text-ivory">Buscar</button>
+        </form>
+        <DealerAdd open={!list.length} />
+      </div>
+      {rows.length ? (
+        <div className="overflow-x-auto border border-line">
+          <table className="w-full min-w-[760px] text-sm">
+            <thead className="bg-ink/60 text-left text-[0.6rem] tracking-[0.18em] uppercase text-stone">
+              <tr>
+                <th className="px-3 py-2.5">Dealer</th>
+                <th className="px-3 py-2.5">Contacto</th>
+                <th className="px-3 py-2.5 text-right">Pedidos</th>
+                <th className="px-3 py-2.5 text-right">Respondió</th>
+                <th className="px-3 py-2.5 text-right">La tenía</th>
+                <th className="px-3 py-2.5">Mejor oferta</th>
+                <th className="px-3 py-2.5">Último pedido</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-line/60">
+              {rows.map(({ d, company, s }) => (
+                <tr key={d.id} className="hover:bg-ivory/[0.03]">
+                  <td className="px-3 py-2.5">
+                    <Link href={`/admin/dealers/${d.id}`} className="hover:text-brass">{d.name ?? "Sin nombre"}</Link>
+                    {company && <p className="text-xs text-stone">{company}</p>}
+                  </td>
+                  <td className="px-3 py-2.5 text-xs text-stone">{[d.phone, d.email].filter(Boolean).join(" · ") || "—"}</td>
+                  <td className="px-3 py-2.5 text-right">{s.asked || "—"}</td>
+                  <td className="px-3 py-2.5 text-right">{s.asked ? `${Math.round((s.answered / s.asked) * 100)}%` : "—"}</td>
+                  <td className="px-3 py-2.5 text-right">{s.has || "—"}</td>
+                  <td className="px-3 py-2.5 text-xs">{s.best ? `${money(s.best.price!)} · ${s.best.query}` : "—"}</td>
+                  <td className="px-3 py-2.5 text-xs text-stone">{s.last ? fmtDate(s.last) : "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p className="text-sm text-stone">{q ? "Ningún dealer coincide con la búsqueda." : "Aún no tienes dealers. Añade el primero con «+ Nuevo dealer»."}</p>
+      )}
+    </div>
+  );
+}
+
+function AskView({ list, requests, byId, doc }: { list: Awaited<ReturnType<typeof dealers>>; requests: DealerRequest[]; byId: Map<string, Awaited<ReturnType<typeof dealers>>[number]>; doc: { id: string; number: string; items: unknown; total: number | null; client_name: string | null } | null }) {
   // Búsquedas agrupadas (misma consulta y mismo día/encargo)
   const groups = new Map<string, DealerRequest[]>();
   for (const r of requests) {
@@ -32,79 +112,39 @@ export default async function DealersPage({ searchParams }: PageProps<"/admin/de
   }
   const line = (doc?.items as { title: string; details?: string | null }[] | undefined)?.[0];
   const prefill = line ? [line.title, line.details].filter(Boolean).join(", ") : "";
-  const btn = "border px-2 py-1 text-[0.6rem] tracking-[0.14em] uppercase";
 
   return (
     <>
-      <Link href="/admin/leads" className="text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">← Leads</Link>
-      <PageTitle eyebrow="CRM" title="Dealers" />
-
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <Card title={doc ? `🤝 Pedir a mis dealers · encargo ${doc.number} de ${doc.client_name ?? ""}` : "🤝 Pedir una pieza a mis dealers"}>
-          {list.length ? (
-            <DealerAsk
-              dealers={list.map((d) => ({ id: d.id, name: d.name, phone: d.phone, reachable: Boolean(d.wa_id || d.phone) }))}
-              query={prefill}
-              budget={doc ? Number(doc.total) : null}
-              documentId={doc?.id ?? null}
-            />
-          ) : (
-            <p className="text-sm text-stone">Aún no tienes dealers. Añádelos con <b>+ Nuevo dealer</b> (a la derecha) o, si ya son clientes, pulsa la etiqueta <b>Dealer</b> en su ficha.</p>
-          )}
-        </Card>
-
-        <Card title={`Mis dealers · ${list.length}`}>
-          <div className="mb-4"><DealerAdd open={!list.length} /></div>
-          {list.length ? (
-            <ul className="space-y-1.5 text-sm">
-              {list.map((d) => {
-                const answered = requests.filter((r) => r.dealer_id === d.id && r.status !== "asked").length;
-                const asked = requests.filter((r) => r.dealer_id === d.id).length;
-                return (
-                  <li key={d.id} className="flex justify-between gap-3 border-b border-line/60 pb-1.5">
-                    <Link href={`/admin/leads/${d.id}`} className="truncate hover:text-brass">{d.name ?? d.phone ?? "Dealer"}</Link>
-                    <span className="shrink-0 text-xs text-stone">{asked ? `respondió ${answered} de ${asked}` : "sin pedidos"}</span>
-                  </li>
-                );
-              })}
-            </ul>
-          ) : (
-            <p className="text-sm text-stone">También puedes marcar a un cliente que ya tengas con la etiqueta «Dealer» en su ficha.</p>
-          )}
-        </Card>
-      </div>
+      <Card title={doc ? `🤝 Pedir a mis dealers · encargo ${doc.number} de ${doc.client_name ?? ""}` : "🤝 Pedir una pieza a mis dealers"}>
+        {list.length ? (
+          <DealerAsk
+            dealers={list.map((d) => ({ id: d.id, name: d.name, phone: d.phone, reachable: Boolean(d.wa_id || d.phone) }))}
+            query={prefill}
+            budget={doc ? Number(doc.total) : null}
+            documentId={doc?.id ?? null}
+          />
+        ) : (
+          <div className="grid gap-3">
+            <p className="text-sm text-stone">Aún no tienes dealers. Añade el primero aquí (o, si ya es cliente, pulsa la etiqueta <b>Dealer</b> en su ficha).</p>
+            <DealerAdd open />
+          </div>
+        )}
+      </Card>
 
       <h2 className="mt-8 mb-3 text-[0.66rem] tracking-[0.24em] uppercase text-stone">Pedidos y respuestas</h2>
       {groups.size ? (
         <div className="grid gap-4">
-          {[...groups.values()].map((g) => {
+          {[...groups.values()].slice(0, 40).map((g) => {
             const first = g[0];
             const offers = g.filter((r) => r.price).sort((a, b) => Number(a.price) - Number(b.price));
             return (
-              <Card key={first.id} title={`${first.query}${first.budget ? ` · presupuesto $${Math.round(Number(first.budget)).toLocaleString("en-US")}` : ""} · ${fmtDate(first.asked_at)}`}>
+              <Card key={first.id} title={`${first.query}${first.budget ? ` · presupuesto ${money(first.budget)}` : ""} · ${fmtDate(first.asked_at)}`}>
                 {first.document_id && <Link href={`/admin/documentos/${first.document_id}`} className="mb-3 inline-block text-xs text-brass hover:text-ivory">Ver el encargo →</Link>}
-                {offers.length > 0 && <p className="mb-3 text-sm text-emerald-200">Mejor precio: ${Math.round(Number(offers[0].price)).toLocaleString("en-US")} · {byId.get(offers[0].dealer_id)?.name ?? "dealer"}</p>}
+                {offers.length > 0 && <p className="mb-3 text-sm text-emerald-200">Mejor precio: {money(offers[0].price!)} · {byId.get(offers[0].dealer_id)?.name ?? "dealer"}</p>}
                 <ul className="divide-y divide-line/60">
                   {g.map((r) => {
                     const d = byId.get(r.dealer_id);
-                    const wa = d ? waLink(d, dealerMessage(r.query, r.budget ? Number(r.budget) : null, d.name)) : null;
-                    return (
-                      <li key={r.id} className="flex flex-wrap items-center justify-between gap-3 py-2.5 text-sm">
-                        <div className="min-w-0">
-                          <p className="truncate">{d?.name ?? "Dealer"} <span className={`text-xs ${r.status === "no" ? "text-stone" : r.status === "asked" ? "text-amber-200" : "text-emerald-200"}`}>· {REQUEST_STATUS[r.status]}{r.price ? ` · $${Math.round(Number(r.price)).toLocaleString("en-US")}` : ""}</span></p>
-                          {r.note && <p className="text-xs text-stone">{r.note}</p>}
-                        </div>
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          {wa && <a href={wa} target="_blank" rel="noreferrer" className={`${btn} border-emerald-300/40 text-emerald-200 hover:bg-emerald-300/10`}>📲 WhatsApp</a>}
-                          <form action={answerDealerAction.bind(null, r.id)} className="flex items-center gap-1.5">
-                            <input name="price" inputMode="decimal" placeholder="Precio $" defaultValue={r.price ?? ""} className="w-24 border border-line bg-ink/60 px-2 py-1 text-xs" />
-                            <input name="note" placeholder="Nota (año, set…)" defaultValue={r.note ?? ""} className="w-36 border border-line bg-ink/60 px-2 py-1 text-xs" />
-                            <button name="status" value="has" className={`${btn} border-line text-stone hover:text-ivory`}>La tiene</button>
-                            <button name="status" value="no" className={`${btn} border-line text-stone hover:text-ivory`}>No</button>
-                          </form>
-                        </div>
-                      </li>
-                    );
+                    return <DealerRequestRow key={r.id} r={r} dealer={d} title={<Link href={`/admin/dealers/${r.dealer_id}`} className="hover:text-brass">{d?.name ?? "Dealer"}</Link>} />;
                   })}
                 </ul>
               </Card>

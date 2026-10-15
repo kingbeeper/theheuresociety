@@ -528,6 +528,9 @@ export async function onCallback(chatId: number, cbId: string, messageId: number
   const clearButtons = () => tg("editMessageReplyMarkup", { chat_id: chatId, message_id: messageId, reply_markup: keyboard([]) }).catch(() => {});
 
   // Gasto general del negocio
+  // Dealers
+  if (action === "ddl") return (await import("./bot-dealers")).onDealerCallback(chatId, cbId, messageId, arg, user);
+
   if (action === "dbex") return (await import("./bot-expense")).onExpenseCallback(chatId, cbId, messageId, arg);
 
   // Recordatorios de clientes

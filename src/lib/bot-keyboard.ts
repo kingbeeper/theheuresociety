@@ -10,6 +10,7 @@ export const MENU = {
   social: "📣 Redes",
   citas: "📅 Citas",
   reminders: "⏰ Recordatorios",
+  dealers: "🤝 Dealers",
 } as const;
 
 export const mainKeyboard = {
@@ -18,7 +19,7 @@ export const mainKeyboard = {
     [{ text: MENU.money }, { text: MENU.stock }],
     [{ text: MENU.citas }, { text: MENU.reminders }],
     [{ text: MENU.clients }, { text: MENU.social }],
-    [{ text: MENU.help }],
+    [{ text: MENU.dealers }, { text: MENU.help }],
   ],
   resize_keyboard: true,
   is_persistent: true,
@@ -35,6 +36,7 @@ Usa los botones de abajo:
 ⌚ <b>Inventario</b> — marcar vendido o reservado, ver lo publicado, el estuche…
 📅 <b>Citas</b> — agendar, ver las de hoy y de la semana, confirmar, cambiar o cancelar, y el seguimiento (cómo fue, notas, llamadas)
 ⏰ <b>Recordatorios</b> — lo que quiere un cliente y cuándo darle seguimiento; te aviso a la hora
+🤝 <b>Dealers</b> — pedirles una pieza por WhatsApp, anotar lo que responden, ver su historial y añadir nuevos
 👥 <b>Clientes de hoy</b> — a quién escribir hoy, con el mensaje ya preparado
 📣 <b>Redes</b> — cómo van, ideas para publicar con el texto listo, comentarios y competencia
 ❓ <b>Ayuda</b> — esta explicación

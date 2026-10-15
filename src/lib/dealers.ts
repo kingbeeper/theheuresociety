@@ -11,8 +11,8 @@ export type DealerRequest = { id: string; document_id: string | null; query: str
 export const REQUEST_STATUS: Record<DealerRequest["status"], string> = { asked: "Preguntado", has: "La tiene", offered: "Ofrece precio", no: "No la tiene" };
 
 export async function dealers() {
-  const { data } = await adminDb().from("customers").select("id, name, phone, wa_id, email, tags").order("name");
-  return ((data ?? []) as (Dealer & { tags: string[] })[]).filter((c) => (c.tags ?? []).some((t) => t.toLowerCase() === "dealer"));
+  const { data } = await adminDb().from("customers").select("id, name, phone, wa_id, email, tags, notes").order("name");
+  return ((data ?? []) as (Dealer & { tags: string[]; notes: string | null })[]).filter((c) => (c.tags ?? []).some((t) => t.toLowerCase() === "dealer"));
 }
 
 // Mensaje para el dealer (en inglés, como se habla en el gremio de Miami)
@@ -41,3 +41,33 @@ export async function answerDealer(id: string, status: DealerRequest["status"], 
   const { data: r } = await db.from("dealer_requests").update({ status, price, note, answered_at: new Date().toISOString() }).eq("id", id).select("dealer_id, query").single();
   if (r) await addEvent(r.dealer_id as string, "dealer_request", `Respuesta a «${r.query}»: ${REQUEST_STATUS[status]}${price ? ` · $${Math.round(price).toLocaleString("en-US")}` : ""}${note ? ` · ${note}` : ""}`, {}, user);
 }
+
+// Alta de un dealer (CRM o Telegram): si ya existe por teléfono o correo, solo se le pone la etiqueta
+export async function addDealer(input: { name: string; phone?: string | null; email?: string | null; company?: string | null }, user: string) {
+  const { upsertLead } = await import("./crm");
+  const c = await upsertLead({ name: input.name, phone: input.phone || null, email: input.email || null, source: "other", stage: "contacted", notify: false });
+  const tags = (c.tags ?? []) as string[];
+  const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  const isNew = !tags.some((t) => t.toLowerCase() === "dealer");
+  if (isNew) patch.tags = [...tags, "Dealer"];
+  if (input.company && !(c.notes ?? "").includes(input.company)) patch.notes = c.notes ? `${c.notes}\nEmpresa: ${input.company}` : `Empresa: ${input.company}`;
+  await adminDb().from("customers").update(patch).eq("id", c.id);
+  if (isNew) await addEvent(c.id, "tag", "Añadida la etiqueta «Dealer»", {}, user);
+  return c;
+}
+
+// Resumen de cada dealer: cuántas veces se le pidió, cuántas respondió, ofertas y la última vez
+export type DealerStats = { asked: number; answered: number; has: number; best: DealerRequest | null; last: string | null };
+export function statsFor(requests: DealerRequest[]): DealerStats {
+  const answered = requests.filter((r) => r.status !== "asked");
+  const has = requests.filter((r) => r.status === "has" || r.status === "offered");
+  const priced = has.filter((r) => r.price).sort((a, b) => Number(a.price) - Number(b.price));
+  return { asked: requests.length, answered: answered.length, has: has.length, best: priced[0] ?? null, last: requests[0]?.asked_at ?? null };
+}
+
+export async function requestsOf(dealerId: string, limit = 100) {
+  const { data } = await adminDb().from("dealer_requests").select("*").eq("dealer_id", dealerId).order("asked_at", { ascending: false }).limit(limit);
+  return (data ?? []) as DealerRequest[];
+}
+
+export const companyOf = (notes: string | null | undefined) => notes?.match(/Empresa: (.+)/)?.[1]?.trim() ?? null;
