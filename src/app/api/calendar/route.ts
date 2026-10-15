@@ -15,7 +15,7 @@ export async function GET(request: Request) {
   // Recordatorios de seguimiento pendientes (con hora o de todo el día, con aviso)
   const { data: calls } = await adminDb()
     .from("appointment_followups")
-    .select("id, body, due_at, due_time, customer_id, appointment:appointments(name, phone)")
+    .select("id, body, due_at, due_time, customer_id, appointment:appointments!appointment_followups_appointment_id_fkey(name, phone)")
     .eq("kind", "call")
     .is("done_at", null)
     .gte("due_at", since.slice(0, 10));
