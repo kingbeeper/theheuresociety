@@ -430,3 +430,25 @@ export async function mergeGroupAction(keepId: string, dropIds: string[]) {
   for (const id of dropIds) if (id !== keepId) await mergeCustomers(keepId, id, user);
   refresh();
 }
+
+// Nuevo dealer desde la página de Dealers: si ya existe (mismo teléfono o correo) solo se le añade la etiqueta
+export async function addDealerAction(_: unknown, form: FormData) {
+  const user = await requireAdmin("leads");
+  const name = text(form, "name");
+  const phone = text(form, "phone");
+  const email = text(form, "email");
+  const company = text(form, "company");
+  if (!name) return { error: "Escribe el nombre del dealer." };
+  if (!phone && !email) return { error: "Pon al menos el teléfono (WhatsApp) o el correo." };
+  if (phone && !normalizePhone(phone)) return { error: "El teléfono no parece válido. Escríbelo con código de país, p. ej. +1 305 555 1234." };
+  const c = await upsertLead({ name, phone, email, source: "other", stage: "contacted", notify: false });
+  const db = adminDb();
+  const tags = (c.tags ?? []) as string[];
+  const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  if (!tags.some((t) => t.toLowerCase() === "dealer")) patch.tags = [...tags, "Dealer"];
+  if (company && !(c.notes ?? "").includes(company)) patch.notes = c.notes ? `${c.notes}\nEmpresa: ${company}` : `Empresa: ${company}`;
+  await db.from("customers").update(patch).eq("id", c.id);
+  await addEvent(c.id, "tag", "Añadida la etiqueta «Dealer»", {}, user);
+  refresh();
+  return { ok: c.name ?? name };
+}

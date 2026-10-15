@@ -5,6 +5,7 @@ import { adminDb } from "@/lib/supabase";
 import { dealerMessage, dealers, REQUEST_STATUS, waLink, type DealerRequest } from "@/lib/dealers";
 import { Card, fmtDate, PageTitle } from "@/components/admin/ui";
 import { DealerAsk } from "@/components/admin/DealerAsk";
+import { DealerAdd } from "@/components/admin/DealerAdd";
 import { answerDealerAction } from "../../actions";
 
 export const metadata = { title: "Dealers" };
@@ -48,11 +49,12 @@ export default async function DealersPage({ searchParams }: PageProps<"/admin/de
               documentId={doc?.id ?? null}
             />
           ) : (
-            <p className="text-sm text-stone">Aún no tienes dealers. Abre la ficha de cada uno en Leads y pulsa la etiqueta <b>Dealer</b>.</p>
+            <p className="text-sm text-stone">Aún no tienes dealers. Añádelos con <b>+ Nuevo dealer</b> (a la derecha) o, si ya son clientes, pulsa la etiqueta <b>Dealer</b> en su ficha.</p>
           )}
         </Card>
 
         <Card title={`Mis dealers · ${list.length}`}>
+          <div className="mb-4"><DealerAdd open={!list.length} /></div>
           {list.length ? (
             <ul className="space-y-1.5 text-sm">
               {list.map((d) => {
@@ -67,7 +69,7 @@ export default async function DealersPage({ searchParams }: PageProps<"/admin/de
               })}
             </ul>
           ) : (
-            <p className="text-sm text-stone">Se marcan con la etiqueta «Dealer» en su ficha.</p>
+            <p className="text-sm text-stone">También puedes marcar a un cliente que ya tengas con la etiqueta «Dealer» en su ficha.</p>
           )}
         </Card>
       </div>
