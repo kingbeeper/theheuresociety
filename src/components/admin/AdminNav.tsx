@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  AtSign, CalendarDays, ListTodo, ChartColumn, FileText, HandCoins, LayoutDashboard, Mail, TrendingUp, UserCog, Users, Watch, type LucideIcon,
+  AtSign, CalendarDays, Wallet, ListTodo, ChartColumn, FileText, HandCoins, LayoutDashboard, Mail, TrendingUp, UserCog, Users, Watch, type LucideIcon,
 } from "lucide-react";
 import type { Section } from "@/lib/crm-perms";
 
@@ -16,6 +16,7 @@ const ITEMS: { href: string; label: string; icon: LucideIcon; section?: Section 
   { href: "/admin/inventario", label: "Inventario", icon: Watch, section: "inventario" },
   { href: "/admin/demanda", label: "Demanda", icon: TrendingUp, section: "demanda" },
   { href: "/admin/documentos", label: "Documentos", icon: FileText, section: "documentos" },
+  { href: "/admin/dinero", label: "Dinero", icon: Wallet, section: "costos" },
   { href: "/admin/informes", label: "Informes", icon: ChartColumn, section: "informes" },
   { href: "/admin/compras", label: "Compras y consignas", icon: HandCoins, section: "compras" },
   { href: "/admin/correos", label: "Correos", icon: Mail, section: "correos" },

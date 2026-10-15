@@ -4,6 +4,7 @@ import { CircleUser, LogOut } from "lucide-react";
 import { requireUser } from "@/lib/admin-auth";
 import { ALL_SECTIONS, can, ROLE_LABEL } from "@/lib/crm-perms";
 import { AdminNav } from "@/components/admin/AdminNav";
+import { GlobalSearch } from "@/components/admin/GlobalSearch";
 import { signOut } from "../actions";
 
 // Todo lo que hay dentro exige sesión de un usuario autorizado
@@ -37,6 +38,7 @@ async function Guard({ children }: { children: React.ReactNode }) {
             </form>
           </div>
         </div>
+        <GlobalSearch />
         <AdminNav allowed={allowed} />
         <div className="hidden px-6 py-8 md:absolute md:bottom-0 md:block">
           <Link href="/admin/cuenta" className="flex items-center gap-2 truncate text-xs text-stone hover:text-ivory">
