@@ -125,8 +125,8 @@ export async function returnMemo(id: string) {
   const user = await requireAdmin("documentos");
   const d = await getDoc(id);
   if (!d || (d.kind !== "memo" && d.kind !== "consignment") || d.status !== "sent") return;
-  await closeReturned(d, user);
-  refresh();
+  const receipt = await closeReturned(d, user);
+  redirect(`/admin/documentos/${receipt.id}`);
 }
 
 // Consignación: se vendió el reloj y se pagó al dueño

@@ -7,7 +7,12 @@ import { returnItem } from "@/app/admin/inventory-actions";
 export function QuickReturn({ id, label, today }: { id: string; label: string; today: string }) {
   const [open, setOpen] = useState(false);
   const [state, action, pending] = useActionState(returnItem.bind(null, id), null);
-  if (state && "ok" in state) return <span className="text-[0.62rem] tracking-[0.16em] uppercase text-stone">Devuelto ✓</span>;
+  if (state && "ok" in state)
+    return (
+      <span className="text-[0.62rem] tracking-[0.16em] uppercase text-stone">
+        Devuelto ✓{state.receiptId && <> · <a href={`/admin/documentos/${state.receiptId}`} className="text-brass underline hover:text-ivory">Acta para firmar</a></>}
+      </span>
+    );
   return (
     <div>
       <button
@@ -32,7 +37,7 @@ export function QuickReturn({ id, label, today }: { id: string; label: string; t
               {pending ? "Devolviendo…" : "Devolver"}
             </button>
           </div>
-          <p className="text-[0.68rem] text-stone/80">Sale del inventario disponible y de la web.</p>
+          <p className="text-[0.68rem] text-stone/80">Sale del inventario disponible y de la web. Si es de un dueño (consignación o memo), se genera el acta de devolución para que la firme.</p>
         </form>
         </div>
       )}

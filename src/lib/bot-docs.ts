@@ -3,6 +3,7 @@ import { after } from "next/server";
 import { adminDb } from "./supabase";
 import { normalizePhone, upsertLead } from "./crm";
 import { createStockItem, returnToOwner, type Item } from "./stock";
+import { receiptForItem } from "./documents";
 import { PAYMENT } from "./stock-labels";
 import { todayInMiami } from "./booking";
 import { closeReturned, consignorPaid, getDoc, getDocSettings, insertDoc, issueDoc, payInvoice, toInvoice } from "./documents";
@@ -56,8 +57,8 @@ export const FLOW_COMMANDS: Record<string, FlowKind> = {
   "/proforma": "proforma",
 };
 const NAME: Record<FlowKind, string> = { ...KIND_LABEL, purchase: "Compra" };
-const ICON: Record<FlowKind, string> = { invoice: "🧾", memo: "📋", consignment: "🤝", quote: "💬", purchase: "🛒", sourcing: "🔎", proforma: "📄" };
-const DUE_DAYS: Record<DocKind, number> = { quote: 7, memo: 14, invoice: 0, consignment: 90, purchase: 0, sourcing: 60, proforma: 14 };
+const ICON: Record<FlowKind, string> = { invoice: "🧾", memo: "📋", consignment: "🤝", quote: "💬", purchase: "🛒", sourcing: "🔎", proforma: "📄", return: "↩️" };
+const DUE_DAYS: Record<DocKind, number> = { quote: 7, memo: 14, invoice: 0, consignment: 90, purchase: 0, sourcing: 60, proforma: 14, return: 0 };
 
 // ───────────────────────────── Estado (uno por chat) ─────────────────────────────
 const key = (chatId: number) => `tgdoc:${chatId}`;
@@ -322,6 +323,7 @@ function askPrice(chatId: number, flow: DocFlow) {
     purchase: "💵 ¿Cuánto pagaste por el reloj?",
     sourcing: "💵 ¿Precio máximo acordado?",
     proforma: "💵 ¿Precio de venta? (sin impuesto)",
+    return: "",
   }[flow.kind];
   const s = suggested(flow);
   return sendMessage(chatId, q, s ? { reply_markup: keyboard([[{ text: `Usar ${usd(s)}`, callback_data: `dprice:${s}` }]]) } : {});
@@ -486,7 +488,7 @@ export async function finish(chatId: number, flow: DocFlow) {
 export async function deliver(chatId: number, d: Doc) {
   const link = `${SITE_URL}/d/${d.token}`;
   const first = (d.client_name ?? "").split(" ")[0];
-  const label = d.lang === "es" ? (d.kind === "proforma" ? "factura" : KIND_LABEL[d.kind].toLowerCase()) : { quote: "quotation", memo: "memorandum", invoice: "invoice", consignment: "consignment agreement", purchase: "bill of sale", sourcing: "sourcing agreement", proforma: "invoice" }[d.kind];
+  const label = d.lang === "es" ? (d.kind === "proforma" ? "factura" : KIND_LABEL[d.kind].toLowerCase()) : { quote: "quotation", memo: "memorandum", invoice: "invoice", consignment: "consignment agreement", purchase: "bill of sale", sourcing: "sourcing agreement", proforma: "invoice", return: "return receipt" }[d.kind];
   const msg = d.lang === "es"
     ? `Hola ${first}, le comparto su ${label} ${d.number} de The Heure Society: ${link}`
     : `Hi ${first}, here is your ${label} ${d.number} from The Heure Society: ${link}`;
@@ -615,7 +617,9 @@ export async function onCallback(chatId: number, cbId: string, messageId: number
     }
     await clearButtons();
     await returnToOwner(item as Item, user, "Devuelto al dueño (desde Telegram)");
-    return sendMessage(chatId, `↩️ ${h(item.sku)} devuelto a ${h(item.supplier_name ?? "su dueño")}. Ya no figura como disponible ni en la web.`);
+    const receipt = await receiptForItem(item as Item, null, user);
+    await sendMessage(chatId, `↩️ ${h(item.sku)} devuelto a ${h(item.supplier_name ?? "su dueño")}. Ya no figura como disponible ni en la web.\nAquí va el <b>acta de devolución</b> para que la firme:`);
+    return deliver(chatId, receipt);
   }
 
   if (["dpaid", "dpm", "dret", "dinv", "down", "dshow"].includes(action)) {
@@ -660,8 +664,9 @@ export async function onCallback(chatId: number, cbId: string, messageId: number
     if (action === "dret") {
       await answer("Hecho");
       await clearButtons();
-      await closeReturned(d, user);
-      return sendMessage(chatId, d.kind === "memo" ? `↩️ ${h(d.number)}: reloj devuelto, vuelve a estar disponible.` : `↩️ ${h(d.number)}: reloj devuelto a su dueño; sale del inventario y de la web.`);
+      const receipt = await closeReturned(d, user);
+      await sendMessage(chatId, d.kind === "memo" ? `↩️ ${h(d.number)}: reloj devuelto, vuelve a estar disponible.\nAquí va el <b>acta de devolución</b> para que la firme quien lo devuelve:` : `↩️ ${h(d.number)}: reloj devuelto a su dueño; sale del inventario y de la web.\nAquí va el <b>acta de devolución</b> para que la firme el dueño:`);
+      return deliver(chatId, receipt);
     }
     if (action === "down") {
       await answer("Hecho");

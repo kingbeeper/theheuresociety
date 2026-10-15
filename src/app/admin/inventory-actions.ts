@@ -195,14 +195,15 @@ export async function returnItem(id: string, _: unknown, f: FormData) {
   await logItem(id, "return", `Devuelto ${to}${reason ? `: ${reason}` : ""}`.trim(), user);
   if (item.supplier_customer_id) await addEvent(item.supplier_customer_id, "return", `Se le devolvió ${item.brand} ${item.model ?? ""}`.trim(), { item: id }, user);
   await syncWebStatus(item.watch_id, "draft"); // ya no está a la venta
-  // Si tenía un contrato de consignación abierto, queda como «Devuelto al dueño»
+  // Acta de devolución para que la firme el dueño: si tenía contrato de consignación abierto, se cierra
+  // («Devuelto al dueño») y sale de él; si no, se hace con los datos del reloj
+  let receiptId: string | null = null;
+  const { closeReturned, receiptForItem } = await import("@/lib/documents");
   const { data: contract } = await adminDb().from("documents").select("*").eq("kind", "consignment").eq("status", "sent").filter("items", "cs", JSON.stringify([{ item_id: id }])).limit(1);
-  if (contract?.[0]) {
-    const { closeReturned } = await import("@/lib/documents");
-    await closeReturned(contract[0], user);
-  }
+  if (contract?.[0]) receiptId = (await closeReturned(contract[0], user, reason)).id;
+  else if (item.acquisition === "consignment" || item.acquisition === "memo") receiptId = (await receiptForItem(item, reason, user)).id;
   refresh();
-  return { ok: true };
+  return { ok: true, receiptId };
 }
 
 export async function markOwnerPaid(id: string) {

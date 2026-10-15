@@ -65,7 +65,7 @@ export default async function DocumentsPage({ searchParams }: PageProps<"/admin/
       </div>
 
       <div className="mt-6 flex gap-1 overflow-x-auto">
-        {(["all", "quote", "proforma", "memo", "invoice", "consignment", "purchase", "sourcing"] as const).map((k) => (
+        {(["all", "quote", "proforma", "memo", "invoice", "consignment", "purchase", "sourcing", "return"] as const).map((k) => (
           <Link
             key={k}
             href={k === "all" ? "/admin/documentos" : `/admin/documentos?tipo=${k}`}

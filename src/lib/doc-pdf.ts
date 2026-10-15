@@ -39,6 +39,8 @@ export async function renderDocPdf(d: Doc, s: Required<DocSettings>) {
   const consign = d.kind === "consignment";
   const purchase = d.kind === "purchase";
   const sourcing = d.kind === "sourcing";
+  // Acta de devolución: sin precios ni totales; quién devuelve o recibe, el estado y dos firmas
+  const receipt = d.kind === "return";
   const deposit = Number(d.deposit ?? 0);
   const sellerId = purchase ? maskedId(d) : null;
   const totals = docTotals(d);
@@ -97,7 +99,7 @@ export async function renderDocPdf(d: Doc, s: Required<DocSettings>) {
   contact.forEach((l, i) => text(l, cx, y - 28 - i * 11, { font: light, size: 8, color: GRAY }));
 
   const title = t[d.kind];
-  text(title, W - M, y - 20, { font: display, size: consign || sourcing || d.kind === "proforma" ? 21 : 26, align: "right", track: 0.6 });
+  text(title, W - M, y - 20, { font: display, size: consign || sourcing || receipt || d.kind === "proforma" ? 21 : 26, align: "right", track: 0.6 });
   const date = (iso: string | null) =>
     iso ? new Intl.DateTimeFormat(d.lang === "es" ? "es-ES" : "en-US", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${iso}T12:00:00Z`)) : "-";
   const meta: [string, string][] = [[t.number, d.number], [t.date, date(d.issue_date)], ...(d.due_date && t.due[d.kind] ? [[t.due[d.kind], date(d.due_date)] as [string, string]] : [])];
@@ -118,7 +120,7 @@ export async function renderDocPdf(d: Doc, s: Required<DocSettings>) {
 
   // ── cliente ──
   y -= 24;
-  label(t.billTo[d.kind], M, y, { color: BRASS });
+  label(receipt ? (d.return_of === "memo" ? t.returnedBy : t.returnedTo) : t.billTo[d.kind], M, y, { color: BRASS });
   y -= 18;
   text(d.client_name ?? "", M, y, { font: display, size: 14 });
   const who = [d.client_company, ...(d.client_address ?? "").split("\n"), [d.client_phone, d.client_email].filter(Boolean).join(" · "), sellerId && `${t.sellerId}: ${sellerId}`].filter(Boolean) as string[];
@@ -135,9 +137,11 @@ export async function renderDocPdf(d: Doc, s: Required<DocSettings>) {
   y -= 26;
   rule(y + 12);
   label(sourcing ? t.sought : t.item, M, y);
-  label(t.qty, colQty, y, { align: "center" });
-  label(t.price, colPrice, y, { align: "right" });
-  label(consign ? t.net : t.amount, right, y, { align: "right" });
+  if (!receipt) {
+    label(t.qty, colQty, y, { align: "center" });
+    label(t.price, colPrice, y, { align: "right" });
+    label(consign ? t.net : t.amount, right, y, { align: "right" });
+  } else label(t.qty, right, y, { align: "right" });
   y -= 8;
   rule(y);
 
@@ -153,14 +157,18 @@ export async function renderDocPdf(d: Doc, s: Required<DocSettings>) {
       y -= 11;
       text(dl, M, y, { font: light, size: 8, color: GRAY });
     }
-    text(String(l.qty), colQty, top, { size: 9, align: "center" });
-    text(usd(l.price), colPrice, top, { size: 9, align: "right" });
-    text(usd(l.qty * l.price), right, top, { size: 9, align: "right" });
+    if (receipt) text(String(l.qty), right, top, { size: 9, align: "right" });
+    else {
+      text(String(l.qty), colQty, top, { size: 9, align: "center" });
+      text(usd(l.price), colPrice, top, { size: 9, align: "right" });
+      text(usd(l.qty * l.price), right, top, { size: 9, align: "right" });
+    }
     y -= 12;
     rule(y, M, right, SOFT);
   }
 
-  // ── totales ──
+  // ── totales ── (el acta de devolución no lleva)
+  if (!receipt) {
   const rows: [string, string][] = [[t.subtotal, usd(totals.subtotal)]];
   if (totals.discount > 0) rows.push([t.discount, `-${usd(totals.discount)}`]);
   if (totals.tax > 0) rows.push([`${t.tax} (${Number(d.tax_rate)}%)`, usd(totals.tax)]);
@@ -194,6 +202,7 @@ export async function renderDocPdf(d: Doc, s: Required<DocSettings>) {
     text(k, lx, y, big ? { font: display, size: 13 } : { font: light, size: 9, color: GRAY });
     text(v, right, y, big ? { font: display, size: 13, align: "right" } : { size: 9, align: "right" });
   }
+  }
 
   // ── notas, pago, términos ──
   y -= 26;
@@ -209,9 +218,9 @@ export async function renderDocPdf(d: Doc, s: Required<DocSettings>) {
       text(l, M, y, { font: light, size: 8.5, color: INK });
     }
   };
-  if (d.notes) block(t.notes, d.notes);
+  if (d.notes) block(receipt ? t.conditionNote : t.notes, d.notes);
   const payment = [d.payment_method, d.status === "paid" || purchase ? null : s.doc_payment_info].filter(Boolean).join("\n");
-  if (d.kind !== "memo" && !consign && payment) block(t.payment, payment);
+  if (d.kind !== "memo" && !consign && !receipt && payment) block(t.payment, payment);
   if (d.terms) block(t.terms, d.terms);
 
   // ── firmas ──
@@ -242,8 +251,8 @@ export async function renderDocPdf(d: Doc, s: Required<DocSettings>) {
     sign(M + half + 30, y, t.date);
     if (sigImage) text(signedOn, M + half + 34, y + 4, { size: 8.5 });
   }
-  if (consign || purchase || sourcing) {
-    const who = purchase ? t.purchaseSign : sourcing ? t.sourcingSign : t.consignSign;
+  if (consign || purchase || sourcing || receipt) {
+    const who = purchase ? t.purchaseSign : sourcing ? t.sourcingSign : receipt ? t.returnSign[d.return_of === "memo" ? "memo" : "consignment"] : t.consignSign;
     ensure(110);
     y -= 50;
     sign(M, y, who[0], true);

@@ -1,6 +1,6 @@
 // Cotizaciones, memos y facturas: etiquetas y cálculos (servidor y navegador)
 
-export type DocKind = "quote" | "memo" | "invoice" | "consignment" | "purchase" | "sourcing" | "proforma";
+export type DocKind = "quote" | "memo" | "invoice" | "consignment" | "purchase" | "sourcing" | "proforma" | "return";
 export type DocStatus = "draft" | "sent" | "accepted" | "rejected" | "returned" | "paid" | "void" | "converted";
 
 export type DocLine = {
@@ -59,14 +59,16 @@ export type Doc = {
   refunded_at?: string | null;
   // Proforma: pagos a cuenta (depósitos)
   payments?: DocPayment[];
+  // Acta de devolución: qué se devuelve (consignación o memo de dealer a su dueño, o un memo nuestro)
+  return_of?: "consignment" | "memo" | null;
 };
 export type DocPayment = { date: string; amount: number; method: string | null };
 
-export const SIGNABLE: DocKind[] = ["memo", "consignment", "purchase", "invoice", "quote", "sourcing", "proforma"];
+export const SIGNABLE: DocKind[] = ["memo", "consignment", "purchase", "invoice", "quote", "sourcing", "proforma", "return"];
 
-export const KIND_LABEL: Record<DocKind, string> = { quote: "Cotización", memo: "Memo", invoice: "Factura", consignment: "Consignación", purchase: "Contrato de compra", sourcing: "Encargo", proforma: "Proforma" };
-export const KIND_PLURAL: Record<DocKind, string> = { quote: "Cotizaciones", memo: "Memos", invoice: "Facturas", consignment: "Consignaciones", purchase: "Compras", sourcing: "Encargos", proforma: "Proformas" };
-export const KIND_PREFIX: Record<DocKind, string> = { quote: "Q", memo: "M", invoice: "INV", consignment: "C", purchase: "P", sourcing: "S", proforma: "PF" };
+export const KIND_LABEL: Record<DocKind, string> = { quote: "Cotización", memo: "Memo", invoice: "Factura", consignment: "Consignación", purchase: "Contrato de compra", sourcing: "Encargo", proforma: "Proforma", return: "Acta de devolución" };
+export const KIND_PLURAL: Record<DocKind, string> = { quote: "Cotizaciones", memo: "Memos", invoice: "Facturas", consignment: "Consignaciones", purchase: "Compras", sourcing: "Encargos", proforma: "Proformas", return: "Devoluciones" };
+export const KIND_PREFIX: Record<DocKind, string> = { quote: "Q", memo: "M", invoice: "INV", consignment: "C", purchase: "P", sourcing: "S", proforma: "PF", return: "R" };
 
 // Estados posibles de cada tipo, con su etiqueta en el CRM
 export const STATUS_LABEL: Record<DocKind, Partial<Record<DocStatus, string>>> = {
@@ -81,6 +83,8 @@ export const STATUS_LABEL: Record<DocKind, Partial<Record<DocStatus, string>>> =
   sourcing: { draft: "Borrador", sent: "Buscando", converted: "Conseguido", returned: "Anticipo devuelto", void: "Anulado" },
   // Proforma: cotización aceptada; recibe depósitos y, saldada, pasa a factura pagada
   proforma: { draft: "Borrador", sent: "Abierta", converted: "Facturada", void: "Anulada" },
+  // Acta de devolución: constancia firmada de que el reloj volvió a su dueño (o a nosotros)
+  return: { draft: "Borrador", sent: "Emitida", void: "Anulada" },
 };
 
 export const STATUS_STYLE: Partial<Record<DocStatus, string>> = {
@@ -110,9 +114,11 @@ export const usd = (n: number | null | undefined) =>
 // Textos del documento impreso (lo que ve el cliente), en inglés o español
 export const PRINT = {
   en: {
-    quote: "Quotation", memo: "Memorandum", invoice: "Invoice", consignment: "Consignment Agreement", purchase: "Bill of Sale", sourcing: "Sourcing Agreement", proforma: "Invoice",
-    number: "No.", date: "Date", due: { quote: "Valid until", memo: "Return by", invoice: "Due date", consignment: "Term ends", purchase: "", sourcing: "Search period ends", proforma: "Balance due by" },
-    billTo: { quote: "Prepared for", memo: "Consignee", invoice: "Bill to", consignment: "Consignor", purchase: "Seller", sourcing: "Client", proforma: "Bill to" },
+    quote: "Quotation", memo: "Memorandum", invoice: "Invoice", consignment: "Consignment Agreement", purchase: "Bill of Sale", sourcing: "Sourcing Agreement", proforma: "Invoice", return: "Return Receipt",
+    number: "No.", date: "Date", due: { quote: "Valid until", memo: "Return by", invoice: "Due date", consignment: "Term ends", purchase: "", sourcing: "Search period ends", proforma: "Balance due by", return: "" },
+    billTo: { quote: "Prepared for", memo: "Consignee", invoice: "Bill to", consignment: "Consignor", purchase: "Seller", sourcing: "Client", proforma: "Bill to", return: "Returned to" },
+    returnedTo: "Returned to", returnedBy: "Returned by", returnRef: "Ref. agreement", conditionNote: "Condition and notes",
+    returnSign: { consignment: ["Received by — signature", "The Heure Society — delivered by"], memo: ["Returned by — signature", "The Heure Society — received by"] },
     paymentsReceived: "Payments received", paymentLine: "Payment",
     sought: "Timepiece requested", upTo: "Agreed price (up to)", deposit: "Deposit", depositPaid: "Deposit received", depositDue: "Deposit due", depositRefunded: "Deposit refunded",
     lessDeposit: "Less deposit received", balance: "Balance due", balancePaid: "Balance paid",
@@ -128,9 +134,11 @@ export const PRINT = {
     signedBy: "Signed electronically by", acceptedBy: "Accepted and signed by",
   },
   es: {
-    quote: "Cotización", memo: "Memorándum", invoice: "Factura", consignment: "Contrato de consignación", purchase: "Contrato de compraventa", sourcing: "Acuerdo de búsqueda", proforma: "Factura",
-    number: "N.º", date: "Fecha", due: { quote: "Válida hasta", memo: "Devolver antes de", invoice: "Vencimiento", consignment: "Vigente hasta", purchase: "", sourcing: "Plazo de búsqueda hasta", proforma: "Saldar antes de" },
-    billTo: { quote: "Preparada para", memo: "Recibe en memo", invoice: "Facturar a", consignment: "Consignante", purchase: "Vendedor", sourcing: "Cliente", proforma: "Facturar a" },
+    quote: "Cotización", memo: "Memorándum", invoice: "Factura", consignment: "Contrato de consignación", purchase: "Contrato de compraventa", sourcing: "Acuerdo de búsqueda", proforma: "Factura", return: "Acta de devolución",
+    number: "N.º", date: "Fecha", due: { quote: "Válida hasta", memo: "Devolver antes de", invoice: "Vencimiento", consignment: "Vigente hasta", purchase: "", sourcing: "Plazo de búsqueda hasta", proforma: "Saldar antes de", return: "" },
+    billTo: { quote: "Preparada para", memo: "Recibe en memo", invoice: "Facturar a", consignment: "Consignante", purchase: "Vendedor", sourcing: "Cliente", proforma: "Facturar a", return: "Devuelto a" },
+    returnedTo: "Devuelto a", returnedBy: "Devuelto por", returnRef: "Contrato de referencia", conditionNote: "Estado y observaciones",
+    returnSign: { consignment: ["Recibe — firma", "The Heure Society — entrega"], memo: ["Devuelve — firma", "The Heure Society — recibe"] },
     paymentsReceived: "Pagos recibidos", paymentLine: "Pago",
     sought: "Reloj solicitado", upTo: "Precio acordado (hasta)", deposit: "Anticipo", depositPaid: "Anticipo recibido", depositDue: "Anticipo pendiente", depositRefunded: "Anticipo devuelto",
     lessDeposit: "Menos anticipo recibido", balance: "Saldo pendiente", balancePaid: "Saldo pagado",
@@ -150,7 +158,7 @@ export const PRINT = {
 // Ajustes del negocio que salen en los documentos (se editan en Documentos → Ajustes)
 export const DOC_SETTING_KEYS = [
   "doc_company", "doc_address", "doc_phone", "doc_email", "doc_tax_id", "doc_payment_info", "doc_tax_rate",
-  "doc_terms_quote", "doc_terms_memo", "doc_terms_invoice", "doc_terms_consignment", "doc_terms_purchase", "doc_terms_sourcing", "doc_terms_proforma", "doc_review_url",
+  "doc_terms_quote", "doc_terms_memo", "doc_terms_invoice", "doc_terms_consignment", "doc_terms_purchase", "doc_terms_sourcing", "doc_terms_proforma", "doc_terms_return", "doc_review_url",
 ] as const;
 export type DocSettings = Partial<Record<(typeof DOC_SETTING_KEYS)[number], string>>;
 
@@ -174,6 +182,8 @@ export const DOC_DEFAULTS: Required<DocSettings> = {
     "The Seller sells the timepiece(s) listed to The Heure Society for the total shown and confirms that they are the lawful owner; that the timepiece(s) are free of any lien, claim or encumbrance and have not been reported lost or stolen; and that, to the best of their knowledge, they are authentic and as described. The Seller will indemnify The Heure Society for any loss arising from a breach of these statements. Title passes to The Heure Society upon payment.",
   doc_terms_sourcing:
     "The Client asks The Heure Society to locate the timepiece described above, at a purchase price not exceeding the agreed price, within the search period shown. The deposit secures this request and will be credited in full toward the purchase price. When a timepiece matching the description is located, The Heure Society will notify the Client, who will have 3 business days to pay the balance. The deposit is fully refundable: if the timepiece is not located within the search period, or if the Client cancels this request, The Heure Society will refund the deposit in full within 5 business days. The search period may be extended by mutual agreement.",
+  doc_terms_return:
+    "The undersigned acknowledges the return of the timepiece(s) listed, in the condition described in this document. No amount is owed by either party for these timepieces.",
   doc_terms_proforma:
     "This proforma invoice confirms the sale of the timepiece(s) listed at the price shown. The timepiece(s) are reserved for the buyer from receipt of the deposit until the balance is paid by the date shown. Deposits are credited in full toward the purchase price. Title passes to the buyer, and a final invoice is issued, upon receipt of payment in full. All timepieces are authenticated and sold as described.",
   doc_terms_invoice:
@@ -190,6 +200,8 @@ const TERMS_ES: Record<DocKind, string> = {
     "La propiedad pasa al comprador al recibirse el pago total. Todos los relojes están autenticados y se venden tal como se describen. Todas las ventas son definitivas salvo acuerdo por escrito.",
   purchase:
     "El Vendedor vende a The Heure Society el reloj o relojes indicados por el total que figura y confirma que es su propietario legítimo; que están libres de cargas o reclamaciones y no han sido denunciados como perdidos o robados; y que, a su leal saber, son auténticos y tal como se describen. El Vendedor indemnizará a The Heure Society por cualquier perjuicio derivado del incumplimiento de estas declaraciones. La propiedad pasa a The Heure Society al realizarse el pago.",
+  return:
+    "El firmante deja constancia de la devolución del reloj o relojes indicados, en el estado descrito en este documento. Ninguna de las partes debe importe alguno por estos relojes.",
   proforma:
     "Esta factura proforma confirma la venta del reloj o relojes indicados al precio que figura. El reloj queda reservado para el comprador desde la recepción del depósito hasta el pago del saldo en la fecha indicada. Los depósitos se descuentan íntegramente del precio. La propiedad pasa al comprador, y se emite la factura final, al recibirse el pago total. Todos los relojes están autenticados y se venden tal como se describen.",
   sourcing:
@@ -230,3 +242,14 @@ export const balanceDue = (d: Pick<Doc, "total" | "deposit">) => Math.max(0, Mat
 
 // Proforma: lo pagado a cuenta y lo que falta
 export const paidSoFar = (d: Pick<Doc, "payments">) => Math.round((d.payments ?? []).reduce((a, p) => a + Number(p.amount || 0), 0) * 100) / 100;
+
+// Texto del acta de devolución (en el idioma del documento)
+export function returnTerms(of: "consignment" | "memo", lang: "en" | "es", ref: string | null) {
+  if (of === "consignment")
+    return lang === "es"
+      ? `El firmante declara que ha recibido de The Heure Society el reloj o relojes indicados, en el mismo estado en que los entregó${ref ? `, y que queda terminado el contrato ${ref}` : ""}. Ninguna de las partes debe importe alguno por estos relojes.`
+      : `The undersigned acknowledges receiving from The Heure Society the timepiece(s) listed, in the same condition as delivered${ref ? `, and that agreement ${ref} is terminated` : ""}. No amount is owed by either party for these timepieces.`;
+  return lang === "es"
+    ? `The Heure Society declara que ha recibido de vuelta el reloj o relojes indicados, entregados en memorándum${ref ? ` (${ref})` : ""}, en el estado descrito en este documento. Con esta devolución queda cerrado el memorándum para estos relojes.`
+    : `The Heure Society acknowledges receiving back the timepiece(s) listed, delivered on memorandum${ref ? ` (${ref})` : ""}, in the condition described in this document. This return closes the memorandum for these timepieces.`;
+}

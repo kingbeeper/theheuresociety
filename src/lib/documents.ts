@@ -4,7 +4,7 @@ import { adminDb } from "./supabase";
 import { addEvent, STAGES, STAGE_LABEL, type Stage } from "./crm";
 import { logItem, recordPurchase, syncWebStatus, type Item } from "./stock";
 import { isOwnerStock } from "./stock-labels";
-import { DOC_DEFAULTS, DOC_SETTING_KEYS, KIND_LABEL, KIND_PREFIX, docTotals, paidSoFar, termsFor, usd, type Doc, type DocKind, type DocPayment, type DocSettings } from "./doc-labels";
+import { DOC_DEFAULTS, DOC_SETTING_KEYS, KIND_LABEL, KIND_PREFIX, docTotals, paidSoFar, returnTerms, termsFor, usd, type Doc, type DocKind, type DocPayment, type DocSettings } from "./doc-labels";
 import { escapeHtml as h, notifyAdmins } from "./telegram";
 
 // Cotizaciones, memos y facturas. Van enlazadas al cliente del CRM y a los relojes del inventario:
@@ -163,8 +163,8 @@ export async function issueDoc(d: Doc, user: string) {
   }
 }
 
-// Memo devuelto, o consignación terminada sin vender
-export async function closeReturned(d: Doc, user: string) {
+// Memo devuelto, o consignación terminada sin vender: se cierra y se genera el acta de devolución
+export async function closeReturned(d: Doc, user: string, note: string | null = null) {
   await touch(d.id, { status: "returned" });
   if (d.kind === "memo") {
     await releaseStock(d, user, "devuelto del memo");
@@ -173,6 +173,51 @@ export async function closeReturned(d: Doc, user: string) {
     await returnConsigned(d, user);
     await docEvent(d, "reloj devuelto a su dueño", user);
   }
+  return createReturnReceipt(
+    {
+      of: d.kind === "memo" ? "memo" : "consignment",
+      customerId: d.customer_id, clientName: d.client_name, clientPhone: d.client_phone, clientEmail: d.client_email, clientAddress: d.client_address,
+      lang: d.lang, items: d.items.map((l) => ({ ...l, price: 0 })), sourceId: d.id, sourceNumber: d.number, note,
+    },
+    user
+  );
+}
+
+// Acta de devolución: constancia para que la firme la otra parte (consignante o quien devuelve el memo)
+export async function createReturnReceipt(
+  r: {
+    of: "consignment" | "memo";
+    customerId: string | null;
+    clientName: string | null;
+    clientPhone?: string | null;
+    clientEmail?: string | null;
+    clientAddress?: string | null;
+    lang?: "en" | "es";
+    items: Doc["items"];
+    sourceId?: string | null;
+    sourceNumber?: string | null;
+    note?: string | null;
+  },
+  user: string
+) {
+  const lang = r.lang ?? "en";
+  const doc = await insertDoc({
+    kind: "return",
+    customer_id: r.customerId,
+    client_name: r.clientName, client_phone: r.clientPhone ?? null, client_email: r.clientEmail ?? null, client_address: r.clientAddress ?? null,
+    lang,
+    issue_date: isoToday(),
+    items: r.items.map((l) => ({ ...l, qty: l.qty || 1, price: 0 })),
+    show_serial: true,
+    return_of: r.of,
+    notes: r.note,
+    terms: returnTerms(r.of, lang, r.sourceNumber ?? null),
+    source_id: r.sourceId ?? null,
+    created_by: user,
+  });
+  await touch(doc.id, { status: "sent" });
+  await docEvent(doc, r.of === "memo" ? "reloj recibido de vuelta del memo" : "reloj devuelto a su dueño", user);
+  return { ...doc, status: "sent" as const };
 }
 
 export async function consignorPaid(d: Doc, user: string) {
@@ -441,4 +486,21 @@ export async function closeProforma(d: Doc, p: { date: string; method: string | 
   await docEvent(invoice, `creada al saldar la proforma ${d.number}`, user);
   await touch(invoice.id, { status: "sent" });
   return payInvoice({ ...invoice, status: "sent" }, methods ?? null, p.date, user);
+}
+
+// Acta de devolución de un reloj del inventario que no tenía contrato (consignación o memo de dealer)
+export async function receiptForItem(item: Pick<Item, "id" | "sku" | "brand" | "model" | "reference" | "serial" | "condition" | "comes_with" | "supplier_customer_id" | "supplier_name">, note: string | null, user: string) {
+  const { data: c } = item.supplier_customer_id ? await adminDb().from("customers").select("name, phone, email").eq("id", item.supplier_customer_id).maybeSingle() : { data: null };
+  return createReturnReceipt(
+    {
+      of: "consignment",
+      customerId: item.supplier_customer_id ?? null,
+      clientName: item.supplier_name ?? c?.name ?? null,
+      clientPhone: c?.phone ?? null,
+      clientEmail: c?.email ?? null,
+      items: [{ item_id: item.id, sku: item.sku, title: [item.brand, item.model, item.reference].filter(Boolean).join(" "), details: [item.condition, item.comes_with].filter(Boolean).join(" · ") || null, serial: item.serial, qty: 1, price: 0 }],
+      note,
+    },
+    user
+  );
 }

@@ -35,7 +35,8 @@ async function SharedDocument({ params, searchParams }: { params: Promise<{ toke
   const purchase = d.kind === "purchase";
   const sourcing = d.kind === "sourcing";
   const deposit = Number(d.deposit ?? 0);
-  const twoParty = consign || purchase || sourcing;
+  const receipt = d.kind === "return";
+  const twoParty = consign || purchase || sourcing || receipt;
   const sellerId = purchase ? maskedId(d) : null;
   // Firma del cliente (imagen privada, se incrusta en la página)
   const sigBytes = d.signature_path ? await downloadPrivate(d.signature_path) : null;
@@ -92,7 +93,7 @@ async function SharedDocument({ params, searchParams }: { params: Promise<{ toke
             </div>
           </div>
           <div className="w-full sm:w-auto sm:text-right">
-            <h1 className={`font-display font-light tracking-[0.06em] ${consign || sourcing || d.kind === "proforma" ? "text-[1.7rem] leading-tight" : "text-4xl"}`}>{t[d.kind]}</h1>
+            <h1 className={`font-display font-light tracking-[0.06em] ${consign || sourcing || receipt || d.kind === "proforma" ? "text-[1.7rem] leading-tight" : "text-4xl"}`}>{t[d.kind]}</h1>
             <dl className="mt-3 grid grid-cols-[auto_auto] justify-start gap-x-4 gap-y-1 text-xs sm:justify-end">
               <dt className="text-[#5d625e]">{t.number}</dt><dd>{d.number}</dd>
               <dt className="text-[#5d625e]">{t.date}</dt><dd>{date(d.issue_date)}</dd>
@@ -102,7 +103,7 @@ async function SharedDocument({ params, searchParams }: { params: Promise<{ toke
         </header>
 
         <section className="py-7">
-          <p className="text-[0.62rem] tracking-[0.24em] uppercase text-[#8a7a52]">{t.billTo[d.kind]}</p>
+          <p className="text-[0.62rem] tracking-[0.24em] uppercase text-[#8a7a52]">{receipt ? (d.return_of === "memo" ? t.returnedBy : t.returnedTo) : t.billTo[d.kind]}</p>
           <p className="mt-2 font-display text-xl">{d.client_name}</p>
           <p className="whitespace-pre-line text-sm text-[#5d625e]">
             {[d.client_company, d.client_address, [d.client_phone, d.client_email].filter(Boolean).join(" · "), sellerId && `${t.sellerId}: ${sellerId}`].filter(Boolean).join("\n")}
@@ -116,10 +117,12 @@ async function SharedDocument({ params, searchParams }: { params: Promise<{ toke
               <p className="font-display text-lg leading-tight">{l.title}</p>
               {l.details && <p className="mt-1 text-xs text-[#5d625e]">{l.details}</p>}
               {d.show_serial && l.serial && <p className="mt-1 text-xs text-[#5d625e]">{t.serial}: {l.serial}</p>}
-              <p className="mt-2 flex justify-between text-sm tabular-nums">
-                <span className="text-[#5d625e]">{l.qty} × {usd(l.price)}</span>
-                <span>{usd(l.qty * l.price)}</span>
-              </p>
+              {!receipt && (
+                <p className="mt-2 flex justify-between text-sm tabular-nums">
+                  <span className="text-[#5d625e]">{l.qty} × {usd(l.price)}</span>
+                  <span>{usd(l.qty * l.price)}</span>
+                </p>
+              )}
             </div>
           ))}
         </div>
@@ -129,8 +132,8 @@ async function SharedDocument({ params, searchParams }: { params: Promise<{ toke
             <tr className="border-y border-[#d8d2c4] text-left text-[0.6rem] tracking-[0.2em] uppercase text-[#5d625e]">
               <th className="py-3 font-normal">{sourcing ? t.sought : t.item}</th>
               <th className="py-3 text-center font-normal">{t.qty}</th>
-              <th className="py-3 pl-4 text-right font-normal">{t.price}</th>
-              <th className="py-3 pl-4 text-right font-normal">{consign ? t.net : t.amount}</th>
+              {!receipt && <th className="py-3 pl-4 text-right font-normal">{t.price}</th>}
+              {!receipt && <th className="py-3 pl-4 text-right font-normal">{consign ? t.net : t.amount}</th>}
             </tr>
           </thead>
           <tbody>
@@ -142,14 +145,14 @@ async function SharedDocument({ params, searchParams }: { params: Promise<{ toke
                   {d.show_serial && l.serial && <p className="mt-1 text-xs text-[#5d625e]">{t.serial}: {l.serial}</p>}
                 </td>
                 <td className="py-4 text-center tabular-nums">{l.qty}</td>
-                <td className="py-4 pl-4 text-right tabular-nums">{usd(l.price)}</td>
-                <td className="py-4 pl-4 text-right tabular-nums">{usd(l.qty * l.price)}</td>
+                {!receipt && <td className="py-4 pl-4 text-right tabular-nums">{usd(l.price)}</td>}
+                {!receipt && <td className="py-4 pl-4 text-right tabular-nums">{usd(l.qty * l.price)}</td>}
               </tr>
             ))}
           </tbody>
         </table>
 
-        <div className="mt-6 flex justify-end">
+        <div className={`mt-6 flex justify-end ${receipt ? "hidden" : ""}`}>
           <dl className="grid w-full grid-cols-[1fr_auto] gap-y-2 text-sm sm:max-w-[300px]">
             <dt className="text-[#5d625e]">{t.subtotal}</dt><dd className="text-right tabular-nums">{usd(totals.subtotal)}</dd>
             {totals.discount > 0 && (<><dt className="text-[#5d625e]">{t.discount}</dt><dd className="text-right tabular-nums">−{usd(totals.discount)}</dd></>)}
@@ -182,9 +185,9 @@ async function SharedDocument({ params, searchParams }: { params: Promise<{ toke
 
         <footer className="mt-10 grid gap-6 border-t border-[#d8d2c4] pt-6 text-xs leading-relaxed text-[#4a4f4b]">
           {d.notes && (
-            <div><p className="mb-1 text-[0.6rem] tracking-[0.2em] uppercase text-[#8a7a52]">{t.notes}</p><p className="whitespace-pre-line">{d.notes}</p></div>
+            <div><p className="mb-1 text-[0.6rem] tracking-[0.2em] uppercase text-[#8a7a52]">{receipt ? t.conditionNote : t.notes}</p><p className="whitespace-pre-line">{d.notes}</p></div>
           )}
-          {d.kind !== "memo" && !consign && (d.payment_method || (!purchase && s.doc_payment_info)) && (
+          {d.kind !== "memo" && !consign && !receipt && (d.payment_method || (!purchase && s.doc_payment_info)) && (
             <div>
               <p className="mb-1 text-[0.6rem] tracking-[0.2em] uppercase text-[#8a7a52]">{t.payment}</p>
               <p className="whitespace-pre-line">{[d.payment_method, d.status === "paid" || purchase ? null : s.doc_payment_info].filter(Boolean).join("\n")}</p>
@@ -201,7 +204,7 @@ async function SharedDocument({ params, searchParams }: { params: Promise<{ toke
           )}
           {twoParty && (
             <div className="mt-8 grid gap-10 sm:grid-cols-2">
-              {(purchase ? t.purchaseSign : sourcing ? t.sourcingSign : t.consignSign).map((who) => (
+              {(purchase ? t.purchaseSign : sourcing ? t.sourcingSign : receipt ? t.returnSign[d.return_of === "memo" ? "memo" : "consignment"] : t.consignSign).map((who) => (
                 <div key={who}>
                   <p className="border-t border-[#1b1f1c] pt-2">{who}</p>
                   <p className="mt-6 border-t border-[#1b1f1c] pt-2">{t.date}</p>
