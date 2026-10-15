@@ -186,7 +186,7 @@ export async function apptNoteAction(id: string, form: FormData) {
 export async function apptCallAction(id: string, form: FormData) {
   const user = await requireAdmin("citas");
   const date = text(form, "date");
-  if (date) await scheduleCall(id, date, text(form, "note"), user);
+  if (date) await scheduleCall(id, date, text(form, "note"), user, text(form, "time"));
   refresh();
 }
 

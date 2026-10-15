@@ -2,6 +2,7 @@ import { adminDb } from "@/lib/supabase";
 import { validCalendarKey } from "@/lib/calendar";
 import { booking, contact } from "@/lib/site";
 import { SITE_URL } from "@/lib/seo";
+import { miamiToUtc } from "@/lib/booking";
 
 // Feed iCalendar con las citas (web, WhatsApp, Instagram y manuales). El teléfono lo vuelve a leer solo.
 const esc = (s: string) => s.replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/[,;]/g, (m) => `\\${m}`);
@@ -11,6 +12,13 @@ export async function GET(request: Request) {
   if (!validCalendarKey(new URL(request.url).searchParams.get("key"))) return new Response("No autorizado", { status: 401 });
   const since = new Date(Date.now() - 60 * 86_400_000).toISOString();
   const { data } = await adminDb().from("appointments").select("*").gte("starts_at", since).order("starts_at");
+  // Recordatorios de seguimiento pendientes (con hora o de todo el día, con aviso)
+  const { data: calls } = await adminDb()
+    .from("appointment_followups")
+    .select("id, body, due_at, due_time, customer_id, appointment:appointments(name, phone)")
+    .eq("kind", "call")
+    .is("done_at", null)
+    .gte("due_at", since.slice(0, 10));
   const address = `${contact.address.street}, ${contact.address.city}, ${contact.address.region} ${contact.address.postalCode}`;
   const now = stamp(new Date());
 
@@ -41,8 +49,29 @@ export async function GET(request: Request) {
     ].filter(Boolean);
   });
 
+  type Call = { id: string; body: string | null; due_at: string; due_time: string | null; customer_id: string | null; appointment: { name: string | null; phone: string | null } | null };
+  const reminders = ((calls ?? []) as unknown as Call[]).flatMap((c) => {
+    const d = c.due_at.replace(/-/g, "");
+    const timed = Boolean(c.due_time);
+    const start = timed ? stamp(miamiToUtc(c.due_at, c.due_time!)) : null;
+    const end = timed ? stamp(new Date(miamiToUtc(c.due_at, c.due_time!).getTime() + 15 * 60_000)) : null;
+    const next = new Date(Date.UTC(+c.due_at.slice(0, 4), +c.due_at.slice(5, 7) - 1, +c.due_at.slice(8, 10) + 1)).toISOString().slice(0, 10).replace(/-/g, "");
+    const details = [c.body, c.appointment?.phone && `Tel: ${c.appointment.phone}`, c.customer_id && `${SITE_URL}/admin/leads/${c.customer_id}`].filter(Boolean).join("\n");
+    return [
+      "BEGIN:VEVENT",
+      `UID:fu-${c.id}@theheuresociety`,
+      `DTSTAMP:${now}`,
+      timed ? `DTSTART:${start}` : `DTSTART;VALUE=DATE:${d}`,
+      timed ? `DTEND:${end}` : `DTEND;VALUE=DATE:${next}`,
+      `SUMMARY:${esc(`📞 Seguimiento: ${c.appointment?.name ?? "cliente"}`)}`,
+      `DESCRIPTION:${esc(details)}`,
+      "BEGIN:VALARM", timed ? "TRIGGER:PT0M" : "TRIGGER:PT9H", "ACTION:DISPLAY", "DESCRIPTION:Seguimiento del cliente", "END:VALARM",
+      "END:VEVENT",
+    ];
+  });
+
   const body = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//The Heure Society//CRM//ES", "CALSCALE:GREGORIAN", "METHOD:PUBLISH",
     "X-WR-CALNAME:Citas · The Heure Society", "X-WR-TIMEZONE:America/New_York", "REFRESH-INTERVAL;VALUE=DURATION:PT15M", "X-PUBLISHED-TTL:PT15M",
-    ...events, "END:VCALENDAR"].join("\r\n");
+    ...events, ...reminders, "END:VCALENDAR"].join("\r\n");
   return new Response(body, { headers: { "Content-Type": "text/calendar; charset=utf-8", "Cache-Control": "no-store" } });
 }

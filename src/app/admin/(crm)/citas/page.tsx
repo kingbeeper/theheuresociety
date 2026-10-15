@@ -71,7 +71,7 @@ export default async function CitasPage({ searchParams }: PageProps<"/admin/cita
           {(a.pieces as string[])?.length > 0 && <p className="text-xs text-stone">Quiere ver: {(a.pieces as string[]).map(name).join(", ")}</p>}
           {Boolean(a.note) && <p className="text-xs text-stone">Nota: {a.note as string}</p>}
           {actions && <RescheduleForm id={a.id as string} date={local(a.starts_at as string).d} time={local(a.starts_at as string).t} />}
-          <AppointmentFollowUp id={a.id as string} followups={follow.get(a.id as string) ?? []} outcome={(a.outcome as string | null) ?? null} outcomes={outcomes} today={today} open={sp.cita === a.id} />
+          <AppointmentFollowUp id={a.id as string} name={a.name as string} followups={follow.get(a.id as string) ?? []} outcome={(a.outcome as string | null) ?? null} outcomes={outcomes} today={today} open={sp.cita === a.id} />
           <p className={`mt-1 text-[0.62rem] tracking-[0.18em] uppercase ${a.status === "confirmed" ? "text-emerald-200" : a.status === "cancelled" ? "text-stone/60" : "text-amber-200"}`}>
             {STATUS[a.status as keyof typeof STATUS]}
           </p>
