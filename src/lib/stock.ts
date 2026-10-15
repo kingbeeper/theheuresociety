@@ -145,6 +145,8 @@ export async function createStockItem(fields: Record<string, unknown>, user: str
   }
   if (res.error) throw res.error;
   await logItem(res.data.id as string, "entry", log, user);
+  // Clientes que buscaban una pieza así (búsquedas, recordatorios, cotizaciones, encargos…)
+  await import("./interest").then((m) => m.notifyInterest(res.data!.id as string, user)).catch((e) => console.error("Interesados:", e));
   return res.data as { id: string; sku: string };
 }
 

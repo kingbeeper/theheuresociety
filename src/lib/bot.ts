@@ -6,7 +6,6 @@ import { INVENTORY_TAG } from "./inventory";
 import { analyzeWatch, type WatchDraft } from "./watch-ai";
 import { cutoutConfigured, cutoutPreview, makeCutout } from "./watch-cutout";
 import { reactivateBot } from "./wa-bot";
-import { addEvent, matchAlerts } from "./crm";
 import { downloadFile, escapeHtml as h, keyboard, sendMessage, sendPhoto, tg } from "./telegram";
 import { toSlug } from "./watches";
 import { MENU, WELCOME, mainKeyboard } from "./bot-keyboard";
@@ -325,8 +324,6 @@ export async function handleCallback(cb: TgCallback) {
     await sendMessage(chatId, `✅ <b>Publicado.</b> Ya está en la colección:\n${SITE_URL}/es/watches/${slug}`);
     // El recorte tarda un poco: se prepara después de responder a Telegram
     after(() => cutoutJob(chatId, id));
-    // Compradores que esperaban una pieza así (búsquedas «avísenme» del CRM)
-    after(() => notifyAlertMatches(chatId, draft.data!, slug).catch((e) => console.error("Avisos:", e)));
     // El costo (para el margen): se pregunta al momento; se puede dejar para más tarde
     // Primero el número de serie (historial) y después el costo
     const { data: stock } = await adminDb().from("inventory_items").select("id").eq("watch_id", id).maybeSingle();
@@ -414,48 +411,13 @@ export async function publish(draft: Draft) {
     })
     .select("id")
     .single();
-  if (stock) await adminDb().from("inventory_events").insert({ item_id: stock.id, type: "entry", body: "Entrada desde Telegram (publicado en la web). Falta el costo.", created_by: "bot" });
+  if (stock) {
+    await adminDb().from("inventory_events").insert({ item_id: stock.id, type: "entry", body: "Entrada desde Telegram (publicado en la web). Falta el costo.", created_by: "bot" });
+    // Clientes que buscaban una pieza así (búsquedas, recordatorios, cotizaciones, encargos…)
+    after(() => import("./interest").then((m) => m.notifyInterest(stock.id as string, "bot")).catch((e) => console.error("Interesados:", e)));
+  }
   revalidateTag(INVENTORY_TAG, { expire: 0 });
   return { slug, id: row.id as string };
-}
-
-// ───────────────────────────── Avisos a compradores ─────────────────────────────
-export async function notifyAlertMatches(chatId: number, w: WatchDraft, slug: string) {
-  const matches = await matchAlerts({ brand: w.brand, model: w.model, reference: w.reference });
-  if (!matches.length) return;
-  // Clientes con un encargo abierto: tienen prioridad (dejaron anticipo)
-  const ids = matches.map((a) => a.customer?.id).filter(Boolean) as string[];
-  const { data: orders } = await adminDb().from("documents").select("id, number, customer_id, total, deposit, deposit_paid_at").eq("kind", "sourcing").eq("status", "sent").in("customer_id", ids);
-  const lines = matches.map((a) => {
-    const c = a.customer;
-    const wa = c?.wa_id ?? c?.phone?.replace(/\D/g, "");
-    const order = (orders ?? []).find((o) => o.customer_id === c?.id);
-    return [
-      `• <b>${h(c?.name ?? "Cliente")}</b>${c?.phone ? ` · ${c.phone}` : ""}`,
-      `  Busca: «${h(a.query)}»`,
-      order ? `  🔎 <b>Encargo ${h(order.number)}</b> · hasta $${Number(order.total).toLocaleString("en-US")}${order.deposit_paid_at ? ` · anticipo de $${Number(order.deposit).toLocaleString("en-US")} pagado` : ""}\n  ${SITE_URL}/admin/documentos/${order.id}` : "",
-      wa ? `  https://wa.me/${wa}` : "",
-    ]
-      .filter(Boolean)
-      .join("\n");
-  });
-  await sendMessage(
-    chatId,
-    [
-      `🔔 <b>${matches.length} cliente(s) esperaban una pieza así</b>`,
-      `${h(w.brand)} ${h(w.model)} (${h(w.reference)})`,
-      `${SITE_URL}/es/watches/${slug}`,
-      "",
-      lines.join("\n\n"),
-      "",
-      "Escríbeles antes de que se publique en redes.",
-    ].join("\n")
-  );
-  const now = new Date().toISOString();
-  for (const a of matches) {
-    await adminDb().from("watch_alerts").update({ last_notified_at: now }).eq("id", a.id);
-    if (a.customer) await addEvent(a.customer.id, "match", `Llegó una pieza que encaja: ${w.brand} ${w.model} ${w.reference}`, { slug });
-  }
 }
 
 // ───────────────────────────── Recorte para el estuche ─────────────────────────────

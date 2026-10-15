@@ -77,6 +77,8 @@ export async function saveItem(id: string | null, _: unknown, f: FormData) {
     if (error) return { error: error.message };
     await logItem(data.id, "entry", `Entrada · ${ACQUISITION[fields.acquisition]}${fields.cost != null ? ` · costo ${usd(fields.cost)}` : ""}${fields.supplier_name ? ` · de ${fields.supplier_name}` : ""}`, user);
     await syncWebPrice(fields.watch_id, fields.asking_price);
+    // Clientes que buscaban una pieza así (búsquedas, recordatorios, cotizaciones, encargos…)
+    await import("@/lib/interest").then((m) => m.notifyInterest(data.id as string, user)).catch((e) => console.error("Interesados:", e));
     redirect(`/admin/inventario/${data.id}`);
   }
 

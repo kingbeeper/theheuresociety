@@ -10,7 +10,7 @@ import { pdfName, renderDocPdf } from "./doc-pdf";
 import { KIND_LABEL, docTotals, paidSoFar, termsFor, usd, type Doc, type DocKind } from "./doc-labels";
 import { SOURCING_ACTIONS, onSourcingCallback, sourcingButtons } from "./bot-sourcing";
 import { escapeHtml as h, keyboard, sendDocumentFile, sendMessage, tg, type InlineButton } from "./telegram";
-import { analyze, cutoutJob, draftWatch, notifyAlertMatches, parsePrice, publish, updateDraft } from "./bot";
+import { analyze, cutoutJob, draftWatch, parsePrice, publish, updateDraft } from "./bot";
 import type { WatchDraft } from "./watch-ai";
 
 // Documentos desde Telegram: /factura, /memo, /consignacion, /cotizacion y /compra.
@@ -428,7 +428,6 @@ export async function finish(chatId: number, flow: DocFlow) {
       itemId = stock!.id;
       await db.from("inventory_items").update({ acquisition, purchase_date: today, ...supplier, ...(flow.serial && { serial: flow.serial }) }).eq("id", itemId);
       after(() => cutoutJob(chatId, id));
-      after(() => notifyAlertMatches(chatId, draft.data, slug).catch((e) => console.error("Avisos:", e)));
     } else {
       const created = await createStockItem(
         {
