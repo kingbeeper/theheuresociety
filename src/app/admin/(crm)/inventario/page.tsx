@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { QuickReturn } from "@/components/admin/QuickReturn";
+import { todayInMiami } from "@/lib/booking";
 import { connection } from "next/server";
 import { adminDb } from "@/lib/supabase";
 import { requireUser } from "@/lib/admin-auth";
@@ -13,13 +15,13 @@ import { LOCATIONS, type Location } from "@/lib/locations";
 export const metadata = { title: "Inventario" };
 
 // Accesos rápidos desde el listado: llevan a la ficha, directo al formulario de venta o de devolución
-function QuickActions({ id, status, owner }: { id: string; status: string; owner: boolean }) {
+function QuickActions({ id, status, owner, today }: { id: string; status: string; owner: boolean; today: string }) {
   if (status !== "in_stock" && status !== "reserved") return null;
   const btn = "whitespace-nowrap border px-2.5 py-1 text-[0.6rem] tracking-[0.16em] uppercase";
   return (
     <div className="flex gap-1.5">
       <Link href={`/admin/inventario/${id}?accion=vender#venta`} className={`${btn} border-emerald-300/40 text-emerald-200 hover:bg-emerald-300/10`}>Vender</Link>
-      <Link href={`/admin/inventario/${id}?accion=devolver#devolucion`} className={`${btn} border-line text-stone hover:text-ivory`}>{owner ? "Devolver al dueño" : "Devolver"}</Link>
+      <QuickReturn id={id} label={owner ? "Devolver al dueño" : "Devolver"} today={today} />
     </div>
   );
 }
@@ -170,7 +172,7 @@ export default async function InventarioPage({ searchParams }: PageProps<"/admin
                       </span>
                     </p>
                   </Link>
-                  <div className="pb-3"><QuickActions id={i.id} status={i.status} owner={isOwnerStock(i.acquisition)} /></div>
+                  <div className="pb-3"><QuickActions id={i.id} status={i.status} owner={isOwnerStock(i.acquisition)} today={todayInMiami(new Date(now))} /></div>
                 </li>
               );
             })}
@@ -226,7 +228,7 @@ export default async function InventarioPage({ searchParams }: PageProps<"/admin
                         {i.status === "sold" && i.buyer_name && <span className="block text-stone">{i.buyer_name}</span>}
                       </td>
                       <td className="py-2.5 pl-3">
-                        <QuickActions id={i.id} status={i.status} owner={isOwnerStock(i.acquisition)} />
+                        <QuickActions id={i.id} status={i.status} owner={isOwnerStock(i.acquisition)} today={todayInMiami(new Date(now))} />
                       </td>
                     </tr>
                   );

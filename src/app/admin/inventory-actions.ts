@@ -195,6 +195,12 @@ export async function returnItem(id: string, _: unknown, f: FormData) {
   await logItem(id, "return", `Devuelto ${to}${reason ? `: ${reason}` : ""}`.trim(), user);
   if (item.supplier_customer_id) await addEvent(item.supplier_customer_id, "return", `Se le devolvió ${item.brand} ${item.model ?? ""}`.trim(), { item: id }, user);
   await syncWebStatus(item.watch_id, "draft"); // ya no está a la venta
+  // Si tenía un contrato de consignación abierto, queda como «Devuelto al dueño»
+  const { data: contract } = await adminDb().from("documents").select("*").eq("kind", "consignment").eq("status", "sent").filter("items", "cs", JSON.stringify([{ item_id: id }])).limit(1);
+  if (contract?.[0]) {
+    const { closeReturned } = await import("@/lib/documents");
+    await closeReturned(contract[0], user);
+  }
   refresh();
   return { ok: true };
 }
