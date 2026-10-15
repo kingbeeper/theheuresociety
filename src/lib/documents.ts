@@ -304,3 +304,58 @@ export async function formOptions() {
     })),
   };
 }
+
+// ───────────────────── Vender desde el inventario = factura pagada ─────────────────────
+// Si el reloj ya tiene una factura abierta, se cobra esa; si no, se crea la factura con los datos de la
+// venta y se marca pagada. En los dos casos payInvoice deja el reloj vendido (inventario y web),
+// el cliente ganado y el aviso al equipo: Documentos e inventario quedan siempre iguales.
+export type Sale = {
+  price: number; // precio del reloj, sin impuesto
+  date: string; // AAAA-MM-DD
+  method: string | null;
+  customerId: string | null;
+  clientName: string | null;
+  clientPhone?: string | null;
+  clientEmail?: string | null;
+  taxRate: number; // % (0 si es dealer con certificado de reventa o se envía fuera de Florida)
+  soldBy?: string | null; // correo del vendedor (comisión)
+  lang?: "en" | "es";
+};
+
+export async function openInvoiceFor(itemId: string) {
+  const { data } = await adminDb().from("documents").select("*").eq("kind", "invoice").in("status", ["draft", "sent"]).filter("items", "cs", JSON.stringify([{ item_id: itemId }])).order("created_at", { ascending: false }).limit(1);
+  return (data?.[0] as Doc | undefined) ?? null;
+}
+
+export async function sellViaInvoice(itemId: string, sale: Sale, user: string) {
+  const open = await openInvoiceFor(itemId);
+  if (open) {
+    if (open.status === "draft") await issueDoc(open, user);
+    return payInvoice({ ...open, status: "sent" }, sale.method ?? open.payment_method, sale.date, user);
+  }
+  const { data: i } = await adminDb().from("inventory_items").select("id, sku, brand, model, reference, serial, condition, comes_with, papers_date").eq("id", itemId).single();
+  if (!i) throw new Error("Reloj no encontrado");
+  const settings = await getDocSettings();
+  const lang = sale.lang ?? "en";
+  const invoice = await insertDoc({
+    kind: "invoice",
+    customer_id: sale.customerId,
+    client_name: sale.clientName, client_phone: sale.clientPhone ?? null, client_email: sale.clientEmail ?? null,
+    lang,
+    issue_date: sale.date,
+    due_date: sale.date,
+    items: [{
+      item_id: i.id, sku: i.sku, serial: i.serial, qty: 1, price: sale.price,
+      title: [i.brand, i.model, i.reference].filter(Boolean).join(" "),
+      details: [i.condition, i.papers_date ? `Papers ${String(i.papers_date).slice(0, 7)}` : null, i.comes_with].filter(Boolean).join(" · ") || null,
+    }],
+    tax_rate: sale.taxRate,
+    show_serial: true,
+    payment_method: sale.method,
+    terms: termsFor("invoice", lang, settings),
+    created_by: sale.soldBy && /@/.test(sale.soldBy) ? sale.soldBy : user,
+  });
+  await docEvent(invoice, `creada al vender ${i.sku} desde el inventario`, user);
+  await touch(invoice.id, { status: "sent" });
+  return payInvoice({ ...invoice, status: "sent" }, sale.method, sale.date, user);
+}

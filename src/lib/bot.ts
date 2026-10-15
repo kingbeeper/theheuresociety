@@ -112,6 +112,9 @@ export async function handleMessage(msg: TgMessage) {
   // Encargo con anticipo a medias
   const { onSourcingText } = await import("./bot-sourcing");
   if (await onSourcingText(chatId, text)) return;
+  // Venta a medias (marcar vendido)
+  const { onSaleText } = await import("./bot-sale");
+  if (await onSaleText(chatId, text)) return;
   // Cita a medias
   const { onCitaText } = await import("./bot-citas");
   if (await onCitaText(chatId, text)) return;
@@ -595,20 +598,20 @@ async function handleCutoutButton(cb: TgCallback, chatId: number, action: string
   return sendMessage(chatId, `${h(data?.brand ?? "")} ${h(data?.model ?? "")} ya no sale en el estuche (sigue en la colección). Para volver a ponerlo, envía una foto con el texto <code>estuche</code> y su referencia.`);
 }
 
-// Cambia el estado de un reloj publicado; el inventario lo sigue (en una venta, el precio y el
-// comprador se completan después en el CRM o con una factura)
-export async function setWatchStatus(chatId: number, w: { id: string; brand: string; model: string; reference: string }, status: "sold" | "reserved" | "available") {
-  await adminDb().from("watches").update({ status, updated_at: new Date().toISOString() }).eq("id", w.id);
+// Cambia el estado de un reloj publicado; el inventario lo sigue. Una venta pide comprador, precio,
+// impuesto y forma de pago, y genera la factura pagada (bot-sale).
+export async function setWatchStatus(chatId: number, w: { id: string; brand: string; model: string; reference: string }, status: "sold" | "reserved" | "available", user = "telegram") {
   const { data: stockItem } = await adminDb().from("inventory_items").select("id, status").eq("watch_id", w.id).in("status", ["in_stock", "reserved", "sold"]).maybeSingle();
+  // Vendido = factura pagada: se piden los datos que falten y la factura deja el reloj vendido (inventario y web)
+  if (status === "sold" && stockItem && stockItem.status !== "sold") {
+    const { startSale } = await import("./bot-sale");
+    return startSale(chatId, stockItem.id as string, user);
+  }
+  await adminDb().from("watches").update({ status, updated_at: new Date().toISOString() }).eq("id", w.id);
   if (stockItem && stockItem.status !== "sold") {
-    const next = status === "sold" ? "sold" : status === "reserved" ? "reserved" : "in_stock";
-    await adminDb().from("inventory_items")
-      .update({ status: next, ...(next === "sold" && { sale_date: new Date().toISOString().slice(0, 10) }), updated_at: new Date().toISOString() })
-      .eq("id", stockItem.id);
-    await adminDb().from("inventory_events").insert({ item_id: stockItem.id, type: next === "sold" ? "sale" : "status", body: `Marcado como ${next === "sold" ? "vendido" : next === "reserved" ? "reservado" : "disponible"} desde Telegram`, created_by: "bot" });
-    if (next === "sold") {
-      await sendMessage(chatId, `Completa el precio de venta y el comprador en el CRM:\n${SITE_URL}/admin/inventario/${stockItem.id}\n<i>O mejor: haz la factura desde 🧾 Documentos.</i>`);
-    }
+    const next = status === "reserved" ? "reserved" : "in_stock";
+    await adminDb().from("inventory_items").update({ status: next, updated_at: new Date().toISOString() }).eq("id", stockItem.id);
+    await adminDb().from("inventory_events").insert({ item_id: stockItem.id, type: "status", body: `Marcado como ${next === "reserved" ? "reservado" : "disponible"} desde Telegram`, created_by: "bot" });
   }
   revalidateTag(INVENTORY_TAG, { expire: 0 });
   const label = { sold: "vendido", reserved: "reservado", available: "disponible" }[status];
@@ -701,6 +704,7 @@ async function handleCommand(chatId: number, text: string, user: string) {
       const { clearSourcing } = await import("./bot-sourcing");
       await clearSourcing(chatId);
       await (await import("./bot-citas")).clearCita(chatId);
+      await (await import("./bot-sale")).clearSale(chatId);
       return sendMessage(chatId, draft || flow ? "Cancelado." : "Listo: no queda nada en curso.");
     }
 
@@ -726,7 +730,7 @@ async function handleCommand(chatId: number, text: string, user: string) {
       if (!arg) return sendMessage(chatId, `Indica la referencia. Ej.: <code>${command} 126610LN</code>`);
       const found = await findPublished(arg);
       if (typeof found === "string") return sendMessage(chatId, found);
-      return setWatchStatus(chatId, found, status);
+      return setWatchStatus(chatId, found, status, user);
     }
 
     case "/estuche": {

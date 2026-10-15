@@ -90,18 +90,37 @@ export function ItemForm({ item, watches, showCosts = true }: { item?: Item; wat
 type CustomerOption = { id: string; label: string };
 
 // Venta: un solo pago. El comprador puede ser un cliente del CRM o uno nuevo.
-export function SaleForm({ item, customers, today, sellers = [], me }: { item: Item; customers: CustomerOption[]; today: string; sellers?: { email: string; label: string }[]; me?: string }) {
+export function SaleForm({ item, customers, today, sellers = [], me, taxRate = 0, openInvoice }: { item: Item; customers: CustomerOption[]; today: string; sellers?: { email: string; label: string }[]; me?: string; taxRate?: number; openInvoice?: { id: string; number: string; total: number } | null }) {
   const [state, action, pending] = useActionState(sellItem.bind(null, item.id), null);
   const [buyer, setBuyer] = useState("");
   return (
     <form action={action} className="grid gap-4">
+      {openInvoice && (
+        <p className="border border-amber-300/40 bg-amber-300/5 p-3 text-sm">
+          Este reloj ya tiene la factura <a href={`/admin/documentos/${openInvoice.id}`} className="underline">{openInvoice.number}</a> abierta por ${Number(openInvoice.total).toLocaleString("en-US")}: al registrar la venta se marca <b>pagada esa factura</b> (con su precio y su comprador).
+        </p>
+      )}
       <div className="grid gap-4 sm:grid-cols-3">
-        <label><span className={label}>Precio de venta (USD) *</span><input name="sale_price" inputMode="decimal" defaultValue={item.asking_price ?? ""} required className={field} /></label>
+        <label><span className={label}>Precio de venta (USD, sin impuesto) *</span><input name="sale_price" inputMode="decimal" defaultValue={item.asking_price ?? ""} required className={field} /></label>
         <label><span className={label}>Fecha</span><input name="sale_date" type="date" defaultValue={today} className={field} /></label>
         <label>
           <span className={label}>Forma de pago</span>
           <select name="payment_method" className={field} defaultValue="wire">
             {Object.entries(PAYMENT).map(([k, l]) => <option key={k} value={l}>{l}</option>)}
+          </select>
+        </label>
+      </div>
+      <div className="grid gap-4 sm:grid-cols-3">
+        <label>
+          <span className={label}>Impuesto de ventas %</span>
+          <input name="tax_rate" inputMode="decimal" defaultValue={taxRate} className={field} />
+          <span className="mt-1 block text-[0.7rem] text-stone/80">0 si el comprador es dealer con certificado de reventa o se envía fuera de Florida.</span>
+        </label>
+        <label>
+          <span className={label}>Idioma de la factura</span>
+          <select name="lang" defaultValue="en" className={field}>
+            <option value="en">Inglés</option>
+            <option value="es">Español</option>
           </select>
         </label>
       </div>
@@ -146,8 +165,9 @@ export function SaleForm({ item, customers, today, sellers = [], me }: { item: I
         </div>
       </details>
       <div className="flex items-center gap-4">
-        <button disabled={pending} className={button}>{pending ? "Guardando…" : "Registrar venta"}</button>
+        <button disabled={pending} className={button}>{pending ? "Guardando…" : "Registrar venta y factura"}</button>
         {state?.error && <p className="text-sm text-red-200/90">{state.error}</p>}
+        {!state?.error && <p className="text-xs text-stone">Se crea la factura <b>pagada</b> en Documentos, lista para descargar.</p>}
       </div>
     </form>
   );

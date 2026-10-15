@@ -177,7 +177,7 @@ export async function onMenuCallback(chatId: number, cbId: string, messageId: nu
       const [id, status] = arg.split("|");
       const { data: w } = await adminDb().from("watches").select("id, brand, model, reference").eq("id", id).maybeSingle();
       if (!w || !["sold", "reserved", "available"].includes(status)) return sendMessage(chatId, "Ese reloj ya no está publicado.");
-      return setWatchStatus(chatId, w as Watch, status as "sold" | "reserved" | "available");
+      return setWatchStatus(chatId, w as Watch, status as "sold" | "reserved" | "available", user);
     }
 
     case "mvid": {

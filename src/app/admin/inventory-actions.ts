@@ -7,8 +7,8 @@ import { can } from "@/lib/crm-perms";
 import { adminDb } from "@/lib/supabase";
 import { addEvent, notifyPriceDrop, upsertLead } from "@/lib/crm";
 import { SITE_URL } from "@/lib/seo";
-import { createStockItem, logItem, recordPurchase, syncWebPrice, syncWebStatus, webPrice, type Item } from "@/lib/stock";
-import { ACQUISITION, ITEM_STATUS, isOwnerStock } from "@/lib/stock-labels";
+import { createStockItem, logItem, syncWebPrice, syncWebStatus, webPrice, type Item } from "@/lib/stock";
+import { ACQUISITION, ITEM_STATUS } from "@/lib/stock-labels";
 import { SOURCE_LABEL } from "@/lib/crm-labels";
 
 // Acciones del inventario. Todas comprueban la sesión y dejan rastro en el historial del reloj.
@@ -131,20 +131,30 @@ export async function sellItem(id: string, _: unknown, f: FormData) {
     buyerId = c.id;
   }
   let name = buyerName;
-  if (buyerId && !name) {
-    const { data } = await adminDb().from("customers").select("name").eq("id", buyerId).single();
-    name = (data?.name as string) ?? null;
+  let phone = text(f, "buyer_phone");
+  let email = text(f, "buyer_email");
+  if (buyerId) {
+    const { data } = await adminDb().from("customers").select("name, phone, email").eq("id", buyerId).single();
+    name = name ?? (data?.name as string) ?? null;
+    phone = phone ?? (data?.phone as string) ?? null;
+    email = email ?? (data?.email as string) ?? null;
   }
+  if (!name) return { error: "Falta el nombre del comprador: la factura lo necesita." };
 
-  const { error } = await adminDb()
-    .from("inventory_items")
-    .update({ status: "sold", sale_date: saleDate, sale_price: price, buyer_customer_id: buyerId, buyer_name: name, payment_method: text(f, "payment_method"), sold_by: text(f, "sold_by") ?? user, updated_at: new Date().toISOString() })
-    .eq("id", id);
-  if (error) return { error: error.message };
-  const sold = { ...item, sale_price: price, sale_date: saleDate };
-  await logItem(id, "sale", `Vendido a ${name ?? "cliente"} por ${usd(price)}${text(f, "payment_method") ? ` (${text(f, "payment_method")})` : ""}`, user);
-  await recordPurchase(buyerId, sold, user);
-  await syncWebStatus(item.watch_id, "sold");
+  // La venta se registra con su factura (pagada): Documentos e inventario quedan iguales.
+  // Si el reloj ya tenía una factura abierta, se cobra esa.
+  const { sellViaInvoice } = await import("@/lib/documents");
+  let invoiceId: string;
+  try {
+    const paid = await sellViaInvoice(
+      id,
+      { price, date: saleDate, method: text(f, "payment_method"), customerId: buyerId, clientName: name, clientPhone: phone, clientEmail: email, taxRate: Math.max(0, Number(text(f, "tax_rate") ?? 0) || 0), soldBy: text(f, "sold_by") ?? user, lang: text(f, "lang") === "es" ? "es" : "en" },
+      user
+    );
+    invoiceId = paid.id;
+  } catch (e) {
+    return { error: (e as Error).message };
+  }
 
   // Intercambio: el reloj que entrega el cliente entra al inventario (costo = valor reconocido)
   const tradeBrand = text(f, "trade_brand");
@@ -169,9 +179,8 @@ export async function sellItem(id: string, _: unknown, f: FormData) {
     );
     await logItem(id, "trade", `Recibido a cambio: ${tradeBrand} ${text(f, "trade_model") ?? ""} (${trade.sku})${tradeValue != null ? ` por ${usd(tradeValue)}` : ""}`.replace(/\s+/g, " "), user);
   }
-  if (isOwnerStock(item.acquisition)) await logItem(id, "owed", `Pendiente de pagar al dueño: ${usd(item.cost)}`, user);
   refresh();
-  return { ok: true };
+  return { ok: true, invoiceId };
 }
 
 export async function returnItem(id: string, _: unknown, f: FormData) {

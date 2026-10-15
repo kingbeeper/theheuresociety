@@ -43,7 +43,12 @@ export default async function ItemPage({ params }: PageProps<"/admin/inventario/
   const counting = count && count.expected.includes(id) ? count : null;
   const openService = services.find((s) => !s.returned_at);
   // Cotizaciones, memos y facturas en las que aparece (vacío si falta la migración)
-  const { data: docs } = await db.from("documents").select("id, kind, number, status, client_name, total").contains("items", [{ item_id: id }]).order("created_at", { ascending: false });
+  const { data: docs } = await db.from("documents").select("id, kind, number, status, client_name, total, token").filter("items", "cs", JSON.stringify([{ item_id: id }])).order("created_at", { ascending: false });
+  // Venta = factura: la abierta (se cobra al vender) o la pagada (para descargarla)
+  const openInvoice = (docs ?? []).find((d) => d.kind === "invoice" && (d.status === "sent" || d.status === "draft")) ?? null;
+  const paidInvoice = (docs ?? []).find((d) => d.kind === "invoice" && d.status === "paid") ?? null;
+  const { data: taxSetting } = await db.from("integration_settings").select("value").eq("key", "doc_tax_rate").maybeSingle();
+  const taxRate = Number(taxSetting?.value ?? 7) || 0;
   const watchOptions = (watches.data ?? []).map((w) => ({ id: w.id as string, label: `${w.brand} ${w.model} · ${w.reference}${w.status === "sold" ? " (vendido)" : ""}` }));
   const customerOptions = (customers.data ?? []).map((c) => ({ id: c.id as string, label: [c.name, c.phone, c.email].filter(Boolean).join(" · ") || "Sin nombre" }));
 
@@ -189,7 +194,7 @@ export default async function ItemPage({ params }: PageProps<"/admin/inventario/
             )}
           </Card>
 
-          {available && <Card title="Registrar venta"><SaleForm item={item} customers={customerOptions} today={today} sellers={(await team()).map((m) => ({ email: m.email, label: m.name ?? m.email }))} me={user.email} /></Card>}
+          {available && <Card title="Registrar venta"><SaleForm item={item} customers={customerOptions} today={today} sellers={(await team()).map((m) => ({ email: m.email, label: m.name ?? m.email }))} me={user.email} taxRate={taxRate} openInvoice={openInvoice ? { id: openInvoice.id, number: openInvoice.number, total: Number(openInvoice.total) } : null} /></Card>}
 
           {item.status === "sold" && (
             <Card title="Venta">
@@ -197,6 +202,14 @@ export default async function ItemPage({ params }: PageProps<"/admin/inventario/
                 {fmtDate(item.sale_date!)} · {money(item.sale_price)} · {item.payment_method ?? "—"} ·{" "}
                 {item.buyer_customer_id ? <Link href={`/admin/leads/${item.buyer_customer_id}`} className="text-brass hover:text-ivory">{item.buyer_name ?? "Cliente"}</Link> : item.buyer_name ?? "—"}
               </p>
+              {paidInvoice ? (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <a href={`/d/${paidInvoice.token}/pdf`} target="_blank" rel="noreferrer" className={ghostButtonClass}>Descargar factura {paidInvoice.number}</a>
+                  <Link href={`/admin/documentos/${paidInvoice.id}`} className={ghostButtonClass}>Ver en Documentos</Link>
+                </div>
+              ) : (
+                <p className="mt-3 text-xs text-stone">Esta venta se registró sin factura (antes de enlazar ventas y documentos).</p>
+              )}
               {owner && showCosts && (
                 <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4 text-sm">
                   {item.owner_paid_at ? (

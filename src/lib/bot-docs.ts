@@ -513,6 +513,9 @@ export async function onCallback(chatId: number, cbId: string, messageId: number
   const answer = (text?: string) => tg("answerCallbackQuery", { callback_query_id: cbId, ...(text && { text }) }).catch(() => {});
   const clearButtons = () => tg("editMessageReplyMarkup", { chat_id: chatId, message_id: messageId, reply_markup: keyboard([]) }).catch(() => {});
 
+  // Venta (marcar vendido = factura pagada)
+  if (action === "dsale") return (await import("./bot-sale")).onSaleCallback(chatId, cbId, messageId, arg);
+
   // Citas: agendar y gestionar
   const citas = await import("./bot-citas");
   if (citas.CITA_ACTIONS.has(action)) return citas.onCitaCallback(chatId, cbId, messageId, action, arg, user);
