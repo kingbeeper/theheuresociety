@@ -3,7 +3,9 @@ import { connection } from "next/server";
 import { adminDb } from "@/lib/supabase";
 import { requireAdmin } from "@/lib/admin-auth";
 import { ago, fieldClass, PageTitle, requestTime } from "@/components/admin/ui";
-import { updateSellRequest } from "../../actions";
+import { offerMarketAction, updateSellRequest } from "../../actions";
+import { askingOf, offerSuggestion } from "@/lib/offers";
+import { PendingButton } from "@/components/admin/PendingButton";
 import { OfferNew } from "@/components/admin/OfferNew";
 
 export const metadata = { title: "Ofertas de clientes" };
@@ -87,6 +89,7 @@ export default async function ComprasPage() {
                         ))}
                       </div>
                     )}
+                    <OfferMarket r={r} />
                     <form action={updateSellRequest.bind(null, r.id as string)} className="mt-3 grid gap-2">
                       <div className="grid grid-cols-2 gap-2">
                         <select name="status" defaultValue={(r.status as string) ?? "new"} className={`${fieldClass} px-2 py-2 text-xs`}>
@@ -105,5 +108,57 @@ export default async function ComprasPage() {
         })}
       </div>
     </>
+  );
+}
+
+const usd = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
+
+// Precio de mercado de la oferta y cuánto ofrecer (o, en consignación, a cuánto venderlo y cuánto le queda al dueño)
+function OfferMarket({ r }: { r: Record<string, unknown> }) {
+  const open = !["paid", "rejected"].includes((r.status as string) ?? "new");
+  const typical = r.market_typical != null ? Number(r.market_typical) : null;
+  const low = r.market_low != null ? Number(r.market_low) : null;
+  const high = r.market_high != null ? Number(r.market_high) : null;
+  const asking = askingOf(r.message as string | null);
+  const s = offerSuggestion(r.kind as string, typical);
+  const checked = Boolean(r.market_checked_at);
+  return (
+    <div className="mt-3 border-t border-line/60 pt-3 text-xs">
+      {typical || low || high ? (
+        <>
+          <p className="text-stone">
+            Mercado: <span className="text-ivory">{low ? usd(low) : "?"} – {high ? usd(high) : "?"}</span>
+            {typical ? <> · típico <span className="text-ivory">{usd(typical)}</span></> : null}
+            {r.market_listings ? ` · ${r.market_listings} anuncios` : ""}
+          </p>
+          {s?.kind === "buy" && (
+            <p className="mt-1 text-emerald-200">Ofrecer: {s.offers.map((o) => `${usd(o.amount)} (${Math.round(o.margin * 100)}%)`).join(" · ")}</p>
+          )}
+          {s?.kind === "consign" && (
+            <p className="mt-1 text-emerald-200">Venderlo a ≈ {usd(s.sellAt)} · al dueño ≈ {usd(s.owner)} (15% para ti)</p>
+          )}
+          {asking && typical ? (
+            <p className={`mt-1 ${asking > typical * 0.9 ? "text-amber-200" : "text-stone"}`}>
+              Pide {usd(asking)}: {r.kind === "consign" ? `${asking > typical ? "por encima" : "por debajo"} del mercado` : `te dejaría ${Math.round(((typical - asking) / typical) * 100)}% de margen`}
+            </p>
+          ) : null}
+          {Boolean(r.market_note) && <p className="mt-1 text-stone">{r.market_note as string}</p>}
+          {((r.market_sources as string[] | null) ?? []).length > 0 && (
+            <p className="mt-1 flex flex-wrap gap-2">
+              {(r.market_sources as string[]).map((u, i) => <a key={u} href={u} target="_blank" rel="noreferrer" className="text-brass hover:text-ivory">Fuente {i + 1}</a>)}
+            </p>
+          )}
+        </>
+      ) : checked ? (
+        <p className="text-stone">No se encontraron anuncios comparables.</p>
+      ) : null}
+      {open && (
+        <form action={offerMarketAction.bind(null, r.id as string)} className="mt-2">
+          <PendingButton pending="Buscando precios… (≈1 min)" className="border border-line px-2.5 py-1 text-[0.6rem] tracking-[0.16em] uppercase text-stone hover:text-ivory">
+            {checked ? "🔎 Volver a tasar" : "🔎 Tasar (precio de mercado)"}
+          </PendingButton>
+        </form>
+      )}
+    </div>
   );
 }

@@ -8,6 +8,7 @@ import { KIND_LABEL, PRINT, STATUS_LABEL, STATUS_STYLE, balanceDue, paidSoFar, u
 import { todayInMiami } from "@/lib/booking";
 import { SITE_URL } from "@/lib/seo";
 import { Card, fmtDate, ghostButtonClass, PageTitle, requestTime } from "@/components/admin/ui";
+import { ShipmentCard } from "@/components/admin/ShipmentCard";
 import { CloseProformaForm, DepositForm, DocumentForm, PaidForm, ProformaPaymentForm, SourcedForm } from "@/components/admin/DocumentForm";
 import { convertToInvoice, convertToProforma, deleteDocument, markConsignorPaid, refundSourcing, returnMemo, sendDocument, setQuoteResult, voidDocument } from "../../../document-actions";
 
@@ -184,6 +185,7 @@ export default async function DocumentPage({ params }: PageProps<"/admin/documen
         </div>
         <p className="mt-4 break-all text-xs text-stone/80">Enlace para el cliente (privado, sin costos ni datos internos): {link}</p>
       </Card>
+      {["invoice", "memo", "proforma", "consignment", "return", "sourcing"].includes(d.kind) && d.status !== "draft" && d.status !== "void" && <ShipmentCard d={d} />}
 
       <Card className="mt-6" title={editable ? "Editar" : "Contenido"}>
         {editable ? (

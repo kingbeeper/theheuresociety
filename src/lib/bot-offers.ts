@@ -1,7 +1,8 @@
 import "server-only";
 import { adminDb } from "./supabase";
 import { normalizePhone } from "./crm";
-import { createOffer, OFFER_KIND, type OfferKind } from "./offers";
+import { after } from "next/server";
+import { appraiseOffer, askingOf, createOffer, offerSuggestion, OFFER_KIND, type OfferKind } from "./offers";
 import { escapeHtml as h, keyboard, sendMessage, tg, type InlineButton } from "./telegram";
 
 // 🤲 «Me ofrecen un reloj» por Telegram: tipo → cliente → reloj → cuánto pide → queda en CRM → Ofertas de clientes
@@ -51,7 +52,7 @@ async function save(chatId: number, f: Flow, asking: string | null) {
   return sendMessage(
     chatId,
     `✅ <b>Oferta guardada</b> · ${OFFER_KIND[f.kind]}\n${h(f.watch ?? "")}${asking ? ` · pide ${h(asking)}` : ""}\n${h(f.name ?? "")}${f.phone ? ` · ${f.phone}` : ""}\n\nEstá en CRM → Ofertas de clientes («Nuevas»). Las fotos se añaden ahí.`,
-    { reply_markup: keyboard([[{ text: "📂 Abrir en el CRM", url: `${SITE}/admin/compras` }]]) }
+    { reply_markup: keyboard([[{ text: "🔎 Tasar (precio de mercado)", callback_data: `dofr:tas|${r.id}` }], [{ text: "📂 Abrir en el CRM", url: `${SITE}/admin/compras` }]]) }
   );
 }
 
@@ -104,6 +105,11 @@ export async function onOfferCallback(chatId: number, cbId: string, messageId: n
     await clearOffer(chatId);
     return sendMessage(chatId, "Cancelado.");
   }
+  if (what === "tas") {
+    await sendMessage(chatId, "🔎 Buscando precios en Chrono24, WatchCharts… (≈1 minuto)");
+    after(() => appraisalJob(chatId, value));
+    return;
+  }
   if (what === "k") {
     await saveFlow(chatId, { step: "client", user, kind: (value in OFFER_KIND ? value : "sell") as OfferKind });
     return sendMessage(chatId, "👤 ¿Quién es? Escribe su nombre y teléfono (ej. <code>Juan Pérez +1 305 555 1234</code>) o comparte el contacto (📎 → Contacto).", { reply_markup: keyboard([cancel]) });
@@ -116,4 +122,23 @@ export async function onOfferCallback(chatId: number, cbId: string, messageId: n
     return sendMessage(chatId, "⌚ ¿Qué reloj es? (marca, modelo y referencia)", { reply_markup: keyboard([cancel]) });
   }
   if (what === "noask") return save(chatId, f, null);
+}
+
+async function appraisalJob(chatId: number, id: string) {
+  const m = await appraiseOffer(id).catch(() => null);
+  const { data: r } = await adminDb().from("sell_requests").select("kind, brand, model, reference, message").eq("id", id).maybeSingle();
+  if (!r) return;
+  const usd = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
+  const watch = [r.brand, r.model, r.reference].filter(Boolean).join(" ");
+  if (!m || (!m.low && !m.typical && !m.high)) return sendMessage(chatId, `🔎 ${h(watch)}: no encontré anuncios comparables.`);
+  const s = offerSuggestion(r.kind as string, m.typical);
+  const asking = askingOf(r.message as string | null);
+  return sendMessage(chatId, [
+    `🔎 <b>${h(watch)}</b>`,
+    `Mercado: <b>${m.low ? usd(m.low) : "?"} – ${m.high ? usd(m.high) : "?"}</b>${m.typical ? ` · típico ${usd(m.typical)}` : ""}${m.listings ? ` · ${m.listings} anuncios` : ""}`,
+    s?.kind === "buy" ? `💵 Ofrecer: ${s.offers.map((o) => `<b>${usd(o.amount)}</b> (${Math.round(o.margin * 100)}%)`).join(" · ")}` : "",
+    s?.kind === "consign" ? `🤝 Venderlo a ≈ <b>${usd(s.sellAt)}</b> · al dueño ≈ <b>${usd(s.owner)}</b> (15% para ti)` : "",
+    asking && m.typical && r.kind !== "consign" ? `Pide ${usd(asking)}: te dejaría ${Math.round(((m.typical - asking) / m.typical) * 100)}% de margen` : "",
+    h(m.note),
+  ].filter(Boolean).join("\n"));
 }

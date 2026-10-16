@@ -19,6 +19,7 @@ import { STATUS_LABEL, type DocKind, type DocStatus } from "@/lib/doc-labels";
 export const metadata = { title: "Cliente" };
 
 const EVENT_ICON: Record<string, string> = {
+  shipment: "📦", payment_reminder: "💌", dealer_request: "🤝", tag: "🏷", merge: "🔗",
   lead: "✦", note: "✎", stage: "→", appointment: "📅", sell_request: "⌚", alert: "🔔", match: "✨", handoff: "👤", document: "📄", follow_up: "⏰", price_drop: "📉", purchase: "💰", return: "↩",
 };
 const SELL_LABEL: Record<string, string> = { new: "Nueva", offered: "Ofertada", accepted: "Aceptada", received: "Recibido", paid: "Pagada", rejected: "Rechazada" };

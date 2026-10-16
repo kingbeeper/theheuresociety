@@ -464,3 +464,11 @@ export async function offerPhotosAction(id: string, urls: string[]) {
   await adminDb().from("sell_requests").update({ image_paths: urls, updated_at: new Date().toISOString() }).eq("id", id);
   refresh();
 }
+
+// Tasar una oferta de cliente (≈ 1 minuto: busca anuncios actuales)
+export async function offerMarketAction(id: string) {
+  await requireAdmin("compras");
+  const { appraiseOffer } = await import("@/lib/offers");
+  await appraiseOffer(id);
+  refresh();
+}

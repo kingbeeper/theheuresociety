@@ -64,3 +64,36 @@ export async function createOffer(o: OfferInput, user: string, source = "walk_in
   if (error) return { error: error.message };
   return { ok: true as const, id, customerId: customer.id, uploads };
 }
+
+// Tasar la oferta: el mismo estudio de mercado que el inventario (Chrono24, WatchCharts…), guardado en la oferta
+export async function appraiseOffer(id: string) {
+  const db = adminDb();
+  const { data: r } = await db.from("sell_requests").select("id, brand, model, reference, message").eq("id", id).single();
+  if (!r) return null;
+  const { checkMarket } = await import("./market");
+  const m = await checkMarket({ id: r.id, sku: "", brand: r.brand, model: r.model, reference: r.reference, condition: null, comes_with: r.message, papers_date: null, asking_price: null }).catch(() => null);
+  await db
+    .from("sell_requests")
+    .update({ market_checked_at: new Date().toISOString(), updated_at: new Date().toISOString(), ...(m && { market_low: m.low, market_typical: m.typical, market_high: m.high, market_listings: m.listings, market_note: m.note, market_sources: m.sources.slice(0, 3) }) })
+    .eq("id", id);
+  return m;
+}
+
+// Lo que pide el cliente, sacado del texto «Pide: $14,000» / «Price: 14k» de la oferta
+export function askingOf(message: string | null | undefined) {
+  const m = message?.match(/(?:pide|price|precio|asking)[^:\n]*:\s*\$?\s*([\d.,]+)\s*(k)?/i);
+  if (!m) return null;
+  const n = Number(m[2] ? m[1].replace(",", ".") : m[1].replace(/[.,](?=\d{3}\b)/g, "").replace(",", "."));
+  return Number.isFinite(n) && n > 0 ? Math.round(m[2] ? n * 1000 : n) : null;
+}
+
+// Cuánto ofrecer: para comprar o cambiar, el precio típico de mercado menos el margen; en consignación,
+// a qué precio venderlo y cuánto quedaría para el dueño con nuestra comisión.
+export const MARGINS = [0.12, 0.15, 0.2];
+export const CONSIGN_COMMISSION = 0.15;
+export function offerSuggestion(kind: string, typical: number | null) {
+  if (!typical) return null;
+  const r = (n: number) => Math.round(n / 50) * 50;
+  if (kind === "consign") return { kind: "consign" as const, sellAt: r(typical), owner: r(typical * (1 - CONSIGN_COMMISSION)) };
+  return { kind: "buy" as const, offers: MARGINS.map((m) => ({ margin: m, amount: r(typical * (1 - m)) })) };
+}

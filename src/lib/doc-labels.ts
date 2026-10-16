@@ -39,6 +39,8 @@ export type Doc = {
   payment_method: string | null;
   paid_at: string | null;
   token: string;
+  last_reminder_at?: string | null;
+  reminder_count?: number;
   source_id: string | null;
   created_by: string | null;
   created_at: string;

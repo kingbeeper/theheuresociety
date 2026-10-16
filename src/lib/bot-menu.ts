@@ -54,6 +54,7 @@ export async function onMenuText(chatId: number, text: string, user: string) {
           [{ text: "🛒 Compré un reloj", callback_data: "mnew:purchase" }],
           [{ text: "🔎 Encargo con anticipo", callback_data: "mnew:sourcing" }],
           [{ text: "📂 Ver documentos abiertos", callback_data: "mopen:menu" }],
+          [{ text: "🚚 Envíos en camino", callback_data: "dship:list" }, { text: "💰 Cobros pendientes", callback_data: "dcob:list" }],
         ]),
       });
       return true;

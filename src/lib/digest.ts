@@ -152,6 +152,17 @@ export async function sendDigest() {
       console.error("Resumen semanal:", e);
     }
   }
+  // Cobros pendientes: recordatorios automáticos a los vencidos y aviso con el total
+  try {
+    const { dailyCollections } = await import("./collections");
+    const text = await dailyCollections();
+    if (text) {
+      const { keyboard } = await import("./telegram");
+      await notifyAdmins(text, { reply_markup: keyboard([[{ text: "💰 Ver cobros", callback_data: "dcob:list" }]]) });
+    }
+  } catch (e) {
+    console.error("Cobros:", e);
+  }
   // Citas de ayer sin resultado: «¿cómo fue?» con botones, para empezar el seguimiento
   try {
     const { askYesterdayOutcomes } = await import("./bot-citas");

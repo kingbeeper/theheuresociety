@@ -505,6 +505,7 @@ export async function deliver(chatId: number, d: Doc) {
     if (d.kind === "proforma") rows.push([{ text: "💵 Registrar depósito", callback_data: `dpf:dep|${d.id}` }], [{ text: "✅ Saldada: facturar", callback_data: `dpf:close|${d.id}` }]);
     if (d.kind === "sourcing") rows.push(...sourcingButtons(d));
   }
+  if (["invoice", "memo", "proforma", "consignment", "return", "sourcing"].includes(d.kind) && d.status !== "draft" && d.status !== "void") rows.push([{ text: "📦 Añadir envío (rastreo)", callback_data: `dship:add|${d.id}` }]);
   rows.push([{ text: "Abrir en el CRM", url: `${SITE_URL}/admin/documentos/${d.id}` }]);
 
   const caption = [
@@ -528,6 +529,12 @@ export async function onCallback(chatId: number, cbId: string, messageId: number
   const clearButtons = () => tg("editMessageReplyMarkup", { chat_id: chatId, message_id: messageId, reply_markup: keyboard([]) }).catch(() => {});
 
   // Gasto general del negocio
+  // Cobros pendientes
+  if (action === "dcob") return (await import("./bot-collections")).onCollectionsCallback(chatId, cbId, messageId, arg, user);
+
+  // Envíos
+  if (action === "dship") return (await import("./bot-shipping")).onShippingCallback(chatId, cbId, messageId, arg, user);
+
   // Ofertas de clientes (me ofrecen un reloj)
   if (action === "dofr") return arg === "start" ? (await import("./bot-offers")).startOffer(chatId).then(() => answer()) : (await import("./bot-offers")).onOfferCallback(chatId, cbId, messageId, arg, user);
 

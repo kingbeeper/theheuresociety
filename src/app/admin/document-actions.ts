@@ -249,3 +249,52 @@ export async function saveDocumentSettings(_: unknown, f: FormData) {
   return { ok: true };
 }
 
+
+// ───────────── Envíos ─────────────
+export async function addShipmentAction(docId: string, f: FormData) {
+  const user = await requireAdmin("documentos");
+  const d = await getDoc(docId);
+  if (!d) return;
+  const { addShipment } = await import("@/lib/shipping");
+  await addShipment(d, { carrier: text(f, "carrier"), tracking: text(f, "tracking") ?? "", note: text(f, "note"), notify: f.get("notify") === "1" }, user);
+  refresh();
+}
+
+export async function shipmentDeliveredAction(id: string, f: FormData) {
+  const user = await requireAdmin("documentos");
+  const { markDelivered } = await import("@/lib/shipping");
+  await markDelivered(id, f.get("notify") === "1", user);
+  refresh();
+}
+
+export async function deleteShipmentAction(id: string) {
+  await requireAdmin("documentos");
+  const { deleteShipment } = await import("@/lib/shipping");
+  await deleteShipment(id);
+  refresh();
+}
+
+// ───────────── Cobros ─────────────
+export async function remindPaymentAction(docId: string) {
+  const user = await requireAdmin("documentos");
+  const { receivables, remindClient } = await import("@/lib/collections");
+  const d = (await receivables()).find((x) => x.id === docId);
+  if (d) await remindClient(d, user, "email");
+  refresh();
+}
+
+export async function remindedByWhatsAppAction(docId: string) {
+  const user = await requireAdmin("documentos");
+  const { receivables, remindClient } = await import("@/lib/collections");
+  const d = (await receivables()).find((x) => x.id === docId);
+  if (d) await remindClient(d, user, "whatsapp");
+  refresh();
+}
+
+export async function toggleAutoRemindersAction() {
+  await requireAdmin("documentos");
+  const { AUTO_KEY, autoRemindersOn } = await import("@/lib/collections");
+  const on = await autoRemindersOn();
+  await adminDb().from("integration_settings").upsert({ key: AUTO_KEY, value: on ? "off" : "on", updated_at: new Date().toISOString() }, { onConflict: "key" });
+  refresh();
+}
