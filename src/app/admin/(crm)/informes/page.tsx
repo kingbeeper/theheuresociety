@@ -1,4 +1,4 @@
-import { tr, trParts, dateLocale } from "@/lib/admin-i18n";
+import { adminLang, tr, trParts, dateLocale } from "@/lib/admin-i18n";
 import Link from "next/link";
 import { connection } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
@@ -45,6 +45,7 @@ export default async function ReportsPage({ searchParams }: PageProps<"/admin/in
               <button className="border border-line px-4 text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">{tr("Ver")}</button>
             </form>
             <a href={`/api/reports/monthly?mes=${month}`} download className={buttonClass}>{tr("Excel para el contador")}</a>
+            <a href={`/api/reports/monthly-pdf?mes=${month}&lang=${adminLang()}`} target="_blank" rel="noreferrer" className="border border-line px-5 py-2.5 text-[0.68rem] tracking-[0.22em] uppercase text-stone hover:text-ivory">{tr("📊 Informe en PDF")}</a>
           </div>
         }
       />

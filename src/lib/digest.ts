@@ -152,6 +152,10 @@ export async function sendDigest() {
       console.error("Resumen semanal:", e);
     }
   }
+  // Día 1: informe del mes anterior en PDF
+  if (new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", day: "numeric" }).format(new Date()) === "1") {
+    await (await import("./monthly-pdf")).sendMonthlyPdf().catch((e) => console.error("Informe mensual:", e));
+  }
   // Domingos: copia de seguridad de todo (Excel en el almacenamiento privado)
   if (new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", weekday: "short" }).format(new Date()) === "Sun") {
     await (await import("./backup")).weeklyBackup().catch((e) => console.error("Copia de seguridad:", e));

@@ -93,6 +93,7 @@ export default async function InventarioPage({ searchParams }: PageProps<"/admin
             {showCosts && <a href="/api/inventory/export" download className={ghostButtonClass}>{tr("Exportar a Excel")}</a>}
             <Link href="/admin/inventario/serial" className={ghostButtonClass}>{tr("Buscar serial")}</Link>
             <Link href="/admin/inventario/conteo" className={ghostButtonClass}>{tr("Conteo")}</Link>
+            <Link href="/admin/inventario/mercado" className={ghostButtonClass}>{tr("📈 Mercado")}</Link>
             <a href="/admin/etiquetas" target="_blank" rel="noreferrer" className={ghostButtonClass}>{tr("Etiquetas QR")}</a>
             <Link href="/admin/inventario/nuevo" className={buttonClass}>{tr("+ Añadir reloj")}</Link>
           </div>

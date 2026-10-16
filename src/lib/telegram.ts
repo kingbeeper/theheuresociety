@@ -120,3 +120,10 @@ export async function notifyAdminsVideo(video: string, caption: string) {
     await tg("sendVideo", { chat_id: Number(id), video, caption, parse_mode: "HTML", supports_streaming: true }).catch((e) => console.error("No se pudo enviar el video", id, e));
   }
 }
+
+// PDF a todo el equipo (p. ej. el informe del mes)
+export async function notifyAdminsDocument(bytes: Uint8Array, filename: string, caption: string) {
+  for (const id of adminIds()) {
+    await sendDocumentFile(Number(id), bytes, filename, caption).catch((e) => console.error("No se pudo enviar el documento", id, e));
+  }
+}
