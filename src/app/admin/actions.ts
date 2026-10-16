@@ -481,3 +481,21 @@ export async function offerMarketAction(id: string) {
   await appraiseOffer(id);
   refresh();
 }
+
+// Copia de seguridad ahora (Excel con todas las tablas, en el almacenamiento privado)
+export async function makeBackupAction() {
+  await requireAdmin("informes");
+  const { makeBackup } = await import("@/lib/backup");
+  await makeBackup();
+  refresh();
+}
+
+// Enviar nuestra oferta al cliente por WhatsApp (queda «Ofertada» con su importe)
+export async function sendOfferAction(id: string, amount: number, lang: "es" | "en") {
+  const user = await requireAdmin("compras");
+  if (!(amount > 0)) return { error: "Indica un importe." };
+  const { sendOffer } = await import("@/lib/offers");
+  const r = await sendOffer(id, amount, lang, user);
+  refresh();
+  return r ? { ok: true as const, wa: r.wa, text: r.text } : { error: "La oferta ya no existe." };
+}

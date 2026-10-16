@@ -5,6 +5,9 @@ import { requireAdmin } from "@/lib/admin-auth";
 import { monthlyReport } from "@/lib/report";
 import { monthlyCommissions } from "@/lib/team";
 import { todayInMiami } from "@/lib/booking";
+import { makeBackupAction } from "../../actions";
+import { listBackups } from "@/lib/backup";
+import { PendingButton } from "@/components/admin/PendingButton";
 import { buttonClass, Card, fieldClass, fmtDate, money, PageTitle, requestTime } from "@/components/admin/ui";
 
 export const metadata = { title: "Informes" };
@@ -15,7 +18,7 @@ export default async function ReportsPage({ searchParams }: PageProps<"/admin/in
   const sp = await searchParams;
   const current = todayInMiami(new Date(requestTime())).slice(0, 7);
   const month = typeof sp.mes === "string" && /^\d{4}-\d{2}$/.test(sp.mes) ? sp.mes : current;
-  const [r, commissions] = await Promise.all([monthlyReport(month), monthlyCommissions(month)]);
+  const [r, commissions, backups] = await Promise.all([monthlyReport(month), monthlyCommissions(month), listBackups().catch(() => [])]);
   const t = r.totals;
   const label = new Intl.DateTimeFormat(dateLocale(), { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${month}-15T12:00:00Z`));
   const day = (iso: string) => fmtDate(`${iso}T12:00:00`);
@@ -126,6 +129,24 @@ export default async function ReportsPage({ searchParams }: PageProps<"/admin/in
           ) : <p className="text-sm text-stone">{tr("Nada este mes.")}</p>}
         </Card>
       </div>
+      <Card className="mt-6" title="🗄 Copias de seguridad">
+        <p className="mb-3 text-sm text-stone">{tr("Un Excel con todo el negocio (clientes, inventario, documentos, ventas, citas, historial de seriales…). Se hace sola cada domingo y te llega el enlace por Telegram; se guardan las 12 últimas en un almacenamiento privado.")}</p>
+        {backups.length ? (
+          <ul className="mb-4 divide-y divide-line/60 text-sm">
+            {backups.slice(0, 6).map((b) => (
+              <li key={b.name} className="flex justify-between gap-3 py-2">
+                <span>{b.created ? fmtDate(b.created) : b.name} <span className="text-xs text-stone">· {(b.size / 1024).toFixed(0)} KB</span></span>
+                <a href={`/api/backup?f=${encodeURIComponent(b.name)}`} className="text-brass hover:text-ivory">{tr("⬇ Descargar")}</a>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="mb-4 text-sm text-amber-200">{tr("Aún no hay ninguna copia.")}</p>
+        )}
+        <form action={makeBackupAction}>
+          <PendingButton pending={tr("Haciendo la copia…")} className="border border-line px-4 py-2 text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">{tr("Hacer una copia ahora")}</PendingButton>
+        </form>
+      </Card>
       <p className="mt-6 text-xs text-stone">
         {tr("El Excel trae una hoja por apartado (resumen, ventas, compras, pagos a dueños, impuesto y relojero).")} <Link href="/admin/inventario" className="underline hover:text-ivory">{tr("Inventario completo →")}</Link>
       </p>

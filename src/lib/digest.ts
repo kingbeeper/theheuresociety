@@ -152,6 +152,10 @@ export async function sendDigest() {
       console.error("Resumen semanal:", e);
     }
   }
+  // Domingos: copia de seguridad de todo (Excel en el almacenamiento privado)
+  if (new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", weekday: "short" }).format(new Date()) === "Sun") {
+    await (await import("./backup")).weeklyBackup().catch((e) => console.error("Copia de seguridad:", e));
+  }
   // Cobros pendientes: recordatorios automáticos a los vencidos y aviso con el total
   try {
     const { dailyCollections } = await import("./collections");

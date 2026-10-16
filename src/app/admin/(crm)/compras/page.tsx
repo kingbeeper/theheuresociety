@@ -7,6 +7,7 @@ import { ago, fieldClass, PageTitle, requestTime } from "@/components/admin/ui";
 import { offerMarketAction, updateSellRequest } from "../../actions";
 import { askingOf, offerSuggestion } from "@/lib/offers";
 import { PendingButton } from "@/components/admin/PendingButton";
+import { OfferReply } from "@/components/admin/OfferReply";
 import { OfferNew } from "@/components/admin/OfferNew";
 
 export const metadata = { title: "Ofertas de clientes" };
@@ -32,6 +33,11 @@ export default async function ComprasPage() {
   const { data: stocked } = rows.length
     ? await adminDb().from("inventory_items").select("id, sku, sell_request_id").in("sell_request_id", rows.map((r) => r.id as string))
     : { data: [] };
+  // Idioma de cada cliente (para el mensaje de la oferta)
+  const ids = [...new Set(rows.map((r) => r.customer_id as string).filter(Boolean))];
+  const { data: langs } = ids.length ? await adminDb().from("customers").select("id, lang, phone, wa_id").in("id", ids) : { data: [] };
+  const langOf = new Map((langs ?? []).map((c) => [c.id as string, c.lang === "en" ? ("en" as const) : ("es" as const)]));
+  const phoneOf = new Set((langs ?? []).filter((c) => c.phone || c.wa_id).map((c) => c.id as string));
   const stockOf = (id: string) => (stocked ?? []).find((s) => s.sell_request_id === id);
   const now = requestTime();
 
@@ -90,7 +96,7 @@ export default async function ComprasPage() {
                         ))}
                       </div>
                     )}
-                    <OfferMarket r={r} />
+                    <OfferMarket r={r} lang={langOf.get(r.customer_id as string) ?? "es"} hasPhone={Boolean(r.phone) || phoneOf.has(r.customer_id as string)} />
                     <form action={updateSellRequest.bind(null, r.id as string)} className="mt-3 grid gap-2">
                       <div className="grid grid-cols-2 gap-2">
                         <select name="status" defaultValue={(r.status as string) ?? "new"} className={`${fieldClass} px-2 py-2 text-xs`}>
@@ -115,7 +121,7 @@ export default async function ComprasPage() {
 const usd = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
 
 // Precio de mercado de la oferta y cuánto ofrecer (o, en consignación, a cuánto venderlo y cuánto le queda al dueño)
-function OfferMarket({ r }: { r: Record<string, unknown> }) {
+function OfferMarket({ r, lang, hasPhone }: { r: Record<string, unknown>; lang: "es" | "en"; hasPhone: boolean }) {
   const open = !["paid", "rejected"].includes((r.status as string) ?? "new");
   const typical = r.market_typical != null ? Number(r.market_typical) : null;
   const low = r.market_low != null ? Number(r.market_low) : null;
@@ -153,6 +159,14 @@ function OfferMarket({ r }: { r: Record<string, unknown> }) {
       ) : checked ? (
         <p className="text-stone">{tr("No se encontraron anuncios comparables.")}</p>
       ) : null}
+      {["new", "offered"].includes((r.status as string) ?? "new") && (
+        <OfferReply
+          id={r.id as string}
+          hasPhone={hasPhone}
+          defaultLang={lang}
+          amounts={s?.kind === "buy" ? s.offers.map((o) => ({ amount: o.amount, label: `${Math.round(o.margin * 100)}%` })) : s?.kind === "consign" ? [{ amount: s.owner, label: tr("neto al dueño") }] : []}
+        />
+      )}
       {open && (
         <form action={offerMarketAction.bind(null, r.id as string)} className="mt-2">
           <PendingButton pending={tr("Buscando precios… (≈1 min)")} className="border border-line px-2.5 py-1 text-[0.6rem] tracking-[0.16em] uppercase text-stone hover:text-ivory">

@@ -2,7 +2,7 @@ import "server-only";
 import { adminDb } from "./supabase";
 import { normalizePhone } from "./crm";
 import { after } from "next/server";
-import { appraiseOffer, askingOf, createOffer, offerSuggestion, OFFER_KIND, type OfferKind } from "./offers";
+import { appraiseOffer, askingOf, createOffer, offerSuggestion, sendOffer, OFFER_KIND, type OfferKind } from "./offers";
 import { escapeHtml as h, keyboard, sendMessage, tg, type InlineButton } from "./telegram";
 
 // 🤲 «Me ofrecen un reloj» por Telegram: tipo → cliente → reloj → cuánto pide → queda en CRM → Ofertas de clientes
@@ -105,6 +105,15 @@ export async function onOfferCallback(chatId: number, cbId: string, messageId: n
     await clearOffer(chatId);
     return sendMessage(chatId, "Cancelado.");
   }
+  // Enviar nuestra oferta: queda «Ofertada» y llega el botón de WhatsApp con el mensaje
+  if (what === "off") {
+    const [id, amount] = value.split(":");
+    const r = await sendOffer(id, Number(amount), null, user);
+    if (!r) return sendMessage(chatId, "Esa oferta ya no existe.");
+    return sendMessage(chatId, `📲 Oferta de <b>$${Number(amount).toLocaleString("en-US")}</b> lista (queda «Ofertada»):\n\n<i>${h(r.text)}</i>`, {
+      ...(r.wa && { reply_markup: keyboard([[{ text: "📲 Enviarla por WhatsApp", url: r.wa }]]) }),
+    });
+  }
   if (what === "tas") {
     await sendMessage(chatId, "🔎 Buscando precios en Chrono24, WatchCharts… (≈1 minuto)");
     after(() => appraisalJob(chatId, value));
@@ -140,5 +149,11 @@ async function appraisalJob(chatId: number, id: string) {
     s?.kind === "consign" ? `🤝 Venderlo a ≈ <b>${usd(s.sellAt)}</b> · al dueño ≈ <b>${usd(s.owner)}</b> (15% para ti)` : "",
     asking && m.typical && r.kind !== "consign" ? `Pide ${usd(asking)}: te dejaría ${Math.round(((m.typical - asking) / m.typical) * 100)}% de margen` : "",
     h(m.note),
-  ].filter(Boolean).join("\n"));
+  ].filter(Boolean).join("\n"), {
+    ...(s && {
+      reply_markup: keyboard(
+        (s.kind === "buy" ? s.offers.map((o) => ({ amount: o.amount, label: `${Math.round(o.margin * 100)}%` })) : [{ amount: s.owner, label: "neto" }]).map((o) => [{ text: `📲 Ofrecer ${usd(o.amount)} (${o.label})`, callback_data: `dofr:off|${id}:${o.amount}` }])
+      ),
+    }),
+  });
 }
