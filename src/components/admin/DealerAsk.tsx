@@ -9,13 +9,14 @@ const field = "w-full border border-line bg-ink/60 px-3 py-2.5 text-sm text-ivor
 const label = "mb-1.5 block text-[0.62rem] tracking-[0.22em] uppercase text-stone";
 
 // Pedir una pieza a los dealers: qué se busca, presupuesto y a quién (todos marcados por defecto)
-export function DealerAsk({ dealers, query = "", budget, documentId }: { dealers: { id: string; name: string | null; phone: string | null; reachable: boolean }[]; query?: string; budget?: number | null; documentId?: string | null }) {
+export function DealerAsk({ dealers, query = "", budget, documentId, customerId }: { dealers: { id: string; name: string | null; phone: string | null; reachable: boolean }[]; query?: string; budget?: number | null; documentId?: string | null; customerId?: string | null }) {
   const tr = useTr();
   const [state, action, pending] = useActionState(askDealersAction, null);
   const [all, setAll] = useState(true);
   return (
     <form action={action} key={state && "ok" in state ? "sent" : "form"} className="grid gap-4">
       {documentId && <input type="hidden" name="document_id" value={documentId} />}
+      {customerId && <input type="hidden" name="customer_id" value={customerId} />}
       <div className="grid gap-4 sm:grid-cols-[1fr_160px]">
         <label><span className={label}>{tr("Qué buscas *")}</span><input name="query" required defaultValue={query} placeholder={tr("Rolex Daytona 126500LN blanco, 2023+, full set")} className={field} /></label>
         <label><span className={label}>{tr("Presupuesto $")}</span><input name="budget" inputMode="decimal" defaultValue={budget ?? ""} className={field} /></label>

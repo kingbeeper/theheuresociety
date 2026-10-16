@@ -1,6 +1,7 @@
 import { publishDue } from "@/lib/ig-publish";
 import { sendDueReminders } from "@/lib/bot-reminders";
 import { marketPass } from "@/lib/market";
+import { pushAppointmentsSoon } from "@/lib/push";
 
 // Pasada de cada 10 minutos (Supabase pg_cron, Authorization: Bearer CRON_SECRET): avisa de los
 // recordatorios de clientes que ya tocan y publica en Instagram las ideas aprobadas cuya hora llegó.
@@ -13,5 +14,7 @@ export async function GET(request: Request) {
   const results = await publishDue();
   // Precio de mercado: un reloj por pasada (los que llevan más de 5 días sin revisar)
   const market = await marketPass().catch((e) => `error: ${(e as Error).message}`);
-  return Response.json({ ok: true, reminders, results, market });
+  // Aviso en el móvil una hora antes de cada cita
+  const appts = await pushAppointmentsSoon().catch((e) => `error: ${(e as Error).message}`);
+  return Response.json({ ok: true, reminders, results, market, appts });
 }

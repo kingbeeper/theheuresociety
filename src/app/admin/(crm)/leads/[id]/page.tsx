@@ -15,6 +15,8 @@ import { getDocSettings } from "@/lib/documents";
 import { todayInMiami } from "@/lib/booking";
 import { CUSTOMER_TAGS, hasTag } from "@/lib/crm-labels";
 import { duplicatesOf } from "@/lib/merge";
+import { templates } from "@/lib/templates";
+import { QuickReplies } from "@/components/admin/QuickReplies";
 import { STATUS_LABEL, type DocKind, type DocStatus } from "@/lib/doc-labels";
 
 export const metadata = { title: "Cliente" };
@@ -49,6 +51,17 @@ export default async function LeadPage({ params }: PageProps<"/admin/leads/[id]"
   const value = values.get(id);
   const { data: docs } = await db.from("documents").select("id, kind, number, status, total").eq("customer_id", id).order("created_at", { ascending: false });
   const dupes = await duplicatesOf(id);
+  // Respuestas rápidas: plantillas y relojes disponibles (con su ficha en la web)
+  const [replies, { data: stockRows }] = await Promise.all([
+    templates(),
+    db.from("inventory_items").select("id, sku, brand, model, reference, asking_price, watch:watches(slug, status)").in("status", ["in_stock", "reserved"]).order("brand"),
+  ]);
+  const replyWatches = ((stockRows ?? []) as unknown as { id: string; sku: string; brand: string; model: string | null; reference: string | null; asking_price: number | null; watch: { slug: string; status: string } | null }[]).map((i) => ({
+    id: i.id,
+    label: [i.brand, i.model, i.reference].filter(Boolean).join(" "),
+    price: i.asking_price ? Number(i.asking_price) : null,
+    slug: i.watch && ["available", "reserved"].includes(i.watch.status) ? i.watch.slug : null,
+  }));
   const { data: reminders } = await db.from("reminders").select("id, body, due_at, all_day, done_at").eq("customer_id", id).order("due_at", { ascending: false }).limit(20);
   const [events, alerts, appts, sells, wa, msgs] = await Promise.all([
     db.from("customer_events").select("*").eq("customer_id", id).order("created_at", { ascending: false }).limit(200),
@@ -186,6 +199,10 @@ export default async function LeadPage({ params }: PageProps<"/admin/leads/[id]"
             </Card>
           )}
           <Card title="Datos del cliente"><LeadForm c={c} /></Card>
+          <Card title="💬 Respuestas rápidas">
+            <QuickReplies templates={replies.map((t) => ({ title: tr(t.title), body_es: t.body_es, body_en: t.body_en }))} watches={replyWatches} name={c.name ?? ""} phone={waNumber ?? null} defaultLang={c.lang === "en" ? "en" : "es"} payInfo={docSettings.doc_payment_info} site={(process.env.NEXT_PUBLIC_SITE_URL ?? "https://theheuresociety.vercel.app").replace(/\/$/, "")} />
+            <Link href="/admin/plantillas" className="mt-3 inline-block text-xs text-stone underline hover:text-ivory">{tr("Editar las plantillas")}</Link>
+          </Card>
 
           {c.wa_id && wa.data && (
             <Card title="Bot de WhatsApp">
@@ -243,6 +260,7 @@ export default async function LeadPage({ params }: PageProps<"/admin/leads/[id]"
                 {alerts.data.map((a) => (
                   <li key={a.id as string} className="flex items-center justify-between gap-3 border-b border-line/60 pb-2">
                     <span className={a.active ? "" : "text-stone line-through"}>{a.query as string}</span>
+                    {a.active && <Link href={`/admin/dealers?q=${encodeURIComponent(a.query as string)}&cliente=${c.id}`} className="ml-auto whitespace-nowrap text-xs text-brass hover:text-ivory">{tr("🤝 Pedir a dealers")}</Link>}
                     <form action={toggleAlert.bind(null, a.id as string, !a.active)}>
                       <button className="text-xs text-stone underline hover:text-ivory">{a.active ? tr("Desactivar") : tr("Activar")}</button>
                     </form>
@@ -250,7 +268,10 @@ export default async function LeadPage({ params }: PageProps<"/admin/leads/[id]"
                 ))}
               </ul>
             ) : (
-              <p className="text-sm text-stone">{tr("Sin búsquedas guardadas.")}</p>
+              <p className="text-sm text-stone">
+                {tr("Sin búsquedas guardadas.")}
+                {c.interests && <> <Link href={`/admin/dealers?q=${encodeURIComponent(c.interests.slice(0, 200))}&cliente=${c.id}`} className="text-brass hover:text-ivory">{tr("🤝 Pedir lo que busca a mis dealers")}</Link></>}
+              </p>
             )}
           </Card>
 

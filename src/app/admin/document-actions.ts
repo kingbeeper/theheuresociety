@@ -30,13 +30,15 @@ function parseLines(raw: string | null): DocLine[] {
     const rows = JSON.parse(raw ?? "[]") as DocLine[];
     return rows
       .map((l) => ({
-        item_id: l.item_id || null,
-        sku: l.sku || null,
-        title: String(l.title ?? "").trim().slice(0, 200),
+        item_id: l.trade ? null : l.item_id || null,
+        sku: l.trade ? null : l.sku || null,
+        // Intercambio: el reloj que entrega el cliente resta del total
+        title: l.trade && l.title && !/^(trade-in|intercambio)/i.test(String(l.title).trim()) ? `Trade-in: ${String(l.title).trim()}`.slice(0, 200) : String(l.title ?? "").trim().slice(0, 200),
+        ...(l.trade && { trade: true }),
         details: String(l.details ?? "").trim().slice(0, 500) || null,
         serial: String(l.serial ?? "").trim().slice(0, 80) || null,
         qty: Math.max(1, Math.round(Number(l.qty) || 1)),
-        price: Math.round((Number(l.price) || 0) * 100) / 100,
+        price: (l.trade ? -1 : 1) * Math.round(Math.abs(Number(l.price) || 0) * 100) / 100,
       }))
       .filter((l) => l.title);
   } catch {
@@ -298,4 +300,17 @@ export async function toggleAutoRemindersAction() {
   const on = await autoRemindersOn();
   await adminDb().from("integration_settings").upsert({ key: AUTO_KEY, value: on ? "off" : "on", updated_at: new Date().toISOString() }, { onConflict: "key" });
   refresh();
+}
+
+// Tasar el reloj que entrega el cliente (≈ 1 minuto): mercado típico y cuánto reconocerle (15 % menos)
+export async function appraiseTradeAction(title: string, details: string | null) {
+  await requireAdmin("documentos");
+  const words = title.replace(/^(trade-in|intercambio)\s*:?\s*/i, "").trim().split(/\s+/);
+  if (!words[0]) return { error: tr("Escribe primero el reloj (marca, modelo y referencia).") };
+  const refIdx = words.findIndex((w, i) => i > 0 && /\d/.test(w) && w.length >= 4);
+  const reference = refIdx > 0 ? words.splice(refIdx, 1)[0] : null;
+  const { checkMarket } = await import("@/lib/market");
+  const m = await checkMarket({ id: "trade", sku: "", brand: words.shift()!, model: words.join(" ") || null, reference, condition: null, comes_with: details, papers_date: null, asking_price: null }).catch(() => null);
+  if (!m?.typical) return { error: tr("No se encontraron anuncios comparables.") };
+  return { typical: m.typical, low: m.low, high: m.high, suggested: Math.round((m.typical * 0.85) / 50) * 50 };
 }

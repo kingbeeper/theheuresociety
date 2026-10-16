@@ -11,6 +11,7 @@ export type DocLine = {
   serial?: string | null;
   qty: number;
   price: number;
+  trade?: boolean; // reloj que entrega el cliente como parte del pago (importe negativo)
 };
 
 export type Doc = {
@@ -111,7 +112,7 @@ export function docTotals(d: { items: DocLine[]; discount: number; tax_rate: num
 }
 
 export const usd = (n: number | null | undefined) =>
-  n == null ? "—" : `$${Number(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  n == null ? "—" : `${Number(n) < 0 ? "−" : ""}$${Math.abs(Number(n)).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 // Textos del documento impreso (lo que ve el cliente), en inglés o español
 export const PRINT = {

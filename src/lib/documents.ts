@@ -4,7 +4,7 @@ import { adminDb } from "./supabase";
 import { addEvent, STAGES, STAGE_LABEL, type Stage } from "./crm";
 import { logItem, recordPurchase, syncWebStatus, type Item } from "./stock";
 import { isOwnerStock } from "./stock-labels";
-import { DOC_DEFAULTS, DOC_SETTING_KEYS, KIND_LABEL, KIND_PREFIX, docTotals, paidSoFar, returnTerms, termsFor, usd, type Doc, type DocKind, type DocPayment, type DocSettings } from "./doc-labels";
+import { DOC_DEFAULTS, DOC_SETTING_KEYS, KIND_LABEL, KIND_PREFIX, docTotals, paidSoFar, returnTerms, termsFor, usd, type Doc, type DocKind, type DocLine, type DocPayment, type DocSettings } from "./doc-labels";
 import { escapeHtml as h, notifyAdmins } from "./telegram";
 
 // Cotizaciones, memos y facturas. Van enlazadas al cliente del CRM y a los relojes del inventario:
@@ -99,6 +99,11 @@ export async function sellStock(d: Doc, user: string) {
   const { subtotal, discount } = docTotals(d);
   const items = await stockFor(d);
   for (const line of d.items) {
+    // Reloj que entregó el cliente como parte del pago: entra al inventario como «Intercambio»
+    if (line.trade) {
+      await tradeInToStock(d, line, user).catch((e) => console.error("Intercambio al inventario:", e));
+      continue;
+    }
     const item = items.find((i) => i.id === line.item_id);
     if (!item || item.status === "returned") continue;
     if (item.status === "sold") {
@@ -269,6 +274,7 @@ export async function payInvoice(d: Doc, method: string | null, paidAt: string, 
   await sellStock(paid, user);
   await docEvent(paid, `pagada (${usd(d.total)}${method ? ` · ${method}` : ""})`, user);
   if (d.customer_id) await adminDb().from("customers").update({ stage: "won", last_activity_at: new Date().toISOString() }).eq("id", d.customer_id);
+  await import("./push").then((p) => p.pushTeam({ title: `💰 Factura pagada · ${d.number}`, body: `${d.client_name ?? "Cliente"} · ${usd(d.total)}`, url: `/admin/documentos/${d.id}` }, "documentos")).catch(() => {});
   await notifyAdmins(`💰 <b>Factura pagada · ${h(d.number)}</b>\n${h(d.client_name ?? "Cliente")} · <b>${usd(d.total)}</b>${method ? ` · ${h(method)}` : ""}\n${h(d.items.map((l) => l.title).join(", "))}`).catch(() => {});
   return paid;
 }
@@ -301,6 +307,7 @@ async function sourcingAlert(d: Doc, active: boolean) {
 export async function depositReceived(d: Doc, method: string | null, paidAt: string, user: string) {
   await touch(d.id, { deposit_paid_at: paidAt, deposit_method: method });
   await docEvent(d, `anticipo recibido: ${usd(d.deposit ?? 0)}${method ? ` · ${method}` : ""}`, user);
+  await import("./push").then((p) => p.pushTeam({ title: `💵 Anticipo recibido · ${d.number}`, body: `${d.client_name ?? "Cliente"} · ${usd(d.deposit ?? 0)}`, url: `/admin/documentos/${d.id}` }, "documentos")).catch(() => {});
   await notifyAdmins(`💵 <b>Anticipo recibido · ${h(d.number)}</b>\n${h(d.client_name ?? "Cliente")} · <b>${usd(d.deposit ?? 0)}</b>${method ? ` · ${h(method)}` : ""}\nBusca: ${h(d.items.map((l) => l.title).join(", "))}`).catch(() => {});
 }
 
@@ -457,6 +464,7 @@ export async function addProformaPayment(d: Doc, p: DocPayment, user: string) {
   await touch(d.id, { status: "sent", payments, deposit: paid, deposit_paid_at: p.date, deposit_method: p.method });
   const balance = Math.max(0, Math.round((Number(d.total) - paid) * 100) / 100);
   await docEvent(d, `depósito de ${usd(p.amount)}${p.method ? ` (${p.method})` : ""} · pagado ${usd(paid)} · saldo ${usd(balance)}`, user);
+  await import("./push").then((x) => x.pushTeam({ title: `💵 Depósito recibido · ${d.number}`, body: `${d.client_name ?? "Cliente"} · ${usd(p.amount)} · saldo ${usd(balance)}`, url: `/admin/documentos/${d.id}` }, "documentos")).catch(() => {});
   await notifyAdmins(`💵 <b>Depósito recibido · ${h(d.number)}</b>\n${h(d.client_name ?? "Cliente")} · <b>${usd(p.amount)}</b>${p.method ? ` · ${h(p.method)}` : ""}\nPagado ${usd(paid)} de ${usd(d.total)} · saldo <b>${usd(balance)}</b>`).catch(() => {});
   return { ...d, status: "sent" as const, payments, deposit: paid, balance };
 }
@@ -510,5 +518,29 @@ export async function receiptForItem(item: Pick<Item, "id" | "sku" | "brand" | "
       note,
     },
     user
+  );
+}
+
+// Intercambio de una factura pagada → inventario (costo = valor reconocido; proveedor = el cliente)
+async function tradeInToStock(d: Doc, line: DocLine, user: string) {
+  const words = line.title.replace(/^(trade-in|intercambio)\s*:?\s*/i, "").trim().split(/\s+/);
+  const refIdx = words.findIndex((w, i) => i > 0 && /\d/.test(w) && w.length >= 4);
+  const reference = refIdx > 0 ? words.splice(refIdx, 1)[0] : null;
+  const { createStockItem } = await import("./stock");
+  await createStockItem(
+    {
+      acquisition: "trade",
+      brand: words.shift() ?? "?",
+      model: words.join(" ") || null,
+      reference,
+      serial: line.serial ?? null,
+      comes_with: line.details ?? null,
+      supplier_customer_id: d.customer_id,
+      supplier_name: d.client_name,
+      purchase_date: d.paid_at ?? new Date().toISOString().slice(0, 10),
+      cost: Math.abs(Number(line.price)),
+    },
+    user,
+    `Entrada por intercambio en ${docLabel(d)} · valor ${usd(Math.abs(Number(line.price)))}`
   );
 }

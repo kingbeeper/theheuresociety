@@ -4,6 +4,7 @@ import { requireUser } from "@/lib/admin-auth";
 import { can, ROLE_LABEL, SECTIONS, type Section } from "@/lib/crm-perms";
 import { Card, PageTitle } from "@/components/admin/ui";
 import { PasswordForm } from "@/components/admin/UserForms";
+import { PushToggle } from "@/components/admin/PushToggle";
 import { monthlyCommissions } from "@/lib/team";
 import { money } from "@/components/admin/ui";
 import { todayInMiami } from "@/lib/booking";
@@ -22,6 +23,7 @@ export default async function AccountPage({ searchParams }: PageProps<"/admin/cu
     <>
       <PageTitle eyebrow="CRM" title="Mi cuenta" />
       <div className="grid gap-6 xl:grid-cols-2">
+        <Card title="🔔 Avisos en este dispositivo"><PushToggle publicKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? null} /></Card>
         <Card title="Contraseña">
           <PasswordForm welcome={welcome} />
         </Card>

@@ -3,7 +3,7 @@
 
 import { useTr } from "@/components/admin/AdminLang";
 import { useActionState, useState } from "react";
-import { closeProformaAction, convertSourcing, markDepositReceived, markPaid, proformaPaymentAction, saveDocument } from "@/app/admin/document-actions";
+import { appraiseTradeAction, closeProformaAction, convertSourcing, markDepositReceived, markPaid, proformaPaymentAction, saveDocument } from "@/app/admin/document-actions";
 import { ID_TYPES, KIND_LABEL, depositPct, docTotals, suggestedDeposit, usd, type Doc, type DocKind, type DocLine } from "@/lib/doc-labels";
 import { PAYMENT } from "@/lib/stock-labels";
 import { SerialWarning } from "./SerialCheck";
@@ -59,6 +59,17 @@ export function DocumentForm({
 
   const totals = docTotals({ items: lines, discount: Number(discount), tax_rate: Number(tax), shipping: Number(shipping) });
   const update = (i: number, patch: Partial<DocLine>) => setLines((ls) => ls.map((l, j) => (j === i ? { ...l, ...patch } : l)));
+  // Intercambio: tasar el reloj que entrega el cliente (≈ 1 min) y proponer cuánto reconocerle
+  const [appraising, setAppraising] = useState<number | null>(null);
+  const [tradeNote, setTradeNote] = useState<Record<number, string>>({});
+  const appraise = async (i: number) => {
+    setAppraising(i);
+    const r = await appraiseTradeAction(lines[i].title, lines[i].details ?? null).catch(() => ({ error: tr("No se pudo tasar.") }));
+    setAppraising(null);
+    if ("error" in r) return setTradeNote((n) => ({ ...n, [i]: r.error ?? "" }));
+    update(i, { price: -r.suggested });
+    setTradeNote((n) => ({ ...n, [i]: tr("Mercado {low} – {high} · típico {t} → reconocerle {s} (15 % menos)", { low: r.low ? usd(r.low) : "?", high: r.high ? usd(r.high) : "?", t: usd(r.typical), s: usd(r.suggested) }) }));
+  };
   const used = new Set(lines.map((l) => l.item_id));
 
   const pickCustomer = (id: string) => {
@@ -147,13 +158,24 @@ export function DocumentForm({
             <div>
               <input value={l.title} onChange={(e) => update(i, { title: e.target.value })} placeholder={tr("Rolex Daytona 126500LN")} className={small} />
               {l.sku && <p className="mt-1 text-[0.66rem] text-stone">{tr("Inventario")} {l.sku}</p>}
+              {l.trade && <p className="mt-1 text-[0.66rem] text-amber-200">{tr("↩ Intercambio: el cliente lo entrega como parte del pago")}</p>}
             </div>
             <input value={l.details ?? ""} onChange={(e) => update(i, { details: e.target.value })} placeholder={tr("Año, caja y papeles…")} className={small} />
             <input value={l.serial ?? ""} onChange={(e) => update(i, { serial: e.target.value })} placeholder={tr("Serial")} className={small} />
             <input value={l.qty} onChange={(e) => update(i, { qty: Number(e.target.value) || 1 })} inputMode="numeric" aria-label={tr("Cantidad")} className={small} />
-            <input value={l.price} onChange={(e) => update(i, { price: Number(e.target.value.replace(/[^\d.]/g, "")) || 0 })} inputMode="decimal" aria-label={tr("Precio")} className={small} />
+            <input value={l.trade ? Math.abs(l.price) : l.price} onChange={(e) => update(i, { price: (l.trade ? -1 : 1) * (Number(e.target.value.replace(/[^\d.]/g, "")) || 0) })} inputMode="decimal" aria-label={l.trade ? tr("Valor reconocido") : tr("Precio")} className={`${small} ${l.trade ? "text-amber-200" : ""}`} />
             <button type="button" onClick={() => setLines(lines.filter((_, j) => j !== i))} className="px-2 py-2 text-xs text-stone hover:text-red-200" aria-label={tr("Quitar")}>✕</button>
-            <div className="sm:col-span-6"><SerialWarning value={l.serial} itemId={l.item_id} docId={doc?.id} /></div>
+            <div className="sm:col-span-6">
+              <SerialWarning value={l.serial} itemId={l.item_id} docId={doc?.id} />
+              {l.trade && (
+                <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-stone">
+                  <button type="button" disabled={appraising !== null || !l.title.trim()} onClick={() => appraise(i)} className="border border-line px-2 py-1 text-[0.6rem] tracking-[0.14em] uppercase hover:text-ivory disabled:opacity-50">
+                    {appraising === i ? tr("Buscando precios… (≈1 min)") : tr("🔎 Tasar (precio de mercado)")}
+                  </button>
+                  {tradeNote[i]}
+                </p>
+              )}
+            </div>
           </div>
         ))}
         <div className={`flex flex-wrap gap-2 ${sourcing ? "hidden" : ""}`}>
@@ -171,6 +193,11 @@ export function DocumentForm({
           <button type="button" onClick={() => setLines([...lines, { title: "", qty: 1, price: 0 }])} className="border border-line px-4 py-2 text-[0.66rem] tracking-[0.18em] uppercase text-stone hover:text-ivory">
             {tr("+ Línea libre")}
           </button>
+          {["quote", "invoice", "proforma"].includes(kind) && (
+            <button type="button" onClick={() => setLines([...lines, { title: "", qty: 1, price: 0, trade: true }])} className="border border-amber-300/40 px-4 py-2 text-[0.66rem] tracking-[0.18em] uppercase text-amber-200 hover:bg-amber-300/10">
+              {tr("+ Intercambio (el cliente entrega un reloj)")}
+            </button>
+          )}
         </div>
         <label className="flex items-center gap-2 text-sm text-stone">
           <input name="show_serial" type="checkbox" defaultChecked={doc?.show_serial ?? kind !== "quote"} className="h-4 w-4" /> {tr("Mostrar el número de serie en el documento")}

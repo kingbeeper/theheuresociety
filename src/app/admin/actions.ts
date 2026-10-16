@@ -417,7 +417,7 @@ export async function askDealersAction(_: unknown, form: FormData) {
   if (!ids.length) return { error: tr("Elige al menos un dealer.") };
   const budget = Number(String(form.get("budget") ?? "").replace(/[^\d.]/g, "")) || null;
   const { askDealers } = await import("@/lib/dealers");
-  await askDealers(query.slice(0, 300), budget, ids, text(form, "document_id"), user);
+  await askDealers(query.slice(0, 300), budget, ids, text(form, "document_id"), user, text(form, "customer_id"));
   refresh();
   return { ok: true };
 }
@@ -498,4 +498,45 @@ export async function sendOfferAction(id: string, amount: number, lang: "es" | "
   const r = await sendOffer(id, amount, lang, user);
   refresh();
   return r ? { ok: true as const, wa: r.wa, text: r.text } : { error: "La oferta ya no existe." };
+}
+
+// Respuestas rápidas: guardar, añadir o quitar una plantilla
+export async function saveTemplateAction(id: string | null, form: FormData) {
+  await requireAdmin("leads");
+  const { ensureTemplates } = await import("@/lib/templates");
+  await ensureTemplates();
+  const row = { title: text(form, "title") ?? "", body_es: text(form, "body_es") ?? "", body_en: text(form, "body_en") ?? "", updated_at: new Date().toISOString() };
+  if (!row.title || (!row.body_es && !row.body_en)) return;
+  const db = adminDb();
+  if (id) await db.from("message_templates").update(row).eq("id", id);
+  else await db.from("message_templates").insert({ ...row, sort: 99 });
+  refresh();
+}
+
+export async function deleteTemplateAction(id: string) {
+  await requireAdmin("leads");
+  await adminDb().from("message_templates").delete().eq("id", id);
+  refresh();
+}
+
+// Avisos en este dispositivo (Web Push): guardar o quitar la suscripción del navegador
+export async function savePushAction(sub: { endpoint: string; keys: { p256dh: string; auth: string } }, device: string) {
+  const email = await requireAdmin();
+  if (!sub?.endpoint?.startsWith("https://") || !sub.keys?.p256dh || !sub.keys?.auth) return { error: tr("Suscripción no válida.") };
+  const { error } = await adminDb().from("push_subscriptions").upsert({ user_email: email, endpoint: sub.endpoint, p256dh: sub.keys.p256dh, auth: sub.keys.auth, device: device.slice(0, 120) }, { onConflict: "endpoint" });
+  if (error) return { error: error.message };
+  return { ok: true as const };
+}
+
+export async function removePushAction(endpoint: string) {
+  const email = await requireAdmin();
+  await adminDb().from("push_subscriptions").delete().eq("endpoint", endpoint).eq("user_email", email);
+  return { ok: true as const };
+}
+
+export async function testPushAction() {
+  const email = await requireAdmin();
+  const { pushTo } = await import("@/lib/push");
+  const n = await pushTo(email, { title: "🔔 The Heure Society", body: tr("Los avisos funcionan en este dispositivo."), url: "/admin" });
+  return n ? { ok: true as const } : { error: tr("No hay ningún dispositivo activado.") };
 }

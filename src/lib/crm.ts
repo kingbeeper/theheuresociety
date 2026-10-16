@@ -153,6 +153,8 @@ export async function upsertLead(input: LeadInput) {
           .filter(Boolean)
           .join("\n")
       ).catch(() => {});
+      // Aviso en el móvil desde la app del CRM
+      await import("./push").then((p) => p.pushTeam({ title: `🆕 Nuevo lead · ${SOURCE_LABEL[input.source] ?? input.source}`, body: [customer.name ?? "Sin nombre", input.interests].filter(Boolean).join(" · ").slice(0, 140), url: `/admin/leads/${customer.id}`, tag: `lead-${customer.id}` }, "leads")).catch(() => {});
     }
   }
 

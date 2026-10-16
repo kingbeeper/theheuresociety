@@ -22,6 +22,10 @@ export default async function DealersPage({ searchParams }: PageProps<"/admin/de
   const sp = await searchParams;
   const view = sp.ver === "dealers" ? "dealers" : "pedir";
   const encargo = typeof sp.encargo === "string" ? sp.encargo : null;
+  // Desde la ficha de un cliente: su búsqueda («avísenme») ya escrita y el pedido queda a su nombre
+  const forQuery = typeof sp.q === "string" && sp.ver !== "dealers" ? sp.q.slice(0, 200) : "";
+  const forClient = typeof sp.cliente === "string" ? sp.cliente : null;
+  const { data: client } = forClient ? await adminDb().from("customers").select("id, name").eq("id", forClient).maybeSingle() : { data: null };
   const q = typeof sp.q === "string" ? sp.q.trim().toLowerCase() : "";
   const db = adminDb();
   const [list, { data: reqRows }, { data: doc }] = await Promise.all([
@@ -45,7 +49,7 @@ export default async function DealersPage({ searchParams }: PageProps<"/admin/de
       {view === "dealers" ? (
         <DealerDirectory list={list} requests={requests} q={q} />
       ) : (
-        <AskView list={list} requests={requests} byId={byId} doc={doc} />
+        <AskView list={list} requests={requests} byId={byId} doc={doc} forQuery={forQuery} client={client} />
       )}
     </>
   );
@@ -104,7 +108,7 @@ function DealerDirectory({ list, requests, q }: { list: Awaited<ReturnType<typeo
   );
 }
 
-function AskView({ list, requests, byId, doc }: { list: Awaited<ReturnType<typeof dealers>>; requests: DealerRequest[]; byId: Map<string, Awaited<ReturnType<typeof dealers>>[number]>; doc: { id: string; number: string; items: unknown; total: number | null; client_name: string | null } | null }) {
+function AskView({ list, requests, byId, doc, forQuery, client }: { forQuery: string; client: { id: string; name: string | null } | null; list: Awaited<ReturnType<typeof dealers>>; requests: DealerRequest[]; byId: Map<string, Awaited<ReturnType<typeof dealers>>[number]>; doc: { id: string; number: string; items: unknown; total: number | null; client_name: string | null } | null }) {
   // Búsquedas agrupadas (misma consulta y mismo día/encargo)
   const groups = new Map<string, DealerRequest[]>();
   for (const r of requests) {
@@ -112,17 +116,18 @@ function AskView({ list, requests, byId, doc }: { list: Awaited<ReturnType<typeo
     groups.set(k, [...(groups.get(k) ?? []), r]);
   }
   const line = (doc?.items as { title: string; details?: string | null }[] | undefined)?.[0];
-  const prefill = line ? [line.title, line.details].filter(Boolean).join(", ") : "";
+  const prefill = line ? [line.title, line.details].filter(Boolean).join(", ") : forQuery;
 
   return (
     <>
-      <Card title={doc ? `${tr("🤝 Pedir a mis dealers")} · ${tr("encargo {n} de {c}", { n: doc.number, c: doc.client_name ?? "" })}` : "🤝 Pedir una pieza a mis dealers"}>
+      <Card title={doc ? `${tr("🤝 Pedir a mis dealers")} · ${tr("encargo {n} de {c}", { n: doc.number, c: doc.client_name ?? "" })}` : client ? `${tr("🤝 Pedir a mis dealers")} · ${tr("para {c}", { c: client.name ?? tr("el cliente") })}` : "🤝 Pedir una pieza a mis dealers"}>
         {list.length ? (
           <DealerAsk
             dealers={list.map((d) => ({ id: d.id, name: d.name, phone: d.phone, reachable: Boolean(d.wa_id || d.phone) }))}
             query={prefill}
             budget={doc ? Number(doc.total) : null}
             documentId={doc?.id ?? null}
+            customerId={client?.id ?? null}
           />
         ) : (
           <div className="grid gap-3">

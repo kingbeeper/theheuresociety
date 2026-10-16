@@ -25,12 +25,13 @@ export const waLink = (d: Pick<Dealer, "wa_id" | "phone">, text: string) => {
   return n ? `https://wa.me/${n}?text=${encodeURIComponent(text)}` : null;
 };
 
-export async function askDealers(query: string, budget: number | null, dealerIds: string[], documentId: string | null, user: string) {
+// customerId: el cliente para quien se busca (su búsqueda «avísenme»); al responder «la tiene» llega aviso con él
+export async function askDealers(query: string, budget: number | null, dealerIds: string[], documentId: string | null, user: string, customerId: string | null = null) {
   if (!dealerIds.length) return [];
   const db = adminDb();
   const { data } = await db
     .from("dealer_requests")
-    .insert(dealerIds.map((dealer_id) => ({ document_id: documentId, query, budget, dealer_id, created_by: user })))
+    .insert(dealerIds.map((dealer_id) => ({ document_id: documentId, query, budget, dealer_id, created_by: user, ...(customerId && { customer_id: customerId }) })))
     .select("id");
   for (const id of dealerIds) await addEvent(id, "dealer_request", `Se le pidió: ${query}${budget ? ` (presupuesto $${Math.round(budget).toLocaleString("en-US")})` : ""}`, { document: documentId }, user);
   return data ?? [];
@@ -38,8 +39,30 @@ export async function askDealers(query: string, budget: number | null, dealerIds
 
 export async function answerDealer(id: string, status: DealerRequest["status"], price: number | null, note: string | null, user: string) {
   const db = adminDb();
-  const { data: r } = await db.from("dealer_requests").update({ status, price, note, answered_at: new Date().toISOString() }).eq("id", id).select("dealer_id, query").single();
-  if (r) await addEvent(r.dealer_id as string, "dealer_request", `Respuesta a «${r.query}»: ${REQUEST_STATUS[status]}${price ? ` · $${Math.round(price).toLocaleString("en-US")}` : ""}${note ? ` · ${note}` : ""}`, {}, user);
+  const { data: r } = await db.from("dealer_requests").update({ status, price, note, answered_at: new Date().toISOString() }).eq("id", id).select("*").single();
+  if (!r) return;
+  await addEvent(r.dealer_id as string, "dealer_request", `Respuesta a «${r.query}»: ${REQUEST_STATUS[status]}${price ? ` · $${Math.round(price).toLocaleString("en-US")}` : ""}${note ? ` · ${note}` : ""}`, {}, user);
+  // Era para un cliente: aviso con el cliente al lado y el margen si hay presupuesto
+  if ((status === "has" || status === "offered") && r.customer_id) await dealerFoundForClient(r as DealerRequest & { customer_id: string }, user);
+}
+
+async function dealerFoundForClient(r: DealerRequest & { customer_id: string }, user: string) {
+  const db = adminDb();
+  const [{ data: c }, { data: d }] = await Promise.all([
+    db.from("customers").select("id, name, phone").eq("id", r.customer_id).maybeSingle(),
+    db.from("customers").select("name").eq("id", r.dealer_id).maybeSingle(),
+  ]);
+  if (!c) return;
+  const usd = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
+  const price = r.price ? Number(r.price) : null;
+  const budget = r.budget ? Number(r.budget) : null;
+  const marginLine = price && budget ? (budget > price ? `Margen si se lo vendes a su presupuesto: ${usd(budget - price)} (${Math.round(((budget - price) / budget) * 100)}%)` : `⚠️ El dealer pide más que el presupuesto del cliente (${usd(budget)})`) : "";
+  await addEvent(c.id, "dealer_request", `🤝 ${d?.name ?? "Un dealer"} tiene «${r.query}»${price ? ` a ${usd(price)}` : ""}`, { request: r.id }, user);
+  const { notifyAdmins, escapeHtml: h } = await import("./telegram");
+  const site = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://theheuresociety.vercel.app").replace(/\/$/, "");
+  await notifyAdmins(
+    [`🤝 <b>${h(d?.name ?? "Un dealer")} tiene lo que busca ${h(c.name ?? "tu cliente")}</b>`, `${h(r.query)}${price ? ` · <b>${usd(price)}</b>` : ""}${r.note ? ` · ${h(r.note)}` : ""}`, marginLine, `Ficha del cliente: ${site}/admin/leads/${c.id}`].filter(Boolean).join("\n")
+  ).catch(() => {});
 }
 
 // Alta de un dealer (CRM o Telegram): si ya existe por teléfono o correo, solo se le pone la etiqueta
