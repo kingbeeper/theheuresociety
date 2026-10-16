@@ -528,6 +528,9 @@ export async function onCallback(chatId: number, cbId: string, messageId: number
   const clearButtons = () => tg("editMessageReplyMarkup", { chat_id: chatId, message_id: messageId, reply_markup: keyboard([]) }).catch(() => {});
 
   // Gasto general del negocio
+  // Ofertas de clientes (me ofrecen un reloj)
+  if (action === "dofr") return arg === "start" ? (await import("./bot-offers")).startOffer(chatId).then(() => answer()) : (await import("./bot-offers")).onOfferCallback(chatId, cbId, messageId, arg, user);
+
   // Dealers
   if (action === "ddl") return (await import("./bot-dealers")).onDealerCallback(chatId, cbId, messageId, arg, user);
 

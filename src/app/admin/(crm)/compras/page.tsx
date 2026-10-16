@@ -4,8 +4,9 @@ import { adminDb } from "@/lib/supabase";
 import { requireAdmin } from "@/lib/admin-auth";
 import { ago, fieldClass, PageTitle, requestTime } from "@/components/admin/ui";
 import { updateSellRequest } from "../../actions";
+import { OfferNew } from "@/components/admin/OfferNew";
 
-export const metadata = { title: "Compras y consignas" };
+export const metadata = { title: "Ofertas de clientes" };
 
 // Relojes que los clientes nos ofrecen, por etapa: de la solicitud al pago
 const COLUMNS = [
@@ -33,7 +34,11 @@ export default async function ComprasPage() {
 
   return (
     <>
-      <PageTitle eyebrow="CRM" title="Compras y consignaciones" />
+      <PageTitle eyebrow="CRM" title="Ofertas de clientes" />
+      <p className="mb-5 max-w-3xl text-sm text-stone">
+        Relojes que los clientes te ofrecen para que se los <b>compres</b>, los <b>cambies</b> o los tengas en <b>consignación</b>. Llegan solas desde la web (Sell / Consign), WhatsApp e Instagram/Facebook, y puedes añadir a mano las que te hacen en persona o por teléfono. Al marcar una como «Reloj recibido» entra sola al inventario.
+      </p>
+      <div className="mb-6"><OfferNew /></div>
       <div className="flex gap-4 overflow-x-auto pb-4">
         {COLUMNS.map((col) => {
           const items = rows.filter((r) => (r.status ?? "new") === col.key);

@@ -48,7 +48,7 @@ export default async function Dashboard({ searchParams }: PageProps<"/admin">) {
     { label: "Leads nuevos · 7 días", value: week.length, href: "/admin/leads?stage=new" },
     { label: "Seguimientos para hoy", value: follow.length, href: "/admin/leads?follow=1" },
     { label: "Citas próximas", value: appointments.data?.length ?? 0, href: "/admin/citas" },
-    { label: "Compras por responder", value: sells.data?.length ?? 0, href: "/admin/compras" },
+    { label: "Ofertas por responder", value: sells.data?.length ?? 0, href: "/admin/compras" },
     { label: "Chats esperando a una persona", value: waiting.data?.length ?? 0, href: "/admin/leads?bot=off" },
     { label: "Búsquedas activas", value: alerts.count ?? 0, href: "/admin/leads?alerts=1" },
   ];

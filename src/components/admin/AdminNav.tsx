@@ -20,7 +20,7 @@ const ITEMS: { href: string; label: string; icon: LucideIcon; section?: Section 
   { href: "/admin/documentos", label: "Documentos", icon: FileText, section: "documentos" },
   { href: "/admin/dinero", label: "Dinero", icon: Wallet, section: "costos" },
   { href: "/admin/informes", label: "Informes", icon: ChartColumn, section: "informes" },
-  { href: "/admin/compras", label: "Compras y consignas", icon: HandCoins, section: "compras" },
+  { href: "/admin/compras", label: "Ofertas de clientes", icon: HandCoins, section: "compras" },
   { href: "/admin/correos", label: "Correos", icon: Mail, section: "correos" },
   { href: "/admin/redes", label: "Redes", icon: AtSign, section: "redes" },
   { href: "/admin/usuarios", label: "Usuarios", icon: UserCog, section: "usuarios" },

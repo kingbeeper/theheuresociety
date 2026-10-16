@@ -76,6 +76,7 @@ export async function onMenuText(chatId: number, text: string, user: string) {
             { text: "🟢 Volver a disponible", callback_data: "mst:available" },
             { text: "✂️ Repetir recorte", callback_data: "mst:case" },
           ]),
+          [{ text: "🤲 Me ofrecen un reloj (compra, cambio o consigna)", callback_data: "dofr:start" }],
           [{ text: "🔎 Tasar un reloj (fotos)", callback_data: "mappr:1" }],
           [{ text: "🏷 Relojes para rebajar", callback_data: "mdrop:1" }],
           [{ text: "🎬 Video promocional", callback_data: "mst:video" }],

@@ -446,3 +446,21 @@ export async function addDealerAction(_: unknown, form: FormData) {
   refresh();
   return { ok: c.name ?? name };
 }
+
+// Oferta registrada a mano (en persona o por teléfono): crea la ficha del cliente y la tarjeta en «Ofertas de
+// clientes». Devuelve enlaces firmados para que el navegador suba las fotos directamente al almacenamiento.
+export async function createOfferAction(input: { kind: string; name: string; phone?: string; email?: string; brand: string; model?: string; reference?: string; asking?: string; details?: string; photos: { type: string }[] }) {
+  const user = await requireAdmin("compras");
+  const kind = ["sell", "trade", "consign"].includes(input.kind) ? input.kind : "sell";
+  if (!input.name?.trim() || !input.brand?.trim()) return { error: "Faltan el nombre del cliente y la marca del reloj." };
+  const { createOffer } = await import("@/lib/offers");
+  const r = await createOffer({ ...input, kind: kind as "sell" | "trade" | "consign" }, user);
+  refresh();
+  return r;
+}
+
+export async function offerPhotosAction(id: string, urls: string[]) {
+  await requireAdmin("compras");
+  await adminDb().from("sell_requests").update({ image_paths: urls, updated_at: new Date().toISOString() }).eq("id", id);
+  refresh();
+}

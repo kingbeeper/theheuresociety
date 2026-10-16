@@ -6,7 +6,7 @@ export const SECTIONS = {
   inventario: "Inventario",
   costos: "Ver costos, proveedores y márgenes",
   documentos: "Documentos (facturas, memos…)",
-  compras: "Compras y consignas",
+  compras: "Ofertas de clientes",
   demanda: "Demanda",
   informes: "Informes para el contador",
   correos: "Correos de novedades",
