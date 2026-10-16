@@ -1,3 +1,4 @@
+import { tr } from "@/lib/admin-i18n";
 import Link from "next/link";
 import { connection } from "next/server";
 import { requireUser } from "@/lib/admin-auth";
@@ -54,19 +55,19 @@ export default async function TasksPage({ searchParams }: PageProps<"/admin/tare
                     <div className="min-w-0 flex-1 text-sm">
                       <p>{r.body}</p>
                       <p className={`text-xs ${late ? "text-red-200" : "text-stone"}`}>
-                        {late ? "⚠️ Vencido · " : ""}{remWhen(r)}{r.created_by ? ` · de ${name(r.created_by)}` : ""}
+                        {late ? tr("⚠️ Vencido · ") : ""}{remWhen(r)}{r.created_by ? ` · de ${name(r.created_by)}` : ""}
                       </p>
                       <div className="mt-1 flex flex-wrap gap-3 text-xs">
-                        {r.customer && <Link href={`/admin/leads/${r.customer.id}`} className="text-brass hover:text-ivory">👤 {r.customer.name ?? "Cliente"}{r.customer.phone ? ` · ${r.customer.phone}` : ""}</Link>}
-                        {wa && <a href={`https://wa.me/${wa}`} target="_blank" rel="noreferrer" className="text-brass hover:text-ivory">📲 WhatsApp</a>}
+                        {r.customer && <Link href={`/admin/leads/${r.customer.id}`} className="text-brass hover:text-ivory">👤 {r.customer.name ?? tr("Cliente")}{r.customer.phone ? ` · ${r.customer.phone}` : ""}</Link>}
+                        {wa && <a href={`https://wa.me/${wa}`} target="_blank" rel="noreferrer" className="text-brass hover:text-ivory">{tr("📲 WhatsApp")}</a>}
                       </div>
                     </div>
                     <div className="flex gap-2">
                       <form action={snoozeReminderAction.bind(null, r.id, 1)}>
-                        <button className="whitespace-nowrap border border-line px-3 py-1.5 text-[0.62rem] tracking-[0.18em] uppercase text-stone hover:text-ivory">Mañana</button>
+                        <button className="whitespace-nowrap border border-line px-3 py-1.5 text-[0.62rem] tracking-[0.18em] uppercase text-stone hover:text-ivory">{tr("Mañana")}</button>
                       </form>
                       <form action={reminderDoneAction.bind(null, r.id)}>
-                        <button className="whitespace-nowrap border border-line px-3 py-1.5 text-[0.62rem] tracking-[0.18em] uppercase text-stone hover:text-ivory">✓ Hecho</button>
+                        <button className="whitespace-nowrap border border-line px-3 py-1.5 text-[0.62rem] tracking-[0.18em] uppercase text-stone hover:text-ivory">{tr("✓ Hecho")}</button>
                       </form>
                     </div>
                   </li>
@@ -74,15 +75,15 @@ export default async function TasksPage({ searchParams }: PageProps<"/admin/tare
               })}
             </ul>
           ) : (
-            <p className="text-sm text-stone">No hay recordatorios pendientes. Se crean desde Telegram (⏰ Recordatorios) o en la ficha de cada cliente.</p>
+            <p className="text-sm text-stone">{tr("No hay recordatorios pendientes. Se crean desde Telegram (⏰ Recordatorios) o en la ficha de cada cliente.")}</p>
           )}
         </Card>
 
         <Card title={view === "all" ? `Todas las tareas · ${tasks.length}` : `Mis tareas · ${tasks.length}`}>
           {manager && (
             <div className="mb-4 flex gap-3 text-[0.62rem] tracking-[0.18em] uppercase">
-              <Link href="/admin/tareas" className={view === "mine" ? "text-brass" : "text-stone hover:text-ivory"}>Mías</Link>
-              <Link href="/admin/tareas?ver=todas" className={view === "all" ? "text-brass" : "text-stone hover:text-ivory"}>De todo el equipo</Link>
+              <Link href="/admin/tareas" className={view === "mine" ? "text-brass" : "text-stone hover:text-ivory"}>{tr("Mías")}</Link>
+              <Link href="/admin/tareas?ver=todas" className={view === "all" ? "text-brass" : "text-stone hover:text-ivory"}>{tr("De todo el equipo")}</Link>
             </div>
           )}
           {tasks.length ? (
@@ -94,57 +95,57 @@ export default async function TasksPage({ searchParams }: PageProps<"/admin/tare
                     <div className="min-w-0 text-sm">
                       <p>{t.title}</p>
                       <p className={`text-xs ${late ? "text-red-200" : "text-stone"}`}>
-                        {t.due_date ? `${late ? "Vencida · " : ""}${fmtDate(`${t.due_date}T12:00:00`)}` : "Sin fecha"}
+                        {t.due_date ? `${late ? tr("Vencida · ") : ""}${fmtDate(`${t.due_date}T12:00:00`)}` : tr("Sin fecha")}
                         {view === "all" && ` · ${name(t.assignee)}`}
                         {t.created_by && t.created_by !== t.assignee && ` · de ${name(t.created_by)}`}
                       </p>
                       {t.notes && <p className="mt-1 text-xs text-stone">{t.notes}</p>}
                       <div className="mt-1 flex flex-wrap gap-3 text-xs">
-                        {t.customer_id && <Link href={`/admin/leads/${t.customer_id}`} className="text-brass hover:text-ivory">👤 {customerName.get(t.customer_id) ?? "Cliente"}</Link>}
-                        {t.item_id && <Link href={`/admin/inventario/${t.item_id}`} className="text-brass hover:text-ivory">⌚ {itemName.get(t.item_id) ?? "Reloj"}</Link>}
+                        {t.customer_id && <Link href={`/admin/leads/${t.customer_id}`} className="text-brass hover:text-ivory">👤 {customerName.get(t.customer_id) ?? tr("Cliente")}</Link>}
+                        {t.item_id && <Link href={`/admin/inventario/${t.item_id}`} className="text-brass hover:text-ivory">⌚ {itemName.get(t.item_id) ?? tr("Reloj")}</Link>}
                       </div>
                     </div>
                     <form action={completeStaffTaskAction.bind(null, t.id)}>
-                      <button className="whitespace-nowrap border border-line px-3 py-1.5 text-[0.62rem] tracking-[0.18em] uppercase text-stone hover:text-ivory">✓ Hecha</button>
+                      <button className="whitespace-nowrap border border-line px-3 py-1.5 text-[0.62rem] tracking-[0.18em] uppercase text-stone hover:text-ivory">{tr("✓ Hecha")}</button>
                     </form>
                   </li>
                 );
               })}
             </ul>
           ) : (
-            <p className="text-sm text-stone">Nada pendiente. 🎉</p>
+            <p className="text-sm text-stone">{tr("Nada pendiente. 🎉")}</p>
           )}
         </Card>
 
         <Card title="Nueva tarea">
           <form action={createStaffTask} className="grid gap-4">
-            <label><span className={labelClass}>Qué hay que hacer *</span><input name="title" required placeholder="Llamar a Juan para la cita del viernes" className={fieldClass} /></label>
+            <label><span className={labelClass}>{tr("Qué hay que hacer *")}</span><input name="title" required placeholder={tr("Llamar a Juan para la cita del viernes")} className={fieldClass} /></label>
             <div className="grid gap-4 sm:grid-cols-2">
               <label>
-                <span className={labelClass}>Para</span>
+                <span className={labelClass}>{tr("Para")}</span>
                 <select name="assignee" defaultValue={user.email} className={fieldClass}>
-                  {members.map((m) => <option key={m.email} value={m.email}>{m.name ?? m.email}{m.email === user.email ? " (yo)" : ""}</option>)}
+                  {members.map((m) => <option key={m.email} value={m.email}>{m.name ?? m.email}{m.email === user.email ? tr(" (yo)") : ""}</option>)}
                 </select>
               </label>
-              <label><span className={labelClass}>Para cuándo</span><input name="due_date" type="date" defaultValue={today} className={fieldClass} /></label>
+              <label><span className={labelClass}>{tr("Para cuándo")}</span><input name="due_date" type="date" defaultValue={today} className={fieldClass} /></label>
               <label>
-                <span className={labelClass}>Cliente (opcional)</span>
+                <span className={labelClass}>{tr("Cliente (opcional)")}</span>
                 <select name="customer_id" defaultValue={typeof sp.cliente === "string" ? sp.cliente : ""} className={fieldClass}>
                   <option value="">—</option>
-                  {(customers.data ?? []).map((c) => <option key={c.id} value={c.id}>{c.name ?? "Sin nombre"}</option>)}
+                  {(customers.data ?? []).map((c) => <option key={c.id} value={c.id}>{c.name ?? tr("Sin nombre")}</option>)}
                 </select>
               </label>
               <label>
-                <span className={labelClass}>Reloj (opcional)</span>
+                <span className={labelClass}>{tr("Reloj (opcional)")}</span>
                 <select name="item_id" defaultValue={typeof sp.reloj === "string" ? sp.reloj : ""} className={fieldClass}>
                   <option value="">—</option>
                   {(items.data ?? []).map((i) => <option key={i.id} value={i.id}>{i.sku} · {i.brand} {i.model ?? ""}</option>)}
                 </select>
               </label>
             </div>
-            <label><span className={labelClass}>Notas</span><textarea name="notes" rows={2} className={fieldClass} /></label>
-            <button className={`${buttonClass} justify-self-start`}>Crear tarea</button>
-            <p className="text-xs text-stone">Si la persona tiene su ID de Telegram en Usuarios, le llega el aviso con un botón para marcarla hecha.</p>
+            <label><span className={labelClass}>{tr("Notas")}</span><textarea name="notes" rows={2} className={fieldClass} /></label>
+            <button className={`${buttonClass} justify-self-start`}>{tr("Crear tarea")}</button>
+            <p className="text-xs text-stone">{tr("Si la persona tiene su ID de Telegram en Usuarios, le llega el aviso con un botón para marcarla hecha.")}</p>
           </form>
         </Card>
       </div>

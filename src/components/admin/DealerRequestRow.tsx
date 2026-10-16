@@ -1,3 +1,4 @@
+import { tr } from "@/lib/admin-i18n";
 import { answerDealerAction } from "@/app/admin/actions";
 import { dealerMessage, REQUEST_STATUS, waLink, type Dealer, type DealerRequest } from "@/lib/dealers";
 
@@ -13,18 +14,18 @@ export function DealerRequestRow({ r, dealer, title }: { r: DealerRequest; deale
         <p className="truncate">
           {title}{" "}
           <span className={`text-xs ${r.status === "no" ? "text-stone" : r.status === "asked" ? "text-amber-200" : "text-emerald-200"}`}>
-            · {REQUEST_STATUS[r.status]}{r.price ? ` · ${money(r.price)}` : ""}
+            · {tr(REQUEST_STATUS[r.status])}{r.price ? ` · ${money(r.price)}` : ""}
           </span>
         </p>
         {r.note && <p className="text-xs text-stone">{r.note}</p>}
       </div>
       <div className="flex flex-wrap items-center gap-1.5">
-        {wa && <a href={wa} target="_blank" rel="noreferrer" className={`${btn} border-emerald-300/40 text-emerald-200 hover:bg-emerald-300/10`}>📲 WhatsApp</a>}
+        {wa && <a href={wa} target="_blank" rel="noreferrer" className={`${btn} border-emerald-300/40 text-emerald-200 hover:bg-emerald-300/10`}>{tr("📲 WhatsApp")}</a>}
         <form action={answerDealerAction.bind(null, r.id)} className="flex items-center gap-1.5">
-          <input name="price" inputMode="decimal" placeholder="Precio $" defaultValue={r.price ?? ""} className="w-24 border border-line bg-ink/60 px-2 py-1 text-xs" />
-          <input name="note" placeholder="Nota (año, set…)" defaultValue={r.note ?? ""} className="w-36 border border-line bg-ink/60 px-2 py-1 text-xs" />
-          <button name="status" value="has" className={`${btn} border-line text-stone hover:text-ivory`}>La tiene</button>
-          <button name="status" value="no" className={`${btn} border-line text-stone hover:text-ivory`}>No</button>
+          <input name="price" inputMode="decimal" placeholder={tr("Precio $")} defaultValue={r.price ?? ""} className="w-24 border border-line bg-ink/60 px-2 py-1 text-xs" />
+          <input name="note" placeholder={tr("Nota (año, set…)")} defaultValue={r.note ?? ""} className="w-36 border border-line bg-ink/60 px-2 py-1 text-xs" />
+          <button name="status" value="has" className={`${btn} border-line text-stone hover:text-ivory`}>{tr("La tiene")}</button>
+          <button name="status" value="no" className={`${btn} border-line text-stone hover:text-ivory`}>{tr("No")}</button>
         </form>
       </div>
     </li>

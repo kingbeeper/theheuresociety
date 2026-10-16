@@ -1,3 +1,4 @@
+import { tr } from "@/lib/admin-i18n";
 import Link from "next/link";
 import { connection } from "next/server";
 import { adminDb } from "@/lib/supabase";
@@ -50,33 +51,33 @@ export default async function ClientsPage({ searchParams }: PageProps<"/admin/cl
       <PageTitle
         eyebrow="CRM"
         title="Clientes"
-        action={<Link href="/admin/leads" className="border border-line px-4 py-2.5 text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">Ver leads →</Link>}
+        action={<Link href="/admin/leads" className="border border-line px-4 py-2.5 text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">{tr("Ver leads →")}</Link>}
       />
       <p className="mb-5 max-w-3xl text-sm text-stone">
-        Quien ya hizo negocio contigo: te compró, te vendió o consignó un reloj, o lo marcaste como <b>Ganado</b>. Un lead pasa aquí solo cuando compra. Los prospectos están en <Link href="/admin/leads" className="underline hover:text-ivory">Leads</Link> y los dealers en <Link href="/admin/dealers?ver=dealers" className="underline hover:text-ivory">Dealers</Link>.
+        {tr("Quien ya hizo negocio contigo: te compró, te vendió o consignó un reloj, o lo marcaste como")} <b>{tr("Ganado")}</b>{tr(". Un lead pasa aquí solo cuando compra. Los prospectos están en")} <Link href="/admin/leads" className="underline hover:text-ivory">{tr("Leads")}</Link> {tr("y los dealers en")} <Link href="/admin/dealers?ver=dealers" className="underline hover:text-ivory">{tr("Dealers")}</Link>.
       </p>
 
       <div className="mb-6 grid grid-cols-3 gap-3 md:max-w-xl">
-        <div className="border border-line px-4 py-3"><p className="text-[0.6rem] tracking-[0.2em] uppercase text-stone">Clientes</p><p className="mt-1 text-xl">{all.length}</p></div>
-        <div className="border border-line px-4 py-3"><p className="text-[0.6rem] tracking-[0.2em] uppercase text-stone">⭐ VIP</p><p className="mt-1 text-xl">{vips}</p></div>
-        <div className="border border-line px-4 py-3"><p className="text-[0.6rem] tracking-[0.2em] uppercase text-stone">Han comprado</p><p className="mt-1 text-xl">{money(total)}</p></div>
+        <div className="border border-line px-4 py-3"><p className="text-[0.6rem] tracking-[0.2em] uppercase text-stone">{tr("Clientes")}</p><p className="mt-1 text-xl">{all.length}</p></div>
+        <div className="border border-line px-4 py-3"><p className="text-[0.6rem] tracking-[0.2em] uppercase text-stone">{tr("⭐ VIP")}</p><p className="mt-1 text-xl">{vips}</p></div>
+        <div className="border border-line px-4 py-3"><p className="text-[0.6rem] tracking-[0.2em] uppercase text-stone">{tr("Han comprado")}</p><p className="mt-1 text-xl">{money(total)}</p></div>
       </div>
 
       <form className="mb-6 flex flex-wrap gap-3" action="/admin/clientes">
         {tag && <input type="hidden" name="etiqueta" value={tag} />}
         {vipOnly && <input type="hidden" name="vip" value="1" />}
-        <input name="q" defaultValue={q} placeholder="Buscar nombre, teléfono, correo o interés…" className={`${fieldClass} max-w-md flex-1`} />
+        <input name="q" defaultValue={q} placeholder={tr("Buscar nombre, teléfono, correo o interés…")} className={`${fieldClass} max-w-md flex-1`} />
         <select name="orden" defaultValue={order} className={`${fieldClass} w-auto`}>
-          <option value="gasto">Más compras ($)</option>
-          <option value="reciente">Compra más reciente</option>
-          <option value="nombre">Nombre (A–Z)</option>
+          <option value="gasto">{tr("Más compras ($)")}</option>
+          <option value="reciente">{tr("Compra más reciente")}</option>
+          <option value="nombre">{tr("Nombre (A–Z)")}</option>
         </select>
-        <button className="border border-line px-4 text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">Filtrar</button>
-        <Link href={qs({ vip: vipOnly ? "" : "1" })} className={chip(vipOnly)}>⭐ VIP</Link>
+        <button className="border border-line px-4 text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">{tr("Filtrar")}</button>
+        <Link href={qs({ vip: vipOnly ? "" : "1" })} className={chip(vipOnly)}>{tr("⭐ VIP")}</Link>
         {CUSTOMER_TAGS.filter((t) => t !== "Dealer").map((t) => (
           <Link key={t} href={qs({ etiqueta: tag === t ? "" : t })} className={chip(tag === t)}>{t}</Link>
         ))}
-        {(q || tag || vipOnly) && <Link href="/admin/clientes" className="self-center text-xs text-stone underline hover:text-ivory">Quitar filtros</Link>}
+        {(q || tag || vipOnly) && <Link href="/admin/clientes" className="self-center text-xs text-stone underline hover:text-ivory">{tr("Quitar filtros")}</Link>}
       </form>
 
       {rows.length ? (
@@ -84,12 +85,12 @@ export default async function ClientsPage({ searchParams }: PageProps<"/admin/cl
           <table className="w-full min-w-[760px] text-sm">
             <thead className="bg-forest text-left text-[0.62rem] tracking-[0.2em] uppercase text-stone">
               <tr>
-                <th className="px-4 py-3 font-normal">Cliente</th>
-                <th className="px-4 py-3 font-normal">Etiquetas</th>
-                <th className="px-4 py-3 text-right font-normal">Compras</th>
-                <th className="px-4 py-3 font-normal">Última compra</th>
-                <th className="px-4 py-3 text-right font-normal">Nos vendió / consignó</th>
-                <th className="px-4 py-3 font-normal">Actividad</th>
+                <th className="px-4 py-3 font-normal">{tr("Cliente")}</th>
+                <th className="px-4 py-3 font-normal">{tr("Etiquetas")}</th>
+                <th className="px-4 py-3 text-right font-normal">{tr("Compras")}</th>
+                <th className="px-4 py-3 font-normal">{tr("Última compra")}</th>
+                <th className="px-4 py-3 text-right font-normal">{tr("Nos vendió / consignó")}</th>
+                <th className="px-4 py-3 font-normal">{tr("Actividad")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-line/60">
@@ -98,7 +99,7 @@ export default async function ClientsPage({ searchParams }: PageProps<"/admin/cl
                 return (
                   <tr key={c.id} className="hover:bg-forest/60">
                     <td className="px-4 py-3">
-                      <Link href={`/admin/leads/${c.id}`} className="hover:text-brass">{x?.vip ? "⭐ " : ""}{c.name ?? "Sin nombre"}</Link>
+                      <Link href={`/admin/leads/${c.id}`} className="hover:text-brass">{x?.vip ? "⭐ " : ""}{c.name ?? tr("Sin nombre")}</Link>
                       <p className="text-xs text-stone">{[c.phone, c.email].filter(Boolean).join(" · ")}</p>
                     </td>
                     <td className="px-4 py-3 text-xs text-stone">{c.tags?.length ? c.tags.join(", ") : "—"}</td>
@@ -113,7 +114,7 @@ export default async function ClientsPage({ searchParams }: PageProps<"/admin/cl
           </table>
         </div>
       ) : (
-        <p className="border border-line bg-forest/60 p-8 text-center text-sm text-stone">{all.length ? "Ningún cliente coincide con estos filtros." : "Todavía no hay clientes: aparecen aquí cuando vendes un reloj a alguien (o lo marcas como Ganado)."}</p>
+        <p className="border border-line bg-forest/60 p-8 text-center text-sm text-stone">{all.length ? tr("Ningún cliente coincide con estos filtros.") : tr("Todavía no hay clientes: aparecen aquí cuando vendes un reloj a alguien (o lo marcas como Ganado).")}</p>
       )}
     </>
   );

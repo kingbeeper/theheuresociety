@@ -1,3 +1,4 @@
+import { tr } from "@/lib/admin-i18n";
 import { connection } from "next/server";
 import { requireUser } from "@/lib/admin-auth";
 import { can, ROLE_LABEL, SECTIONS, type Section } from "@/lib/crm-perms";
@@ -26,8 +27,8 @@ export default async function AccountPage({ searchParams }: PageProps<"/admin/cu
         </Card>
         <Card title="Acceso">
           <p className="text-sm">{user.name ?? user.email}</p>
-          <p className="text-xs text-stone">{user.email} · {ROLE_LABEL[user.role]}</p>
-          {mine && mine.total > 0 && <p className="mt-4 text-sm">💰 Comisiones de este mes: <b>{money(mine.total)}</b> ({mine.sales.length} venta/s)</p>}
+          <p className="text-xs text-stone">{user.email} · {tr(ROLE_LABEL[user.role])}</p>
+          {mine && mine.total > 0 && <p className="mt-4 text-sm">{tr("💰 Comisiones de este mes:")} <b>{money(mine.total)}</b> ({mine.sales.length} {tr("venta/s)")}</p>}
           <ul className="mt-4 space-y-1 text-sm text-stone">
             {sections.map((s) => <li key={s}>✓ {SECTIONS[s]}</li>)}
           </ul>

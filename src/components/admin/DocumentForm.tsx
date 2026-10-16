@@ -1,5 +1,7 @@
 "use client";
 
+
+import { useTr } from "@/components/admin/AdminLang";
 import { useActionState, useState } from "react";
 import { closeProformaAction, convertSourcing, markDepositReceived, markPaid, proformaPaymentAction, saveDocument } from "@/app/admin/document-actions";
 import { ID_TYPES, KIND_LABEL, depositPct, docTotals, suggestedDeposit, usd, type Doc, type DocKind, type DocLine } from "@/lib/doc-labels";
@@ -32,6 +34,7 @@ export function DocumentForm({
   presetCustomer?: string;
   presetItem?: string;
 }) {
+  const tr = useTr();
   const [state, action, pending] = useActionState(saveDocument.bind(null, doc?.id ?? null), null);
   const [kind, setKind] = useState<DocKind>(doc?.kind ?? initialKind);
   const preset = customers.find((c) => c.id === (doc?.customer_id ?? presetCustomer));
@@ -79,77 +82,77 @@ export function DocumentForm({
 
       <div className="grid gap-4 sm:grid-cols-4">
         <label>
-          <span className={label}>Tipo</span>
+          <span className={label}>{tr("Tipo")}</span>
           <select name="kind" value={kind} onChange={(e) => changeKind(e.target.value as DocKind)} disabled={Boolean(doc)} className={field}>
-            {Object.entries(KIND_LABEL).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+            {Object.entries(KIND_LABEL).map(([k, l]) => <option key={k} value={k}>{tr(l)}</option>)}
           </select>
           {doc && <input type="hidden" name="kind" value={kind} />}
         </label>
-        <label><span className={label}>Fecha</span><input name="issue_date" type="date" defaultValue={doc?.issue_date ?? today} className={field} /></label>
+        <label><span className={label}>{tr("Fecha")}</span><input name="issue_date" type="date" defaultValue={doc?.issue_date ?? today} className={field} /></label>
         {kind !== "purchase" ? (
           <label>
-            <span className={label}>{kind === "quote" ? "Válida hasta" : kind === "memo" ? "Devolver antes de" : kind === "consignment" ? "Vigente hasta" : sourcing ? "Plazo de búsqueda hasta" : kind === "proforma" ? "Saldar antes de" : "Vence"}</span>
+            <span className={label}>{kind === "quote" ? tr("Válida hasta") : kind === "memo" ? tr("Devolver antes de") : kind === "consignment" ? tr("Vigente hasta") : sourcing ? tr("Plazo de búsqueda hasta") : kind === "proforma" ? tr("Saldar antes de") : tr("Vence")}</span>
             <input name="due_date" type="date" value={due} onChange={(e) => setDue(e.target.value)} className={field} />
           </label>
         ) : (
           <div />
         )}
         <label>
-          <span className={label}>Idioma del documento</span>
+          <span className={label}>{tr("Idioma del documento")}</span>
           <select name="lang" defaultValue={doc?.lang ?? "en"} className={field}>
-            <option value="en">Inglés</option>
-            <option value="es">Español</option>
+            <option value="en">{tr("Inglés")}</option>
+            <option value="es">{tr("Español")}</option>
           </select>
         </label>
       </div>
 
       <div className="grid gap-4">
-        <p className={section}>{kind === "consignment" ? "Consignante (dueño del reloj)" : kind === "purchase" ? "Vendedor" : "Cliente"}</p>
+        <p className={section}>{kind === "consignment" ? tr("Consignante (dueño del reloj)") : kind === "purchase" ? tr("Vendedor") : tr("Cliente")}</p>
         <label>
-          <span className={label}>Cliente del CRM</span>
+          <span className={label}>{tr("Cliente del CRM")}</span>
           <select name="customer_id" value={customer} onChange={(e) => pickCustomer(e.target.value)} className={field}>
-            <option value="">— Cliente nuevo (se crea en el CRM) —</option>
-            {customers.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+            <option value="">{tr("— Cliente nuevo (se crea en el CRM) —")}</option>
+            {customers.map((c) => <option key={c.id} value={c.id}>{tr(c.label)}</option>)}
           </select>
         </label>
         <div className="grid gap-4 sm:grid-cols-3">
-          <label><span className={label}>Nombre *</span><input name="client_name" value={client.client_name} onChange={(e) => setClient({ ...client, client_name: e.target.value })} required className={field} /></label>
-          <label><span className={label}>Empresa</span><input name="client_company" defaultValue={doc?.client_company ?? ""} className={field} /></label>
-          <label><span className={label}>Teléfono</span><input name="client_phone" value={client.client_phone} onChange={(e) => setClient({ ...client, client_phone: e.target.value })} className={field} /></label>
-          <label><span className={label}>Correo</span><input name="client_email" type="email" value={client.client_email} onChange={(e) => setClient({ ...client, client_email: e.target.value })} className={field} /></label>
-          <label className="sm:col-span-2"><span className={label}>Dirección</span><input name="client_address" defaultValue={doc?.client_address ?? ""} placeholder="Calle, ciudad, estado, código postal" className={field} /></label>
+          <label><span className={label}>{tr("Nombre *")}</span><input name="client_name" value={client.client_name} onChange={(e) => setClient({ ...client, client_name: e.target.value })} required className={field} /></label>
+          <label><span className={label}>{tr("Empresa")}</span><input name="client_company" defaultValue={doc?.client_company ?? ""} className={field} /></label>
+          <label><span className={label}>{tr("Teléfono")}</span><input name="client_phone" value={client.client_phone} onChange={(e) => setClient({ ...client, client_phone: e.target.value })} className={field} /></label>
+          <label><span className={label}>{tr("Correo")}</span><input name="client_email" type="email" value={client.client_email} onChange={(e) => setClient({ ...client, client_email: e.target.value })} className={field} /></label>
+          <label className="sm:col-span-2"><span className={label}>{tr("Dirección")}</span><input name="client_address" defaultValue={doc?.client_address ?? ""} placeholder={tr("Calle, ciudad, estado, código postal")} className={field} /></label>
         </div>
       </div>
 
       <div className="grid gap-3">
-        <p className={section}>{sourcing ? "Reloj que busca el cliente" : "Relojes y conceptos"}</p>
-        {sourcing && <p className="text-xs text-stone">Describe el reloj (marca, modelo y referencia) y en el detalle la esfera, el año mínimo, si tiene que traer caja y papeles y el estado. El precio es el <b>máximo acordado</b> con el cliente.</p>}
+        <p className={section}>{sourcing ? tr("Reloj que busca el cliente") : tr("Relojes y conceptos")}</p>
+        {sourcing && <p className="text-xs text-stone">{tr("Describe el reloj (marca, modelo y referencia) y en el detalle la esfera, el año mínimo, si tiene que traer caja y papeles y el estado. El precio es el")} <b>{tr("máximo acordado")}</b> {tr("con el cliente.")}</p>}
         {kind === "purchase" && (
           <div className="grid gap-4 sm:grid-cols-3">
             <label>
-              <span className={label}>Identificación</span>
+              <span className={label}>{tr("Identificación")}</span>
               <select name="seller_id_type" defaultValue={doc?.seller_id_type ?? "Driver's license"} className={field}>
-                {ID_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                {ID_TYPES.map((t) => <option key={t} value={t}>{tr(t)}</option>)}
               </select>
             </label>
-            <label><span className={label}>Número</span><input name="seller_id_number" defaultValue={doc?.seller_id_number ?? ""} autoComplete="off" className={field} /></label>
-            <label><span className={label}>Fecha de nacimiento</span><input name="seller_dob" type="date" defaultValue={doc?.seller_dob ?? ""} className={field} /></label>
-            <p className="text-xs text-stone sm:col-span-3">El número completo y la fecha de nacimiento quedan solo en el CRM; el documento muestra los 4 últimos caracteres.</p>
+            <label><span className={label}>{tr("Número")}</span><input name="seller_id_number" defaultValue={doc?.seller_id_number ?? ""} autoComplete="off" className={field} /></label>
+            <label><span className={label}>{tr("Fecha de nacimiento")}</span><input name="seller_dob" type="date" defaultValue={doc?.seller_dob ?? ""} className={field} /></label>
+            <p className="text-xs text-stone sm:col-span-3">{tr("El número completo y la fecha de nacimiento quedan solo en el CRM; el documento muestra los 4 últimos caracteres.")}</p>
           </div>
         )}
-        {kind === "purchase" && <p className="text-xs text-stone">El precio de cada línea es lo que <b>pagamos al vendedor</b>.</p>}
-        {kind === "consignment" && <p className="text-xs text-stone">El precio de cada línea es el <b>neto al dueño</b>: lo que le pagaremos cuando se venda.</p>}
+        {kind === "purchase" && <p className="text-xs text-stone">{tr("El precio de cada línea es lo que")} <b>{tr("pagamos al vendedor")}</b>.</p>}
+        {kind === "consignment" && <p className="text-xs text-stone">{tr("El precio de cada línea es el")} <b>{tr("neto al dueño")}</b>{tr(": lo que le pagaremos cuando se venda.")}</p>}
         {lines.map((l, i) => (
           <div key={i} className="grid gap-2 border border-line/70 p-3 sm:grid-cols-[1.4fr_1fr_0.8fr_70px_130px_auto] sm:items-start">
             <div>
-              <input value={l.title} onChange={(e) => update(i, { title: e.target.value })} placeholder="Rolex Daytona 126500LN" className={small} />
-              {l.sku && <p className="mt-1 text-[0.66rem] text-stone">Inventario {l.sku}</p>}
+              <input value={l.title} onChange={(e) => update(i, { title: e.target.value })} placeholder={tr("Rolex Daytona 126500LN")} className={small} />
+              {l.sku && <p className="mt-1 text-[0.66rem] text-stone">{tr("Inventario")} {l.sku}</p>}
             </div>
-            <input value={l.details ?? ""} onChange={(e) => update(i, { details: e.target.value })} placeholder="Año, caja y papeles…" className={small} />
-            <input value={l.serial ?? ""} onChange={(e) => update(i, { serial: e.target.value })} placeholder="Serial" className={small} />
-            <input value={l.qty} onChange={(e) => update(i, { qty: Number(e.target.value) || 1 })} inputMode="numeric" aria-label="Cantidad" className={small} />
-            <input value={l.price} onChange={(e) => update(i, { price: Number(e.target.value.replace(/[^\d.]/g, "")) || 0 })} inputMode="decimal" aria-label="Precio" className={small} />
-            <button type="button" onClick={() => setLines(lines.filter((_, j) => j !== i))} className="px-2 py-2 text-xs text-stone hover:text-red-200" aria-label="Quitar">✕</button>
+            <input value={l.details ?? ""} onChange={(e) => update(i, { details: e.target.value })} placeholder={tr("Año, caja y papeles…")} className={small} />
+            <input value={l.serial ?? ""} onChange={(e) => update(i, { serial: e.target.value })} placeholder={tr("Serial")} className={small} />
+            <input value={l.qty} onChange={(e) => update(i, { qty: Number(e.target.value) || 1 })} inputMode="numeric" aria-label={tr("Cantidad")} className={small} />
+            <input value={l.price} onChange={(e) => update(i, { price: Number(e.target.value.replace(/[^\d.]/g, "")) || 0 })} inputMode="decimal" aria-label={tr("Precio")} className={small} />
+            <button type="button" onClick={() => setLines(lines.filter((_, j) => j !== i))} className="px-2 py-2 text-xs text-stone hover:text-red-200" aria-label={tr("Quitar")}>✕</button>
             <div className="sm:col-span-6"><SerialWarning value={l.serial} itemId={l.item_id} docId={doc?.id} /></div>
           </div>
         ))}
@@ -162,81 +165,82 @@ export function DocumentForm({
             }}
             className={`${field} w-auto max-w-full`}
           >
-            <option value="">+ Añadir reloj del inventario…</option>
+            <option value="">{tr("+ Añadir reloj del inventario…")}</option>
             {stock.filter((s) => !used.has(s.id)).map((s) => <option key={s.id} value={s.id}>{s.sku} · {s.title}{s.price ? ` · ${usd(s.price)}` : ""}</option>)}
           </select>
           <button type="button" onClick={() => setLines([...lines, { title: "", qty: 1, price: 0 }])} className="border border-line px-4 py-2 text-[0.66rem] tracking-[0.18em] uppercase text-stone hover:text-ivory">
-            + Línea libre
+            {tr("+ Línea libre")}
           </button>
         </div>
         <label className="flex items-center gap-2 text-sm text-stone">
-          <input name="show_serial" type="checkbox" defaultChecked={doc?.show_serial ?? kind !== "quote"} className="h-4 w-4" /> Mostrar el número de serie en el documento
+          <input name="show_serial" type="checkbox" defaultChecked={doc?.show_serial ?? kind !== "quote"} className="h-4 w-4" /> {tr("Mostrar el número de serie en el documento")}
         </label>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-[1fr_320px]">
         <div className="grid gap-4">
           <label>
-            <span className={label}>Forma de pago</span>
+            <span className={label}>{tr("Forma de pago")}</span>
             <select name="payment_method" defaultValue={doc?.payment_method ?? ""} className={field}>
               <option value="">—</option>
-              {Object.values(PAYMENT).map((p) => <option key={p} value={p}>{p}</option>)}
+              {Object.values(PAYMENT).map((p) => <option key={p} value={p}>{tr(p)}</option>)}
             </select>
           </label>
-          <label><span className={label}>Notas (salen en el documento)</span><textarea name="notes" rows={2} defaultValue={doc?.notes ?? ""} className={field} /></label>
-          <label><span className={label}>Términos</span><textarea name="terms" rows={4} value={termsText} onChange={(e) => setTermsText(e.target.value)} className={field} /></label>
+          <label><span className={label}>{tr("Notas (salen en el documento)")}</span><textarea name="notes" rows={2} defaultValue={doc?.notes ?? ""} className={field} /></label>
+          <label><span className={label}>{tr("Términos")}</span><textarea name="terms" rows={4} value={termsText} onChange={(e) => setTermsText(e.target.value)} className={field} /></label>
         </div>
         {sourcing ? (
           <div className="grid content-start gap-3 border border-line/70 p-4 text-sm">
             <input type="hidden" name="discount" value="0" />
             <input type="hidden" name="tax_rate" value="0" />
             <input type="hidden" name="shipping" value="0" />
-            <p className="flex justify-between font-display text-xl"><span>Precio hasta</span><span className="tabular-nums">{usd(totals.total)}</span></p>
-            <label className="flex items-center justify-between gap-3"><span className="text-stone">Anticipo $</span><input name="deposit" value={deposit} onChange={(e) => setDeposit(e.target.value)} placeholder={String(suggested || "")} inputMode="decimal" className={`${small} w-32 text-right`} /></label>
+            <p className="flex justify-between font-display text-xl"><span>{tr("Precio hasta")}</span><span className="tabular-nums">{usd(totals.total)}</span></p>
+            <label className="flex items-center justify-between gap-3"><span className="text-stone">{tr("Anticipo $")}</span><input name="deposit" value={deposit} onChange={(e) => setDeposit(e.target.value)} placeholder={String(suggested || "")} inputMode="decimal" className={`${small} w-32 text-right`} /></label>
             {suggested > 0 && (
               <button type="button" onClick={() => setDeposit(String(suggested))} className="text-left text-xs text-brass hover:text-ivory">
-                Sugerido: {usd(suggested)} ({depositPct(totals.total)} % del precio) · usar
+                {tr("Sugerido:")} {usd(suggested)} ({depositPct(totals.total)} {tr("% del precio) · usar")}
               </button>
             )}
-            <p className="text-[0.7rem] text-stone/80">Hasta $15k: 20 % · hasta $50k: 15 % · hasta $150k: 10 % · más: 8 %. El anticipo se descuenta de la factura al conseguir el reloj y se devuelve íntegro si no se consigue.</p>
+            <p className="text-[0.7rem] text-stone/80">{tr("Hasta $15k: 20 % · hasta $50k: 15 % · hasta $150k: 10 % · más: 8 %. El anticipo se descuenta de la factura al conseguir el reloj y se devuelve íntegro si no se consigue.")}</p>
           </div>
         ) : (
         <div className="grid content-start gap-3 border border-line/70 p-4 text-sm">
-          <p className="flex justify-between"><span className="text-stone">Subtotal</span><span className="tabular-nums">{usd(totals.subtotal)}</span></p>
-          <label className="flex items-center justify-between gap-3"><span className="text-stone">Descuento $</span><input name="discount" value={discount} onChange={(e) => setDiscount(e.target.value)} inputMode="decimal" className={`${small} w-28 text-right`} /></label>
-          <label className="flex items-center justify-between gap-3"><span className="text-stone">Impuesto %</span><input name="tax_rate" value={tax} onChange={(e) => setTax(e.target.value)} inputMode="decimal" className={`${small} w-28 text-right`} /></label>
-          {totals.tax > 0 && <p className="flex justify-between text-xs text-stone"><span>Impuesto</span><span className="tabular-nums">{usd(totals.tax)}</span></p>}
-          <label className="flex items-center justify-between gap-3"><span className="text-stone">Envío y seguro $</span><input name="shipping" value={shipping} onChange={(e) => setShipping(e.target.value)} inputMode="decimal" className={`${small} w-28 text-right`} /></label>
-          <p className="mt-1 flex justify-between border-t border-line pt-3 font-display text-2xl"><span>Total</span><span className="tabular-nums">{usd(totals.total)}</span></p>
-          <p className="text-[0.7rem] text-stone/80">Impuesto 0 si el cliente es dealer con certificado de reventa o el envío es fuera de Florida.</p>
+          <p className="flex justify-between"><span className="text-stone">{tr("Subtotal")}</span><span className="tabular-nums">{usd(totals.subtotal)}</span></p>
+          <label className="flex items-center justify-between gap-3"><span className="text-stone">{tr("Descuento $")}</span><input name="discount" value={discount} onChange={(e) => setDiscount(e.target.value)} inputMode="decimal" className={`${small} w-28 text-right`} /></label>
+          <label className="flex items-center justify-between gap-3"><span className="text-stone">{tr("Impuesto %")}</span><input name="tax_rate" value={tax} onChange={(e) => setTax(e.target.value)} inputMode="decimal" className={`${small} w-28 text-right`} /></label>
+          {totals.tax > 0 && <p className="flex justify-between text-xs text-stone"><span>{tr("Impuesto")}</span><span className="tabular-nums">{usd(totals.tax)}</span></p>}
+          <label className="flex items-center justify-between gap-3"><span className="text-stone">{tr("Envío y seguro $")}</span><input name="shipping" value={shipping} onChange={(e) => setShipping(e.target.value)} inputMode="decimal" className={`${small} w-28 text-right`} /></label>
+          <p className="mt-1 flex justify-between border-t border-line pt-3 font-display text-2xl"><span>{tr("Total")}</span><span className="tabular-nums">{usd(totals.total)}</span></p>
+          <p className="text-[0.7rem] text-stone/80">{tr("Impuesto 0 si el cliente es dealer con certificado de reventa o el envío es fuera de Florida.")}</p>
         </div>
         )}
       </div>
 
       <div className="flex items-center gap-4">
         <button disabled={pending} className="bg-ivory px-5 py-2.5 text-[0.68rem] tracking-[0.22em] uppercase text-ink hover:bg-brass disabled:opacity-60">
-          {pending ? "Guardando…" : doc ? "Guardar cambios" : `Crear ${KIND_LABEL[kind].toLowerCase()}`}
+          {pending ? tr("Guardando…") : doc ? tr("Guardar cambios") : `Crear ${KIND_LABEL[kind].toLowerCase()}`}
         </button>
         {state && "error" in state && <p className="text-sm text-red-200/90">{state.error}</p>}
-        {state && "ok" in state && !pending && <p className="text-sm text-emerald-200/90">Guardado</p>}
+        {state && "ok" in state && !pending && <p className="text-sm text-emerald-200/90">{tr("Guardado")}</p>}
       </div>
     </form>
   );
 }
 
 export function PaidForm({ id, today, method }: { id: string; today: string; method: string | null }) {
+  const tr = useTr();
   const [state, action, pending] = useActionState(markPaid.bind(null, id), null);
   return (
     <form action={action} className="flex flex-wrap items-end gap-3">
-      <label><span className={label}>Fecha de pago</span><input name="paid_at" type="date" defaultValue={today} className={field} /></label>
+      <label><span className={label}>{tr("Fecha de pago")}</span><input name="paid_at" type="date" defaultValue={today} className={field} /></label>
       <label>
-        <span className={label}>Forma de pago</span>
+        <span className={label}>{tr("Forma de pago")}</span>
         <select name="payment_method" defaultValue={method ?? "Transferencia"} className={field}>
-          {Object.values(PAYMENT).map((p) => <option key={p} value={p}>{p}</option>)}
+          {Object.values(PAYMENT).map((p) => <option key={p} value={p}>{tr(p)}</option>)}
         </select>
       </label>
       <button disabled={pending} className="bg-ivory px-5 py-2.5 text-[0.68rem] tracking-[0.22em] uppercase text-ink hover:bg-brass disabled:opacity-60">
-        {pending ? "Guardando…" : "Marcar pagada"}
+        {pending ? tr("Guardando…") : tr("Marcar pagada")}
       </button>
       {state && "error" in state && <p className="text-sm text-red-200/90">{state.error}</p>}
     </form>
@@ -245,18 +249,19 @@ export function PaidForm({ id, today, method }: { id: string; today: string; met
 
 // Encargo: anticipo recibido a mano (efectivo, transferencia, Zelle…)
 export function DepositForm({ id, today }: { id: string; today: string }) {
+  const tr = useTr();
   const [state, action, pending] = useActionState(markDepositReceived.bind(null, id), null);
   return (
     <form action={action} className="flex flex-wrap items-end gap-3">
-      <label><span className={label}>Fecha</span><input name="paid_at" type="date" defaultValue={today} className={field} /></label>
+      <label><span className={label}>{tr("Fecha")}</span><input name="paid_at" type="date" defaultValue={today} className={field} /></label>
       <label>
-        <span className={label}>Forma de pago</span>
+        <span className={label}>{tr("Forma de pago")}</span>
         <select name="payment_method" defaultValue="Transferencia" className={field}>
-          {Object.values(PAYMENT).map((p) => <option key={p} value={p}>{p}</option>)}
+          {Object.values(PAYMENT).map((p) => <option key={p} value={p}>{tr(p)}</option>)}
         </select>
       </label>
       <button disabled={pending} className="bg-ivory px-5 py-2.5 text-[0.68rem] tracking-[0.22em] uppercase text-ink hover:bg-brass disabled:opacity-60">
-        {pending ? "Guardando…" : "Anticipo recibido"}
+        {pending ? tr("Guardando…") : tr("Anticipo recibido")}
       </button>
       {state && "error" in state && <p className="text-sm text-red-200/90">{state.error}</p>}
     </form>
@@ -265,6 +270,7 @@ export function DepositForm({ id, today }: { id: string; today: string }) {
 
 // Encargo conseguido: el reloj (del inventario o el descrito) y el precio final → factura
 export function SourcedForm({ id, stock, price }: { id: string; stock: StockOption[]; price: number }) {
+  const tr = useTr();
   const [state, action, pending] = useActionState(convertSourcing.bind(null, id), null);
   const [final, setFinal] = useState(String(price || ""));
   const [picked, setPicked] = useState("");
@@ -272,22 +278,22 @@ export function SourcedForm({ id, stock, price }: { id: string; stock: StockOpti
   return (
     <form action={action} className="grid gap-3 sm:grid-cols-[1fr_160px_auto] sm:items-end">
       <label>
-        <span className={label}>Reloj conseguido</span>
+        <span className={label}>{tr("Reloj conseguido")}</span>
         <select name="item_id" value={picked} onChange={(e) => { setPicked(e.target.value); const s = stock.find((x) => x.id === e.target.value); if (s?.price) setFinal(String(s.price)); }} className={field}>
-          <option value="">— El descrito en el encargo (aún no está en el inventario) —</option>
+          <option value="">{tr("— El descrito en el encargo (aún no está en el inventario) —")}</option>
           {stock.map((s) => <option key={s.id} value={s.id}>{s.sku} · {s.title}{s.price ? ` · ${usd(s.price)}` : ""}</option>)}
         </select>
       </label>
-      <label><span className={label}>Precio final $</span><input name="price" value={final} onChange={(e) => setFinal(e.target.value)} inputMode="decimal" className={field} /></label>
+      <label><span className={label}>{tr("Precio final $")}</span><input name="price" value={final} onChange={(e) => setFinal(e.target.value)} inputMode="decimal" className={field} /></label>
       {!picked && (
         <div className="sm:col-span-3">
-          <label htmlFor="sourced_serial" className={label}>Serial del reloj conseguido</label>
+          <label htmlFor="sourced_serial" className={label}>{tr("Serial del reloj conseguido")}</label>
           <input id="sourced_serial" name="serial" value={serial} onChange={(e) => setSerial(e.target.value)} autoComplete="off" className={field} />
           <SerialWarning value={serial} />
         </div>
       )}
       <button disabled={pending} className="bg-ivory px-5 py-2.5 text-[0.68rem] tracking-[0.22em] uppercase text-ink hover:bg-brass disabled:opacity-60">
-        {pending ? "Creando…" : "Conseguido: facturar"}
+        {pending ? tr("Creando…") : tr("Conseguido: facturar")}
       </button>
       {state && "error" in state && <p className="text-sm text-red-200/90 sm:col-span-3">{state.error}</p>}
     </form>
@@ -296,38 +302,40 @@ export function SourcedForm({ id, stock, price }: { id: string; stock: StockOpti
 
 // Proforma: depósito a cuenta
 export function ProformaPaymentForm({ id, today }: { id: string; today: string }) {
+  const tr = useTr();
   const [state, action, pending] = useActionState(proformaPaymentAction.bind(null, id), null);
   return (
     <form action={action} className="flex flex-wrap items-end gap-3">
-      <label><span className={label}>Depósito $</span><input name="amount" inputMode="decimal" required className={field} /></label>
-      <label><span className={label}>Fecha</span><input name="paid_at" type="date" defaultValue={today} className={field} /></label>
+      <label><span className={label}>{tr("Depósito $")}</span><input name="amount" inputMode="decimal" required className={field} /></label>
+      <label><span className={label}>{tr("Fecha")}</span><input name="paid_at" type="date" defaultValue={today} className={field} /></label>
       <label>
-        <span className={label}>Forma de pago</span>
+        <span className={label}>{tr("Forma de pago")}</span>
         <select name="payment_method" defaultValue="Transferencia" className={field}>
-          {Object.values(PAYMENT).map((p) => <option key={p} value={p}>{p}</option>)}
+          {Object.values(PAYMENT).map((p) => <option key={p} value={p}>{tr(p)}</option>)}
         </select>
       </label>
-      <button disabled={pending} className="bg-ivory px-5 py-2.5 text-[0.68rem] tracking-[0.22em] uppercase text-ink hover:bg-brass disabled:opacity-60">{pending ? "Guardando…" : "Registrar depósito"}</button>
+      <button disabled={pending} className="bg-ivory px-5 py-2.5 text-[0.68rem] tracking-[0.22em] uppercase text-ink hover:bg-brass disabled:opacity-60">{pending ? tr("Guardando…") : tr("Registrar depósito")}</button>
       {state && "error" in state && <p className="text-sm text-red-200/90">{state.error}</p>}
-      {state && "ok" in state && !pending && <p className="text-sm text-emerald-200/90">Depósito registrado</p>}
+      {state && "ok" in state && !pending && <p className="text-sm text-emerald-200/90">{tr("Depósito registrado")}</p>}
     </form>
   );
 }
 
 // Proforma saldada: el saldo como último pago → factura pagada
 export function CloseProformaForm({ id, today, balance }: { id: string; today: string; balance: number }) {
+  const tr = useTr();
   const [state, action, pending] = useActionState(closeProformaAction.bind(null, id), null);
   return (
     <form action={action} className="flex flex-wrap items-end gap-3">
-      <label><span className={label}>Fecha del pago final</span><input name="paid_at" type="date" defaultValue={today} className={field} /></label>
+      <label><span className={label}>{tr("Fecha del pago final")}</span><input name="paid_at" type="date" defaultValue={today} className={field} /></label>
       <label>
-        <span className={label}>Cómo pagó el saldo</span>
+        <span className={label}>{tr("Cómo pagó el saldo")}</span>
         <select name="payment_method" defaultValue="Transferencia" className={field}>
-          {Object.values(PAYMENT).map((p) => <option key={p} value={p}>{p}</option>)}
+          {Object.values(PAYMENT).map((p) => <option key={p} value={p}>{tr(p)}</option>)}
         </select>
       </label>
       <button disabled={pending} className="bg-ivory px-5 py-2.5 text-[0.68rem] tracking-[0.22em] uppercase text-ink hover:bg-brass disabled:opacity-60">
-        {pending ? "Generando…" : balance > 0 ? `Saldada (${usd(balance)}): generar factura` : "Generar factura"}
+        {pending ? tr("Generando…") : balance > 0 ? `Saldada (${usd(balance)}): generar factura` : tr("Generar factura")}
       </button>
       {state && "error" in state && <p className="text-sm text-red-200/90">{state.error}</p>}
     </form>

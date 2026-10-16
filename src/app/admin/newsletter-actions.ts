@@ -1,5 +1,6 @@
 "use server";
 
+import { tr } from "@/lib/admin-i18n";
 import { requireAdmin } from "@/lib/admin-auth";
 import { audience, defaultIntro, recentWatches, sendNewsletter } from "@/lib/newsletter";
 
@@ -8,7 +9,7 @@ export async function sendNewsletterAction(_: unknown, f: FormData) {
   const user = await requireAdmin("correos");
   const ids = f.getAll("w").map(String);
   const watches = (await recentWatches(60)).filter((w) => ids.includes(w.id));
-  if (!watches.length) return { error: "Elige al menos un reloj." };
+  if (!watches.length) return { error: tr("Elige al menos un reloj.") };
   const subject = { en: String(f.get("subject_en") || "New arrivals · The Heure Society"), es: String(f.get("subject_es") || "Nuevas llegadas · The Heure Society") };
   const intro = { en: String(f.get("intro_en") || defaultIntro(false)), es: String(f.get("intro_es") || defaultIntro(true)) };
   const test = f.get("mode") === "test";
@@ -17,10 +18,10 @@ export async function sendNewsletterAction(_: unknown, f: FormData) {
       await sendNewsletter(watches, [{ id: "prueba", name: "Prueba", email: user, lang: "es" }, { id: "prueba-en", name: "Test", email: user, lang: "en" }], subject, intro, user);
       return { ok: `Prueba enviada a ${user} (en español y en inglés).` };
     }
-    if (f.get("confirm") !== "on") return { error: "Marca la casilla de confirmación para enviar." };
+    if (f.get("confirm") !== "on") return { error: tr("Marca la casilla de confirmación para enviar.") };
     const brands = f.get("marca") === "1" ? [...new Set(watches.map((w) => w.brand))] : null;
     const people = await audience(brands, f.getAll("etiqueta").map(String).filter(Boolean));
-    if (!people.length) return { error: "No hay destinatarios con estos filtros." };
+    if (!people.length) return { error: tr("No hay destinatarios con estos filtros.") };
     const n = await sendNewsletter(watches, people, subject, intro, user);
     return { ok: `Enviado a ${n} cliente(s).` };
   } catch (e) {

@@ -1,3 +1,4 @@
+import { tr } from "@/lib/admin-i18n";
 import Link from "next/link";
 import { connection } from "next/server";
 import { adminDb } from "@/lib/supabase";
@@ -38,7 +39,7 @@ export default async function ComprasPage() {
     <>
       <PageTitle eyebrow="CRM" title="Ofertas de clientes" />
       <p className="mb-5 max-w-3xl text-sm text-stone">
-        Relojes que los clientes te ofrecen para que se los <b>compres</b>, los <b>cambies</b> o los tengas en <b>consignación</b>. Llegan solas desde la web (Sell / Consign), WhatsApp e Instagram/Facebook, y puedes añadir a mano las que te hacen en persona o por teléfono. Al marcar una como «Reloj recibido» entra sola al inventario.
+        {tr("Relojes que los clientes te ofrecen para que se los")} <b>compres</b>{tr(", los")} <b>cambies</b> {tr("o los tengas en")} <b>{tr("consignación")}</b>{tr(". Llegan solas desde la web (Sell / Consign), WhatsApp e Instagram/Facebook, y puedes añadir a mano las que te hacen en persona o por teléfono. Al marcar una como «Reloj recibido» entra sola al inventario.")}
       </p>
       <div className="mb-6"><OfferNew /></div>
       <div className="flex gap-4 overflow-x-auto pb-4">
@@ -47,12 +48,12 @@ export default async function ComprasPage() {
           return (
             <section key={col.key} className="w-[290px] shrink-0">
               <h2 className="mb-3 flex justify-between text-[0.66rem] tracking-[0.22em] uppercase text-stone">
-                {col.label} <span>{items.length}</span>
+                {tr(col.label)} <span>{items.length}</span>
               </h2>
               <div className="space-y-3">
                 {items.map((r) => (
                   <article key={r.id as string} className="border border-line bg-forest/70 p-4 text-sm">
-                    <p className="text-[0.62rem] tracking-[0.2em] uppercase text-brass">{KIND[r.kind as string] ?? r.kind}</p>
+                    <p className="text-[0.62rem] tracking-[0.2em] uppercase text-brass">{tr(KIND[r.kind as string] ?? r.kind)}</p>
                     <p className="mt-1 font-display text-lg leading-tight">{[r.brand, r.model, r.reference].filter(Boolean).join(" ")}</p>
                     <p className="mt-1 text-xs text-stone">
                       {r.customer_id ? (
@@ -64,7 +65,7 @@ export default async function ComprasPage() {
                     </p>
                     {stockOf(r.id as string) && (
                       <Link href={`/admin/inventario/${stockOf(r.id as string)!.id}`} className="mt-2 inline-block text-xs text-emerald-200 hover:text-ivory">
-                        ✓ En inventario · {stockOf(r.id as string)!.sku} →
+                        {tr("✓ En inventario ·")} {stockOf(r.id as string)!.sku} →
                       </Link>
                     )}
                     {stockOf(r.id as string) && r.kind === "consign" && (
@@ -72,11 +73,11 @@ export default async function ComprasPage() {
                         href={`/admin/documentos/nuevo?tipo=consignment&reloj=${stockOf(r.id as string)!.id}${r.customer_id ? `&cliente=${r.customer_id}` : ""}`}
                         className="mt-1 block text-xs text-brass hover:text-ivory"
                       >
-                        + Contrato de consignación →
+                        {tr("+ Contrato de consignación →")}
                       </Link>
                     )}
                     {(r.status ?? "new") === "accepted" && !stockOf(r.id as string) && (
-                      <p className="mt-2 text-xs text-stone">Al marcarlo «Reloj recibido» entrará solo al inventario.</p>
+                      <p className="mt-2 text-xs text-stone">{tr("Al marcarlo «Reloj recibido» entrará solo al inventario.")}</p>
                     )}
                     {Boolean(r.message) && <p className="mt-2 line-clamp-4 whitespace-pre-wrap text-xs text-stone">{r.message as string}</p>}
                     {(r.image_paths as string[])?.length > 0 && (
@@ -93,12 +94,12 @@ export default async function ComprasPage() {
                     <form action={updateSellRequest.bind(null, r.id as string)} className="mt-3 grid gap-2">
                       <div className="grid grid-cols-2 gap-2">
                         <select name="status" defaultValue={(r.status as string) ?? "new"} className={`${fieldClass} px-2 py-2 text-xs`}>
-                          {COLUMNS.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
+                          {COLUMNS.map((c) => <option key={c.key} value={c.key}>{tr(c.label)}</option>)}
                         </select>
-                        <input name="offer" defaultValue={(r.offer_amount as number | null) ?? ""} placeholder="Oferta USD" inputMode="numeric" className={`${fieldClass} px-2 py-2 text-xs`} />
+                        <input name="offer" defaultValue={(r.offer_amount as number | null) ?? ""} placeholder={tr("Oferta USD")} inputMode="numeric" className={`${fieldClass} px-2 py-2 text-xs`} />
                       </div>
-                      <input name="notes" defaultValue={(r.notes as string | null) ?? ""} placeholder="Notas internas" className={`${fieldClass} px-2 py-2 text-xs`} />
-                      <button className="border border-line py-1.5 text-[0.62rem] tracking-[0.2em] uppercase text-stone hover:border-ivory/40 hover:text-ivory">Guardar</button>
+                      <input name="notes" defaultValue={(r.notes as string | null) ?? ""} placeholder={tr("Notas internas")} className={`${fieldClass} px-2 py-2 text-xs`} />
+                      <button className="border border-line py-1.5 text-[0.62rem] tracking-[0.2em] uppercase text-stone hover:border-ivory/40 hover:text-ivory">{tr("Guardar")}</button>
                     </form>
                   </article>
                 ))}
@@ -127,35 +128,35 @@ function OfferMarket({ r }: { r: Record<string, unknown> }) {
       {typical || low || high ? (
         <>
           <p className="text-stone">
-            Mercado: <span className="text-ivory">{low ? usd(low) : "?"} – {high ? usd(high) : "?"}</span>
-            {typical ? <> · típico <span className="text-ivory">{usd(typical)}</span></> : null}
+            {tr("Mercado:")} <span className="text-ivory">{low ? usd(low) : "?"} – {high ? usd(high) : "?"}</span>
+            {typical ? <> {tr("· típico")} <span className="text-ivory">{usd(typical)}</span></> : null}
             {r.market_listings ? ` · ${r.market_listings} anuncios` : ""}
           </p>
           {s?.kind === "buy" && (
-            <p className="mt-1 text-emerald-200">Ofrecer: {s.offers.map((o) => `${usd(o.amount)} (${Math.round(o.margin * 100)}%)`).join(" · ")}</p>
+            <p className="mt-1 text-emerald-200">{tr("Ofrecer:")} {s.offers.map((o) => `${usd(o.amount)} (${Math.round(o.margin * 100)}%)`).join(" · ")}</p>
           )}
           {s?.kind === "consign" && (
-            <p className="mt-1 text-emerald-200">Venderlo a ≈ {usd(s.sellAt)} · al dueño ≈ {usd(s.owner)} (15% para ti)</p>
+            <p className="mt-1 text-emerald-200">{tr("Venderlo a ≈")} {usd(s.sellAt)} {tr("· al dueño ≈")} {usd(s.owner)} {tr("(15% para ti)")}</p>
           )}
           {asking && typical ? (
             <p className={`mt-1 ${asking > typical * 0.9 ? "text-amber-200" : "text-stone"}`}>
-              Pide {usd(asking)}: {r.kind === "consign" ? `${asking > typical ? "por encima" : "por debajo"} del mercado` : `te dejaría ${Math.round(((typical - asking) / typical) * 100)}% de margen`}
+              {tr("Pide")} {usd(asking)}: {r.kind === "consign" ? (asking > typical ? tr("por encima del mercado") : tr("por debajo del mercado")) : tr("te dejaría {n}% de margen", { n: Math.round(((typical - asking) / typical) * 100) })}
             </p>
           ) : null}
           {Boolean(r.market_note) && <p className="mt-1 text-stone">{r.market_note as string}</p>}
           {((r.market_sources as string[] | null) ?? []).length > 0 && (
             <p className="mt-1 flex flex-wrap gap-2">
-              {(r.market_sources as string[]).map((u, i) => <a key={u} href={u} target="_blank" rel="noreferrer" className="text-brass hover:text-ivory">Fuente {i + 1}</a>)}
+              {(r.market_sources as string[]).map((u, i) => <a key={u} href={u} target="_blank" rel="noreferrer" className="text-brass hover:text-ivory">{tr("Fuente")} {i + 1}</a>)}
             </p>
           )}
         </>
       ) : checked ? (
-        <p className="text-stone">No se encontraron anuncios comparables.</p>
+        <p className="text-stone">{tr("No se encontraron anuncios comparables.")}</p>
       ) : null}
       {open && (
         <form action={offerMarketAction.bind(null, r.id as string)} className="mt-2">
-          <PendingButton pending="Buscando precios… (≈1 min)" className="border border-line px-2.5 py-1 text-[0.6rem] tracking-[0.16em] uppercase text-stone hover:text-ivory">
-            {checked ? "🔎 Volver a tasar" : "🔎 Tasar (precio de mercado)"}
+          <PendingButton pending={tr("Buscando precios… (≈1 min)")} className="border border-line px-2.5 py-1 text-[0.6rem] tracking-[0.16em] uppercase text-stone hover:text-ivory">
+            {checked ? tr("🔎 Volver a tasar") : tr("🔎 Tasar (precio de mercado)")}
           </PendingButton>
         </form>
       )}

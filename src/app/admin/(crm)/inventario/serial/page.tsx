@@ -1,3 +1,4 @@
+import { tr } from "@/lib/admin-i18n";
 import Link from "next/link";
 import { connection } from "next/server";
 import { requireUser } from "@/lib/admin-auth";
@@ -17,22 +18,22 @@ export default async function SerialPage({ searchParams }: PageProps<"/admin/inv
 
   return (
     <>
-      <Link href="/admin/inventario" className="text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">← Inventario</Link>
+      <Link href="/admin/inventario" className="text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">{tr("← Inventario")}</Link>
       <PageTitle eyebrow="Inventario" title="Historial por serial" />
       <form className="flex max-w-xl gap-2">
-        <input name="s" defaultValue={s} placeholder="Número de serie (ej. 7K3P9921)" autoComplete="off" autoFocus className={fieldClass} />
-        <button className={ghostButtonClass}>Buscar</button>
+        <input name="s" defaultValue={s} placeholder={tr("Número de serie (ej. 7K3P9921)")} autoComplete="off" autoFocus className={fieldClass} />
+        <button className={ghostButtonClass}>{tr("Buscar")}</button>
       </form>
-      <p className="mt-2 text-xs text-stone">Da igual mayúsculas, espacios o guiones. Se guarda todo lo que pasó por el sistema: entradas (compra, consignación, memo, intercambio), ventas, devoluciones y documentos firmados o emitidos.</p>
+      <p className="mt-2 text-xs text-stone">{tr("Da igual mayúsculas, espacios o guiones. Se guarda todo lo que pasó por el sistema: entradas (compra, consignación, memo, intercambio), ventas, devoluciones y documentos firmados o emitidos.")}</p>
 
       {s && (
-        <Card className="mt-6" title={rows.length ? `⚠️ ${rows.length} registro(s) con este serial` : "Sin registros"}>
+        <Card className="mt-6" title={rows.length ? tr("⚠️ {n} registro(s) con este serial", { n: rows.length }) : "Sin registros"}>
           {rows.length ? (
             <ol className="space-y-3 text-sm">
               {rows.map((r, i) => (
                 <li key={i} className="border-b border-line/60 pb-3">
                   <p>
-                    <span className="tabular-nums text-stone">{r.event_date}</span> · <b>{r.label}</b>
+                    <span className="tabular-nums text-stone">{r.event_date}</span> · <b>{tr(r.label)}</b>
                     {r.party ? ` · ${r.party}` : ""}
                   </p>
                   <p className="text-xs text-stone">
@@ -45,7 +46,7 @@ export default async function SerialPage({ searchParams }: PageProps<"/admin/inv
               ))}
             </ol>
           ) : (
-            <p className="text-sm text-stone">Este serial no ha pasado nunca por el sistema.</p>
+            <p className="text-sm text-stone">{tr("Este serial no ha pasado nunca por el sistema.")}</p>
           )}
         </Card>
       )}

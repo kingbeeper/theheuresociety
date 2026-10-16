@@ -1,3 +1,4 @@
+import { tr } from "@/lib/admin-i18n";
 import Link from "next/link";
 import { connection } from "next/server";
 import { adminDb } from "@/lib/supabase";
@@ -73,27 +74,25 @@ export default async function RedesPage({ searchParams }: PageProps<"/admin/rede
       <PageTitle
         eyebrow="CRM"
         title="Redes"
-        action={connected ? <div className="flex flex-wrap gap-2"><Link href="/admin/redes/engagement" className="bg-ivory px-5 py-2.5 text-[0.68rem] tracking-[0.22em] uppercase text-ink hover:bg-brass">📣 Engagement</Link><SyncButton /></div> : undefined}
+        action={connected ? <div className="flex flex-wrap gap-2"><Link href="/admin/redes/engagement" className="bg-ivory px-5 py-2.5 text-[0.68rem] tracking-[0.22em] uppercase text-ink hover:bg-brass">{tr("📣 Engagement")}</Link><SyncButton /></div> : undefined}
       />
 
       {!connected ? (
         <Card title="Conectar Instagram y Facebook">
           <p className="mb-5 max-w-2xl text-sm leading-relaxed text-stone">
-            Conecta la página de Facebook de The Heure Society y su Instagram vinculado para ver aquí las métricas de cada publicación,
-            convertir los DM y los comentarios de interés en leads y, si quieres, que el asistente responda los mensajes.
-            Inicia sesión con la cuenta de Facebook que administra la página.
+            {tr("Conecta la página de Facebook de The Heure Society y su Instagram vinculado para ver aquí las métricas de cada publicación, convertir los DM y los comentarios de interés en leads y, si quieres, que el asistente responda los mensajes. Inicia sesión con la cuenta de Facebook que administra la página.")}
           </p>
           {META_APP_ID ? (
             <ConnectMeta appId={META_APP_ID} scopes={META_SCOPES} configId={process.env.NEXT_PUBLIC_META_LOGIN_CONFIG_ID} />
           ) : (
-            <p className="border-l border-brass/60 pl-4 text-sm text-stone">Falta crear la app de Meta (NEXT_PUBLIC_META_APP_ID).</p>
+            <p className="border-l border-brass/60 pl-4 text-sm text-stone">{tr("Falta crear la app de Meta (NEXT_PUBLIC_META_APP_ID).")}</p>
           )}
         </Card>
       ) : (
         <>
           <p className="-mt-4 mb-6 text-sm text-stone">
-            {s.page_name}{s.ig_username ? ` · @${s.ig_username}` : ""} · conectado {s.connected_at ? ago(s.connected_at, now) : ""}
-            {waiting.count ? <> · <Link href="/admin/leads?source=instagram" className="text-brass">{waiting.count} chat(s) esperando a una persona</Link></> : null}
+            {s.page_name}{s.ig_username ? ` · @${s.ig_username}` : ""} {tr("· conectado")} {s.connected_at ? ago(s.connected_at, now) : ""}
+            {waiting.count ? <> · <Link href="/admin/leads?source=instagram" className="text-brass">{waiting.count} {tr("chat(s) esperando a una persona")}</Link></> : null}
           </p>
 
           {/* Cifras clave */}
@@ -107,14 +106,14 @@ export default async function RedesPage({ searchParams }: PageProps<"/admin/rede
                 <div className="mt-3 flex items-baseline gap-3">
                   <p className="font-display text-3xl font-light sm:text-4xl">{fmt(d.followers)}</p>
                   <p className="text-xs text-stone">
-                    seguidores{d.delta != null ? <span className={d.delta >= 0 ? "text-emerald-200" : "text-red-200"}> · {d.delta >= 0 ? "+" : ""}{fmt(d.delta)} en 30 días</span> : null}
+                    seguidores{d.delta != null ? <span className={d.delta >= 0 ? "text-emerald-200" : "text-red-200"}> · {d.delta >= 0 ? "+" : ""}{fmt(d.delta)} {tr("en 30 días")}</span> : null}
                   </p>
                 </div>
                 <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
                   {keys.map(([label, k]) => (
                     <div key={k}>
                       <p className="text-lg tabular-nums">{fmt(d.sum(k))}</p>
-                      <p className="text-[0.6rem] tracking-[0.16em] uppercase text-stone">{label} · 7 d</p>
+                      <p className="text-[0.6rem] tracking-[0.16em] uppercase text-stone">{label} {tr("· 7 d")}</p>
                     </div>
                   ))}
                 </div>
@@ -127,11 +126,11 @@ export default async function RedesPage({ searchParams }: PageProps<"/admin/rede
           <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
             <Card title="Publicaciones">
               <div className="mb-4 flex flex-wrap items-center gap-2 text-[0.62rem] tracking-[0.18em] uppercase">
-                <span className="text-stone">Ordenar:</span>
+                <span className="text-stone">{tr("Ordenar:")}</span>
                 {Object.entries(SORTS).map(([k, v]) => (
                   <Link key={k} href={link({ sort: k })} className={`border px-2 py-1 ${sort === k ? "border-brass text-ivory" : "border-line text-stone hover:text-ivory"}`}>{v}</Link>
                 ))}
-                <span className="ml-2 text-stone">Red:</span>
+                <span className="ml-2 text-stone">{tr("Red:")}</span>
                 {[["", "Todas"], ["instagram", "Instagram"], ["facebook", "Facebook"]].map(([k, v]) => (
                   <Link key={k || "all"} href={`/admin/redes?${new URLSearchParams({ sort, ...(k && { platform: k }) })}`} className={`border px-2 py-1 ${platform === k ? "border-brass text-ivory" : "border-line text-stone hover:text-ivory"}`}>{v}</Link>
                 ))}
@@ -141,14 +140,14 @@ export default async function RedesPage({ searchParams }: PageProps<"/admin/rede
                   <table className="w-full min-w-[720px] text-sm">
                     <thead className="text-left text-[0.6rem] tracking-[0.18em] uppercase text-stone">
                       <tr>
-                        <th className="pb-2 font-normal">Publicación</th>
-                        <th className="pb-2 text-right font-normal">Alcance</th>
-                        <th className="pb-2 text-right font-normal">Vistas</th>
-                        <th className="pb-2 text-right font-normal">Me gusta</th>
-                        <th className="pb-2 text-right font-normal">Coment.</th>
-                        <th className="pb-2 text-right font-normal">Guard.</th>
-                        <th className="pb-2 text-right font-normal">Compart.</th>
-                        <th className="pb-2 text-right font-normal text-brass">Leads</th>
+                        <th className="pb-2 font-normal">{tr("Publicación")}</th>
+                        <th className="pb-2 text-right font-normal">{tr("Alcance")}</th>
+                        <th className="pb-2 text-right font-normal">{tr("Vistas")}</th>
+                        <th className="pb-2 text-right font-normal">{tr("Me gusta")}</th>
+                        <th className="pb-2 text-right font-normal">{tr("Coment.")}</th>
+                        <th className="pb-2 text-right font-normal">{tr("Guard.")}</th>
+                        <th className="pb-2 text-right font-normal">{tr("Compart.")}</th>
+                        <th className="pb-2 text-right font-normal text-brass">{tr("Leads")}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-line/60">
@@ -163,9 +162,9 @@ export default async function RedesPage({ searchParams }: PageProps<"/admin/rede
                                 <span className="h-11 w-11 shrink-0 bg-moss" />
                               )}
                               <span className="min-w-0">
-                                <span className="line-clamp-1">{p.caption?.split("\n")[0] || "(sin texto)"}</span>
+                                <span className="line-clamp-1">{p.caption?.split("\n")[0] || tr("(sin texto)")}</span>
                                 <span className="text-xs text-stone">
-                                  {p.platform === "instagram" ? (p.product_type === "REELS" ? "Reel" : p.media_type === "CAROUSEL_ALBUM" ? "Carrusel" : "Post") : "Facebook"}
+                                  {p.platform === "instagram" ? (p.product_type === "REELS" ? tr("Reel") : p.media_type === "CAROUSEL_ALBUM" ? tr("Carrusel") : tr("Post")) : tr("Facebook")}
                                   {p.posted_at ? ` · ${fmtDate(p.posted_at)}` : ""}
                                 </span>
                               </span>
@@ -184,7 +183,7 @@ export default async function RedesPage({ searchParams }: PageProps<"/admin/rede
                   </table>
                 </div>
               ) : (
-                <p className="text-sm text-stone">Aún no hay publicaciones. Pulsa «Actualizar» para traer las métricas.</p>
+                <p className="text-sm text-stone">{tr("Aún no hay publicaciones. Pulsa «Actualizar» para traer las métricas.")}</p>
               )}
             </Card>
 
@@ -196,18 +195,18 @@ export default async function RedesPage({ searchParams }: PageProps<"/admin/rede
                       <li key={c.id as string} className="border-b border-line/60 pb-3">
                         <p>
                           {c.customer_id ? (
-                            <Link href={`/admin/leads/${c.customer_id}`} className="hover:text-brass">{(c.from_username as string) ?? "Alguien"}</Link>
+                            <Link href={`/admin/leads/${c.customer_id}`} className="hover:text-brass">{(c.from_username as string) ?? tr("Alguien")}</Link>
                           ) : (
-                            (c.from_username as string) ?? "Alguien"
+                            (c.from_username as string) ?? tr("Alguien")
                           )}
-                          <span className="text-stone"> · {ago(c.created_at as string, now)}{c.replied_at ? " · respondido por DM" : ""}</span>
+                          <span className="text-stone"> · {ago(c.created_at as string, now)}{c.replied_at ? tr(" · respondido por DM") : ""}</span>
                         </p>
                         <p className="mt-1 text-stone">«{c.text as string}»</p>
                       </li>
                     ))}
                   </ul>
                 ) : (
-                  <p className="text-sm text-stone">Los comentarios que pregunten por precio o disponibilidad aparecerán aquí y como leads.</p>
+                  <p className="text-sm text-stone">{tr("Los comentarios que pregunten por precio o disponibilidad aparecerán aquí y como leads.")}</p>
                 )}
               </Card>
 
@@ -216,30 +215,30 @@ export default async function RedesPage({ searchParams }: PageProps<"/admin/rede
                   <label className="flex items-start gap-3">
                     <input type="checkbox" name="bot_dm" defaultChecked={s.bot_dm !== "off"} className="mt-1 accent-[#c8b07a]" />
                     <span>
-                      El asistente responde los DM de Instagram y Messenger
-                      <span className="block text-xs text-stone">Si escribes tú en un chat, el bot se aparta 12 h.</span>
+                      {tr("El asistente responde los DM de Instagram y Messenger")}
+                      <span className="block text-xs text-stone">{tr("Si escribes tú en un chat, el bot se aparta 12 h.")}</span>
                     </span>
                   </label>
                   <label className="flex items-start gap-3">
                     <input type="checkbox" name="comment_reply" defaultChecked={s.comment_reply === "on"} className="mt-1 accent-[#c8b07a]" />
                     <span>
-                      Responder por DM a los comentarios de interés (una vez por comentario)
-                      <span className="block text-xs text-stone">Si la persona contesta, sigue el asistente en el DM.</span>
+                      {tr("Responder por DM a los comentarios de interés (una vez por comentario)")}
+                      <span className="block text-xs text-stone">{tr("Si la persona contesta, sigue el asistente en el DM.")}</span>
                     </span>
                   </label>
                   <textarea name="comment_reply_text" rows={3} defaultValue={s.comment_reply_text || DEFAULT_COMMENT_REPLY} className="w-full border border-line bg-ink/60 px-3 py-2 text-sm outline-none focus:border-brass/70" />
-                  <button className="bg-ivory px-5 py-2.5 text-[0.68rem] tracking-[0.22em] uppercase text-ink hover:bg-brass">Guardar</button>
+                  <button className="bg-ivory px-5 py-2.5 text-[0.68rem] tracking-[0.22em] uppercase text-ink hover:bg-brass">{tr("Guardar")}</button>
                 </form>
               </Card>
 
               <Card title="Conexión">
                 <p className="text-xs leading-relaxed text-stone">
-                  Avisos de Meta (webhook): <span className="break-all text-ivory">{SITE_URL}/api/meta</span>
+                  {tr("Avisos de Meta (webhook):")} <span className="break-all text-ivory">{SITE_URL}/api/meta</span>
                 </p>
                 <div className="mt-4 flex flex-wrap gap-3">
-                  {META_APP_ID && <ConnectMeta appId={META_APP_ID} scopes={META_SCOPES} configId={process.env.NEXT_PUBLIC_META_LOGIN_CONFIG_ID} label="Reconectar" />}
+                  {META_APP_ID && <ConnectMeta appId={META_APP_ID} scopes={META_SCOPES} configId={process.env.NEXT_PUBLIC_META_LOGIN_CONFIG_ID} label={tr("Reconectar")} />}
                   <form action={disconnectSocial}>
-                    <button className="border border-line px-4 py-2.5 text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">Desconectar</button>
+                    <button className="border border-line px-4 py-2.5 text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">{tr("Desconectar")}</button>
                   </form>
                 </div>
               </Card>
@@ -253,7 +252,7 @@ export default async function RedesPage({ searchParams }: PageProps<"/admin/rede
 
 // Gráfico de barras sencillo (alcance diario)
 function Bars({ values }: { values: { day: string; v: number }[] }) {
-  if (!values.some((x) => x.v)) return <p className="mt-5 text-xs text-stone">El gráfico de alcance aparecerá tras la primera actualización.</p>;
+  if (!values.some((x) => x.v)) return <p className="mt-5 text-xs text-stone">{tr("El gráfico de alcance aparecerá tras la primera actualización.")}</p>;
   const max = Math.max(...values.map((x) => x.v), 1);
   return (
     <div className="mt-5">
@@ -264,7 +263,7 @@ function Bars({ values }: { values: { day: string; v: number }[] }) {
       </div>
       <p className="mt-1 flex justify-between text-[0.6rem] text-stone">
         <span>{values[0]?.day.slice(5)}</span>
-        <span>Alcance diario</span>
+        <span>{tr("Alcance diario")}</span>
         <span>{values.at(-1)?.day.slice(5)}</span>
       </p>
     </div>

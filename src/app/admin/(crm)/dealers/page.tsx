@@ -1,3 +1,4 @@
+import { tr } from "@/lib/admin-i18n";
 import Link from "next/link";
 import { connection } from "next/server";
 import { requireUser } from "@/lib/admin-auth";
@@ -34,11 +35,11 @@ export default async function DealersPage({ searchParams }: PageProps<"/admin/de
 
   return (
     <>
-      <Link href="/admin/leads" className="text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">← Leads</Link>
+      <Link href="/admin/leads" className="text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">{tr("← Leads")}</Link>
       <PageTitle eyebrow="CRM" title="Dealers" />
       <nav className="mb-6 flex gap-6 border-b border-line">
-        <Link href="/admin/dealers" className={tab(view === "pedir")}>🔎 Pedir una pieza{pending ? ` · ${pending} sin respuesta` : ""}</Link>
-        <Link href="/admin/dealers?ver=dealers" className={tab(view === "dealers")}>🤝 Mis dealers · {list.length}</Link>
+        <Link href="/admin/dealers" className={tab(view === "pedir")}>{tr("🔎 Pedir una pieza")}{pending ? tr(" · {n} sin respuesta", { n: pending }) : ""}</Link>
+        <Link href="/admin/dealers?ver=dealers" className={tab(view === "dealers")}>{tr("🤝 Mis dealers ·")} {list.length}</Link>
       </nav>
 
       {view === "dealers" ? (
@@ -59,8 +60,8 @@ function DealerDirectory({ list, requests, q }: { list: Awaited<ReturnType<typeo
       <div className="flex flex-wrap items-start justify-between gap-4">
         <form className="flex gap-2">
           <input type="hidden" name="ver" value="dealers" />
-          <input name="q" defaultValue={q} placeholder="Buscar por nombre, empresa o teléfono" className="w-72 border border-line bg-ink/60 px-3 py-2 text-sm" />
-          <button className="border border-line px-3 py-2 text-[0.62rem] tracking-[0.18em] uppercase text-stone hover:text-ivory">Buscar</button>
+          <input name="q" defaultValue={q} placeholder={tr("Buscar por nombre, empresa o teléfono")} className="w-72 border border-line bg-ink/60 px-3 py-2 text-sm" />
+          <button className="border border-line px-3 py-2 text-[0.62rem] tracking-[0.18em] uppercase text-stone hover:text-ivory">{tr("Buscar")}</button>
         </form>
         <DealerAdd open={!list.length} />
       </div>
@@ -69,20 +70,20 @@ function DealerDirectory({ list, requests, q }: { list: Awaited<ReturnType<typeo
           <table className="w-full min-w-[760px] text-sm">
             <thead className="bg-ink/60 text-left text-[0.6rem] tracking-[0.18em] uppercase text-stone">
               <tr>
-                <th className="px-3 py-2.5">Dealer</th>
-                <th className="px-3 py-2.5">Contacto</th>
-                <th className="px-3 py-2.5 text-right">Pedidos</th>
-                <th className="px-3 py-2.5 text-right">Respondió</th>
-                <th className="px-3 py-2.5 text-right">La tenía</th>
-                <th className="px-3 py-2.5">Mejor oferta</th>
-                <th className="px-3 py-2.5">Último pedido</th>
+                <th className="px-3 py-2.5">{tr("Dealer")}</th>
+                <th className="px-3 py-2.5">{tr("Contacto")}</th>
+                <th className="px-3 py-2.5 text-right">{tr("Pedidos")}</th>
+                <th className="px-3 py-2.5 text-right">{tr("Respondió")}</th>
+                <th className="px-3 py-2.5 text-right">{tr("La tenía")}</th>
+                <th className="px-3 py-2.5">{tr("Mejor oferta")}</th>
+                <th className="px-3 py-2.5">{tr("Último pedido")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-line/60">
               {rows.map(({ d, company, s }) => (
                 <tr key={d.id} className="hover:bg-ivory/[0.03]">
                   <td className="px-3 py-2.5">
-                    <Link href={`/admin/dealers/${d.id}`} className="hover:text-brass">{d.name ?? "Sin nombre"}</Link>
+                    <Link href={`/admin/dealers/${d.id}`} className="hover:text-brass">{d.name ?? tr("Sin nombre")}</Link>
                     {company && <p className="text-xs text-stone">{company}</p>}
                   </td>
                   <td className="px-3 py-2.5 text-xs text-stone">{[d.phone, d.email].filter(Boolean).join(" · ") || "—"}</td>
@@ -97,7 +98,7 @@ function DealerDirectory({ list, requests, q }: { list: Awaited<ReturnType<typeo
           </table>
         </div>
       ) : (
-        <p className="text-sm text-stone">{q ? "Ningún dealer coincide con la búsqueda." : "Aún no tienes dealers. Añade el primero con «+ Nuevo dealer»."}</p>
+        <p className="text-sm text-stone">{q ? tr("Ningún dealer coincide con la búsqueda.") : tr("Aún no tienes dealers. Añade el primero con «+ Nuevo dealer».")}</p>
       )}
     </div>
   );
@@ -115,7 +116,7 @@ function AskView({ list, requests, byId, doc }: { list: Awaited<ReturnType<typeo
 
   return (
     <>
-      <Card title={doc ? `🤝 Pedir a mis dealers · encargo ${doc.number} de ${doc.client_name ?? ""}` : "🤝 Pedir una pieza a mis dealers"}>
+      <Card title={doc ? `${tr("🤝 Pedir a mis dealers")} · ${tr("encargo {n} de {c}", { n: doc.number, c: doc.client_name ?? "" })}` : "🤝 Pedir una pieza a mis dealers"}>
         {list.length ? (
           <DealerAsk
             dealers={list.map((d) => ({ id: d.id, name: d.name, phone: d.phone, reachable: Boolean(d.wa_id || d.phone) }))}
@@ -125,13 +126,13 @@ function AskView({ list, requests, byId, doc }: { list: Awaited<ReturnType<typeo
           />
         ) : (
           <div className="grid gap-3">
-            <p className="text-sm text-stone">Aún no tienes dealers. Añade el primero aquí (o, si ya es cliente, pulsa la etiqueta <b>Dealer</b> en su ficha).</p>
+            <p className="text-sm text-stone">{tr("Aún no tienes dealers. Añade el primero aquí (o, si ya es cliente, pulsa la etiqueta")} <b>{tr("Dealer")}</b> {tr("en su ficha).")}</p>
             <DealerAdd open />
           </div>
         )}
       </Card>
 
-      <h2 className="mt-8 mb-3 text-[0.66rem] tracking-[0.24em] uppercase text-stone">Pedidos y respuestas</h2>
+      <h2 className="mt-8 mb-3 text-[0.66rem] tracking-[0.24em] uppercase text-stone">{tr("Pedidos y respuestas")}</h2>
       {groups.size ? (
         <div className="grid gap-4">
           {[...groups.values()].slice(0, 40).map((g) => {
@@ -139,12 +140,12 @@ function AskView({ list, requests, byId, doc }: { list: Awaited<ReturnType<typeo
             const offers = g.filter((r) => r.price).sort((a, b) => Number(a.price) - Number(b.price));
             return (
               <Card key={first.id} title={`${first.query}${first.budget ? ` · presupuesto ${money(first.budget)}` : ""} · ${fmtDate(first.asked_at)}`}>
-                {first.document_id && <Link href={`/admin/documentos/${first.document_id}`} className="mb-3 inline-block text-xs text-brass hover:text-ivory">Ver el encargo →</Link>}
-                {offers.length > 0 && <p className="mb-3 text-sm text-emerald-200">Mejor precio: {money(offers[0].price!)} · {byId.get(offers[0].dealer_id)?.name ?? "dealer"}</p>}
+                {first.document_id && <Link href={`/admin/documentos/${first.document_id}`} className="mb-3 inline-block text-xs text-brass hover:text-ivory">{tr("Ver el encargo →")}</Link>}
+                {offers.length > 0 && <p className="mb-3 text-sm text-emerald-200">{tr("Mejor precio:")} {money(offers[0].price!)} · {byId.get(offers[0].dealer_id)?.name ?? "dealer"}</p>}
                 <ul className="divide-y divide-line/60">
                   {g.map((r) => {
                     const d = byId.get(r.dealer_id);
-                    return <DealerRequestRow key={r.id} r={r} dealer={d} title={<Link href={`/admin/dealers/${r.dealer_id}`} className="hover:text-brass">{d?.name ?? "Dealer"}</Link>} />;
+                    return <DealerRequestRow key={r.id} r={r} dealer={d} title={<Link href={`/admin/dealers/${r.dealer_id}`} className="hover:text-brass">{d?.name ?? tr("Dealer")}</Link>} />;
                   })}
                 </ul>
               </Card>
@@ -152,7 +153,7 @@ function AskView({ list, requests, byId, doc }: { list: Awaited<ReturnType<typeo
           })}
         </div>
       ) : (
-        <p className="text-sm text-stone">Todavía no has pedido nada a tus dealers.</p>
+        <p className="text-sm text-stone">{tr("Todavía no has pedido nada a tus dealers.")}</p>
       )}
     </>
   );

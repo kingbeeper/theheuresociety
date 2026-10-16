@@ -1,3 +1,4 @@
+import { tr } from "@/lib/admin-i18n";
 import Link from "next/link";
 import { connection } from "next/server";
 import { requireUser } from "@/lib/admin-auth";
@@ -22,26 +23,25 @@ export default async function CountPage({ searchParams }: PageProps<"/admin/inve
     const { data: missingItems } = missing.length ? await adminDb().from("inventory_items").select("id, sku, brand, model, location").in("id", missing) : { data: [] };
     return (
       <>
-        <Link href="/admin/inventario" className="text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">← Inventario</Link>
+        <Link href="/admin/inventario" className="text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">{tr("← Inventario")}</Link>
         <PageTitle eyebrow="Inventario" title="Conteo de inventario" />
         {sp.terminado && (
           <Card className="mb-6" title={missing.length ? `⚠️ Faltan ${missing.length}` : "✅ Está todo"}>
             {missing.length ? (
               <ul className="space-y-1 text-sm">
                 {(missingItems ?? []).map((i) => (
-                  <li key={i.id}><Link href={`/admin/inventario/${i.id}`} className="hover:text-brass">{i.sku} · {i.brand} {i.model ?? ""}</Link> <span className="text-xs text-stone">· debería estar en {LOCATIONS[i.location as Location] ?? "—"}</span></li>
+                  <li key={i.id}><Link href={`/admin/inventario/${i.id}`} className="hover:text-brass">{i.sku} · {i.brand} {i.model ?? ""}</Link> <span className="text-xs text-stone">{tr("· debería estar en")} {tr(LOCATIONS[i.location as Location] ?? "—")}</span></li>
                 ))}
               </ul>
-            ) : <p className="text-sm text-stone">Todos los relojes esperados se encontraron.</p>}
+            ) : <p className="text-sm text-stone">{tr("Todos los relojes esperados se encontraron.")}</p>}
           </Card>
         )}
         <Card>
           <p className="text-sm text-stone">
-            Recorre la tienda y marca cada reloj que veas (o escanea su etiqueta QR con el móvil y pulsa «Contado»). Al terminar te digo si falta alguno.
-            Los relojes en memo o en el relojero no cuentan: están fuera.
+            {tr("Recorre la tienda y marca cada reloj que veas (o escanea su etiqueta QR con el móvil y pulsa «Contado»). Al terminar te digo si falta alguno. Los relojes en memo o en el relojero no cuentan: están fuera.")}
           </p>
-          {last && <p className="mt-2 text-xs text-stone">Último conteo: {fmtDateTime(last.finished_at as string)} · {(last.found as string[]).length}/{(last.expected as string[]).length} encontrados</p>}
-          <form action={startCountAction} className="mt-4"><button className={buttonClass}>Empezar conteo</button></form>
+          {last && <p className="mt-2 text-xs text-stone">{tr("Último conteo:")} {fmtDateTime(last.finished_at as string)} · {(last.found as string[]).length}/{(last.expected as string[]).length} encontrados</p>}
+          <form action={startCountAction} className="mt-4"><button className={buttonClass}>{tr("Empezar conteo")}</button></form>
         </Card>
       </>
     );
@@ -58,17 +58,17 @@ export default async function CountPage({ searchParams }: PageProps<"/admin/inve
 
   return (
     <>
-      <Link href="/admin/inventario" className="text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">← Inventario</Link>
+      <Link href="/admin/inventario" className="text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">{tr("← Inventario")}</Link>
       <PageTitle
         eyebrow={`Conteo empezado ${fmtDateTime(count.started_at)}`}
-        title={`${found.size} de ${items.length} contados`}
-        action={<form action={finishCountAction.bind(null, count.id)}><button className={buttonClass}>Terminar conteo</button></form>}
+        title={tr("{a} de {b} contados", { a: found.size, b: items.length })}
+        action={<form action={finishCountAction.bind(null, count.id)}><button className={buttonClass}>{tr("Terminar conteo")}</button></form>}
       />
       <div className="mb-6 h-2 bg-ink"><div className="h-full bg-brass/70" style={{ width: `${items.length ? (found.size / items.length) * 100 : 0}%` }} /></div>
 
       <div className="grid gap-6 xl:grid-cols-2">
         {[...groups.entries()].map(([loc, list]) => (
-          <Card key={loc} title={`${LOCATIONS[loc as Location] ?? "Sin ubicación"} · ${list.filter((i) => found.has(i.id)).length}/${list.length}`}>
+          <Card key={loc} title={`${tr(LOCATIONS[loc as Location] ?? "Sin ubicación")} · ${list.filter((i) => found.has(i.id)).length}/${list.length}`}>
             <ul className="divide-y divide-line/60">
               {list.map((i) => {
                 const ok = found.has(i.id);
@@ -76,7 +76,7 @@ export default async function CountPage({ searchParams }: PageProps<"/admin/inve
                   <li key={i.id} className="flex items-center justify-between gap-3 py-2.5 text-sm">
                     <span className={`min-w-0 truncate ${ok ? "text-stone line-through" : ""}`}>{i.sku} · {i.brand} {i.model ?? ""}</span>
                     <form action={markCountedAction.bind(null, count.id, i.id, !ok)}>
-                      <button className={ok ? "text-[0.62rem] tracking-[0.16em] uppercase text-emerald-200" : ghostButtonClass}>{ok ? "✓ Contado" : "Contar"}</button>
+                      <button className={ok ? "text-[0.62rem] tracking-[0.16em] uppercase text-emerald-200" : ghostButtonClass}>{ok ? tr("✓ Contado") : tr("Contar")}</button>
                     </form>
                   </li>
                 );
@@ -86,7 +86,7 @@ export default async function CountPage({ searchParams }: PageProps<"/admin/inve
         ))}
         {away.size > 0 && (
           <Card title={`Fuera de la tienda · ${away.size}`}>
-            <p className="text-xs text-stone">No hace falta contarlos.</p>
+            <p className="text-xs text-stone">{tr("No hace falta contarlos.")}</p>
             <ul className="mt-2 space-y-1 text-sm text-stone">{[...away.values()].map((v, i) => <li key={i}>{v}</li>)}</ul>
           </Card>
         )}

@@ -1,3 +1,4 @@
+import { tr } from "@/lib/admin-i18n";
 import Link from "next/link";
 import { connection } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
@@ -13,7 +14,7 @@ export default async function DocSettingsPage() {
   const s = await getDocSettings();
   return (
     <>
-      <Link href="/admin/documentos" className="text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">← Documentos</Link>
+      <Link href="/admin/documentos" className="text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">{tr("← Documentos")}</Link>
       <PageTitle eyebrow="Documentos" title="Datos que salen en cotizaciones, memos y facturas" />
       <Card>
         <DocSettingsForm s={s} />

@@ -1,5 +1,6 @@
 "use server";
 
+import { tr } from "@/lib/admin-i18n";
 import { redirect } from "next/navigation";
 import { refresh } from "next/cache";
 import { requireAdmin, requireUser } from "@/lib/admin-auth";
@@ -67,7 +68,7 @@ export async function saveItem(id: string | null, _: unknown, f: FormData) {
   if (!can(me, "costos")) {
     for (const k of ["cost", "extra_costs", "supplier_name", "supplier_company", "supplier_location"] as const) delete (fields as Partial<typeof fields>)[k];
   }
-  if (!fields.brand) return { error: "Falta la marca." };
+  if (!fields.brand) return { error: tr("Falta la marca.") };
   const db = adminDb();
   // Enlazado a una ficha de la web sin precio en el inventario: se toma el de la web
   if (fields.watch_id && fields.asking_price == null) fields.asking_price = await webPrice(fields.watch_id);
@@ -121,7 +122,7 @@ export async function sellItem(id: string, _: unknown, f: FormData) {
   const item = await getItem(id);
   const price = money(f, "sale_price");
   const saleDate = date(f, "sale_date") ?? new Date().toISOString().slice(0, 10);
-  if (price == null) return { error: "Falta el precio de venta." };
+  if (price == null) return { error: tr("Falta el precio de venta.") };
 
   // Comprador: un cliente del CRM o uno nuevo (queda como lead ganado)
   let buyerId = text(f, "buyer_customer_id");
@@ -141,7 +142,7 @@ export async function sellItem(id: string, _: unknown, f: FormData) {
     phone = phone ?? (data?.phone as string) ?? null;
     email = email ?? (data?.email as string) ?? null;
   }
-  if (!name) return { error: "Falta el nombre del comprador: la factura lo necesita." };
+  if (!name) return { error: tr("Falta el nombre del comprador: la factura lo necesita.") };
 
   // La venta se registra con su factura (pagada): Documentos e inventario quedan iguales.
   // Si el reloj ya tenía una factura abierta, se cobra esa.
@@ -248,7 +249,7 @@ export async function returnFromServiceAction(serviceId: string, f: FormData) {
 export async function createDepositAction(itemId: string, _: unknown, f: FormData) {
   const user = await requireAdmin("inventario");
   const amount = money(f, "amount");
-  if (!amount || amount < 1) return { error: "Indica el importe del depósito." };
+  if (!amount || amount < 1) return { error: tr("Indica el importe del depósito.") };
   try {
     const { depositLink } = await import("@/lib/payments");
     return { url: await depositLink(itemId, amount, text(f, "customer_id"), user) };

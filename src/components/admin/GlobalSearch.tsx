@@ -1,5 +1,7 @@
 "use client";
 
+
+import { useTr } from "@/components/admin/AdminLang";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Search } from "lucide-react";
@@ -10,6 +12,7 @@ import { Search } from "lucide-react";
 type Result = { group: string; title: string; sub: string; href: string };
 
 export function GlobalSearch() {
+  const tr = useTr();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
@@ -73,13 +76,13 @@ export function GlobalSearch() {
         className="mx-3 mb-2 flex w-[calc(100%-1.5rem)] items-center gap-2 border border-line px-3 py-2 text-left text-xs text-stone hover:text-ivory md:mx-4 md:w-[calc(100%-2rem)]"
       >
         <Search aria-hidden className="h-3.5 w-3.5" strokeWidth={1.5} />
-        <span className="flex-1">Buscar…</span>
-        <kbd className="hidden text-[0.6rem] tracking-wider text-stone/70 md:inline">Ctrl K</kbd>
+        <span className="flex-1">{tr("Buscar…")}</span>
+        <kbd className="hidden text-[0.6rem] tracking-wider text-stone/70 md:inline">{tr("Ctrl K")}</kbd>
       </button>
 
       {open && (
         <div className="fixed inset-0 z-50 flex items-start justify-center bg-ink/70 px-4 pt-[12vh]" onClick={() => setOpen(false)}>
-          <div role="dialog" aria-label="Buscar en el CRM" className="w-full max-w-xl border border-line bg-forest shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <div role="dialog" aria-label={tr("Buscar en el CRM")} className="w-full max-w-xl border border-line bg-forest shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-3 border-b border-line px-4">
               <Search aria-hidden className="h-4 w-4 shrink-0 text-brass" strokeWidth={1.5} />
               <input
@@ -97,13 +100,13 @@ export function GlobalSearch() {
                     go(shown[active]);
                   }
                 }}
-                placeholder="Cliente, teléfono, serial, factura, referencia…"
+                placeholder={tr("Cliente, teléfono, serial, factura, referencia…")}
                 className="w-full bg-transparent py-4 text-sm text-ivory outline-none placeholder:text-stone/60"
               />
               {loading && <span className="text-xs text-stone">…</span>}
             </div>
             <div className="max-h-[60vh] overflow-y-auto">
-              {q.trim().length >= 2 && !loading && !shown.length && <p className="px-4 py-6 text-sm text-stone">Sin resultados.</p>}
+              {q.trim().length >= 2 && !loading && !shown.length && <p className="px-4 py-6 text-sm text-stone">{tr("Sin resultados.")}</p>}
               {shown.map((r, i) => (
                 <div key={`${r.href}-${i}`}>
                   {(i === 0 || shown[i - 1].group !== r.group) && <p className="px-4 pt-3 pb-1 text-[0.58rem] tracking-[0.2em] uppercase text-brass">{r.group}</p>}
@@ -119,7 +122,7 @@ export function GlobalSearch() {
                 </div>
               ))}
             </div>
-            <p className="border-t border-line px-4 py-2 text-[0.6rem] tracking-wider text-stone/70">↑ ↓ para moverte · Enter para abrir · Esc para cerrar</p>
+            <p className="border-t border-line px-4 py-2 text-[0.6rem] tracking-wider text-stone/70">{tr("↑ ↓ para moverte · Enter para abrir · Esc para cerrar")}</p>
           </div>
         </div>
       )}

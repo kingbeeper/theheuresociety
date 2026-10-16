@@ -1,3 +1,4 @@
+import { tr } from "@/lib/admin-i18n";
 import Link from "next/link";
 import { connection } from "next/server";
 import { requireUser } from "@/lib/admin-auth";
@@ -41,10 +42,10 @@ export default async function PipelinePage() {
 
   return (
     <>
-      <Link href="/admin/leads" className="text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">← Leads</Link>
+      <Link href="/admin/leads" className="text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">{tr("← Leads")}</Link>
       <PageTitle eyebrow="Leads" title="Embudo de ventas" />
       <p className="mb-4 text-sm text-stone">
-        Arrastra un cliente a otra columna para cambiar su etapa. Valor abierto en el embudo: <b className="text-ivory">${Math.round(open).toLocaleString("en-US")}</b> (cotizaciones, saldos de proformas y facturas por cobrar). Los perdidos no salen; los ganados, solo los del último mes.
+        {tr("Arrastra un cliente a otra columna para cambiar su etapa. Valor abierto en el embudo:")} <b className="text-ivory">${Math.round(open).toLocaleString("en-US")}</b> {tr("(cotizaciones, saldos de proformas y facturas por cobrar). Los perdidos no salen; los ganados, solo los del último mes.")}
       </p>
       <PipelineBoard cards={cards} />
     </>

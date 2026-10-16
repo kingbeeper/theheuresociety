@@ -1,3 +1,4 @@
+import { tr } from "@/lib/admin-i18n";
 import Link from "next/link";
 import { connection } from "next/server";
 import { redirect } from "next/navigation";
@@ -77,7 +78,7 @@ export default async function LeadsPage({ searchParams }: PageProps<"/admin/lead
           stage === s ? "border-brass text-ivory" : "border-transparent text-stone hover:text-ivory"
         }`}
       >
-        {label} <span className="text-stone/70">{n}</span>
+        {tr(label)} <span className="text-stone/70">{n}</span>
       </Link>
     );
   };
@@ -89,34 +90,34 @@ export default async function LeadsPage({ searchParams }: PageProps<"/admin/lead
         title="Leads"
         action={
           <div className="flex flex-wrap items-start gap-2">
-          <Link href="/admin/clientes" className="border border-line px-4 py-2.5 text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">Clientes</Link>
-          <Link href="/admin/leads/embudo" className="border border-line px-4 py-2.5 text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">Embudo</Link>
-          <Link href="/admin/dealers" className="border border-line px-4 py-2.5 text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">Dealers</Link>
-          <Link href="/admin/leads/duplicados" className="border border-line px-4 py-2.5 text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">Duplicados</Link>
+          <Link href="/admin/clientes" className="border border-line px-4 py-2.5 text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">{tr("Clientes")}</Link>
+          <Link href="/admin/leads/embudo" className="border border-line px-4 py-2.5 text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">{tr("Embudo")}</Link>
+          <Link href="/admin/dealers" className="border border-line px-4 py-2.5 text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">{tr("Dealers")}</Link>
+          <Link href="/admin/leads/duplicados" className="border border-line px-4 py-2.5 text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">{tr("Duplicados")}</Link>
           <details className="group relative">
-            <summary className={`${buttonClass} cursor-pointer list-none`}>+ Nuevo lead</summary>
+            <summary className={`${buttonClass} cursor-pointer list-none`}>{tr("+ Nuevo lead")}</summary>
             <form action={createLead} className="absolute right-0 z-20 mt-2 grid w-[min(92vw,420px)] gap-4 border border-line bg-forest p-5 shadow-2xl">
-              <label><span className={labelClass}>Nombre</span><input name="name" className={fieldClass} required /></label>
+              <label><span className={labelClass}>{tr("Nombre")}</span><input name="name" className={fieldClass} required /></label>
               <div className="grid grid-cols-2 gap-3">
-                <label><span className={labelClass}>Teléfono</span><input name="phone" className={fieldClass} /></label>
-                <label><span className={labelClass}>Correo</span><input name="email" type="email" className={fieldClass} /></label>
+                <label><span className={labelClass}>{tr("Teléfono")}</span><input name="phone" className={fieldClass} /></label>
+                <label><span className={labelClass}>{tr("Correo")}</span><input name="email" type="email" className={fieldClass} /></label>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <label>
-                  <span className={labelClass}>Origen</span>
+                  <span className={labelClass}>{tr("Origen")}</span>
                   <select name="source" className={fieldClass} defaultValue="walk_in">
-                    {Object.entries(SOURCE_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                    {Object.entries(SOURCE_LABEL).map(([k, v]) => <option key={k} value={k}>{tr(v)}</option>)}
                   </select>
                 </label>
                 <label>
-                  <span className={labelClass}>Quiere</span>
+                  <span className={labelClass}>{tr("Quiere")}</span>
                   <select name="intent" className={fieldClass} defaultValue="buy">
-                    {Object.entries(INTENT_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                    {Object.entries(INTENT_LABEL).map(([k, v]) => <option key={k} value={k}>{tr(v)}</option>)}
                   </select>
                 </label>
               </div>
-              <label><span className={labelClass}>Qué busca</span><input name="interests" className={fieldClass} placeholder="Ej.: Daytona acero, hasta $35k" /></label>
-              <button className={buttonClass}>Crear lead</button>
+              <label><span className={labelClass}>{tr("Qué busca")}</span><input name="interests" className={fieldClass} placeholder={tr("Ej.: Daytona acero, hasta $35k")} /></label>
+              <button className={buttonClass}>{tr("Crear lead")}</button>
             </form>
           </details>
           </div>
@@ -130,17 +131,17 @@ export default async function LeadsPage({ searchParams }: PageProps<"/admin/lead
 
       <form className="mb-6 flex flex-wrap gap-3" action="/admin/leads">
         {stage && <input type="hidden" name="stage" value={stage} />}
-        <input name="q" defaultValue={q} placeholder="Buscar nombre, teléfono, correo o interés…" className={`${fieldClass} max-w-md flex-1`} />
+        <input name="q" defaultValue={q} placeholder={tr("Buscar nombre, teléfono, correo o interés…")} className={`${fieldClass} max-w-md flex-1`} />
         <select name="source" defaultValue={source} className={`${fieldClass} w-auto`}>
-          <option value="">Todos los orígenes</option>
-          {Object.entries(SOURCE_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+          <option value="">{tr("Todos los orígenes")}</option>
+          {Object.entries(SOURCE_LABEL).map(([k, v]) => <option key={k} value={k}>{tr(v)}</option>)}
         </select>
-        <button className="border border-line px-4 text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">Filtrar</button>
+        <button className="border border-line px-4 text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">{tr("Filtrar")}</button>
         {CUSTOMER_TAGS.filter((t) => t !== "Dealer").map((t) => (
           <Link key={t} href={`/admin/leads?etiqueta=${encodeURIComponent(t)}`} className={`self-center border px-2.5 py-1 text-[0.6rem] tracking-[0.14em] uppercase ${tag === t ? "border-brass text-brass" : "border-line text-stone hover:text-ivory"}`}>{t}</Link>
         ))}
         {(q || source || botOff || withAlerts || followOnly || tag) && (
-          <Link href="/admin/leads" className="self-center text-xs text-stone underline hover:text-ivory">Quitar filtros</Link>
+          <Link href="/admin/leads" className="self-center text-xs text-stone underline hover:text-ivory">{tr("Quitar filtros")}</Link>
         )}
       </form>
 
@@ -151,7 +152,7 @@ export default async function LeadsPage({ searchParams }: PageProps<"/admin/lead
             <li key={c.id} className="px-4 py-3">
               <div className="flex items-start justify-between gap-3">
                 <Link href={`/admin/leads/${c.id}`} className="min-w-0 hover:text-brass">
-                  <p className="truncate">{c.name ?? "Sin nombre"}</p>
+                  <p className="truncate">{c.name ?? tr("Sin nombre")}</p>
                   <p className="truncate text-xs text-stone">{c.phone ?? c.email ?? ""}</p>
                   {spent(c.id) && <p className="text-xs text-brass">{spent(c.id)}</p>}
                 </Link>
@@ -172,24 +173,24 @@ export default async function LeadsPage({ searchParams }: PageProps<"/admin/lead
           <table className="w-full min-w-[760px] text-sm">
             <thead className="bg-forest text-left text-[0.62rem] tracking-[0.2em] uppercase text-stone">
               <tr>
-                <th className="px-4 py-3 font-normal">Cliente</th>
-                <th className="px-4 py-3 font-normal">Busca / quiere</th>
-                <th className="px-4 py-3 font-normal">Origen</th>
-                <th className="px-4 py-3 font-normal">Etapa</th>
-                <th className="px-4 py-3 font-normal">Actividad</th>
+                <th className="px-4 py-3 font-normal">{tr("Cliente")}</th>
+                <th className="px-4 py-3 font-normal">{tr("Busca / quiere")}</th>
+                <th className="px-4 py-3 font-normal">{tr("Origen")}</th>
+                <th className="px-4 py-3 font-normal">{tr("Etapa")}</th>
+                <th className="px-4 py-3 font-normal">{tr("Actividad")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-line/60">
               {leads.map((c) => (
                 <tr key={c.id} className="hover:bg-forest/60">
                   <td className="px-4 py-3">
-                    <Link href={`/admin/leads/${c.id}`} className="hover:text-brass">{c.name ?? "Sin nombre"}</Link>
+                    <Link href={`/admin/leads/${c.id}`} className="hover:text-brass">{c.name ?? tr("Sin nombre")}</Link>
                     <p className="text-xs text-stone">{c.phone ?? c.email ?? ""}</p>
                     {spent(c.id) && <p className="text-xs text-brass">{spent(c.id)}</p>}
                   </td>
                   <td className="max-w-[280px] px-4 py-3">
                     <p className="truncate">{c.interests ?? "—"}</p>
-                    <p className="text-xs text-stone">{c.intent ? INTENT_LABEL[c.intent] ?? c.intent : ""}{c.tags.length ? ` · ${c.tags.join(", ")}` : ""}</p>
+                    <p className="text-xs text-stone">{c.intent ? tr(INTENT_LABEL[c.intent] ?? c.intent) : ""}{c.tags.length ? ` · ${c.tags.join(", ")}` : ""}</p>
                   </td>
                   <td className="px-4 py-3"><SourceTag source={c.source} /></td>
                   <td className="px-4 py-3"><StageSelect id={c.id} stage={c.stage} /></td>
@@ -200,7 +201,7 @@ export default async function LeadsPage({ searchParams }: PageProps<"/admin/lead
           </table>
         </div>
       ) : (
-        <p className="border border-line bg-forest/60 p-8 text-center text-sm text-stone">No hay leads con estos filtros. Quien ya te compró está en <Link href="/admin/clientes" className="underline hover:text-ivory">Clientes</Link>.</p>
+        <p className="border border-line bg-forest/60 p-8 text-center text-sm text-stone">{tr("No hay leads con estos filtros. Quien ya te compró está en")} <Link href="/admin/clientes" className="underline hover:text-ivory">{tr("Clientes")}</Link>.</p>
       )}
     </>
   );

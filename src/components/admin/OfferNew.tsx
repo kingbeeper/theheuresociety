@@ -1,5 +1,7 @@
 "use client";
 
+
+import { useTr } from "@/components/admin/AdminLang";
 import { useState, useTransition } from "react";
 import { createOfferAction, offerPhotosAction } from "@/app/admin/actions";
 
@@ -8,6 +10,7 @@ const label = "mb-1.5 block text-[0.62rem] tracking-[0.22em] uppercase text-ston
 
 // Registrar a mano un reloj que un cliente nos ofrece (en persona o por teléfono), con sus fotos
 export function OfferNew() {
+  const tr = useTr();
   const [open, setOpen] = useState(false);
   const [kind, setKind] = useState<"sell" | "trade" | "consign">("sell");
   const [files, setFiles] = useState<File[]>([]);
@@ -18,7 +21,7 @@ export function OfferNew() {
     return (
       <div className="flex flex-wrap items-center gap-3">
         <button type="button" onClick={() => { setOpen(true); setMsg(null); }} className="bg-ivory px-5 py-2.5 text-[0.68rem] tracking-[0.22em] uppercase text-ink hover:bg-brass">
-          + Nueva oferta
+          {tr("+ Nueva oferta")}
         </button>
         {msg?.ok && <p className="text-sm text-emerald-200/90">{msg.ok}</p>}
       </div>
@@ -46,7 +49,7 @@ export function OfferNew() {
       if (urls.length) await offerPhotosAction(r.id, urls);
       setFiles([]);
       setOpen(false);
-      setMsg({ ok: `Oferta guardada en «Nuevas»${files.length ? ` con ${urls.length} foto(s)` : ""}.` });
+      setMsg({ ok: tr(files.length ? "Oferta guardada en «Nuevas» con {n} foto(s)." : "Oferta guardada en «Nuevas».", { n: urls.length }) });
     });
   }
 
@@ -61,26 +64,26 @@ export function OfferNew() {
         ))}
       </div>
       <div className="grid gap-3 sm:grid-cols-3">
-        <label><span className={label}>Cliente *</span><input name="name" required className={field} /></label>
-        <label><span className={label}>Teléfono</span><input name="phone" type="tel" placeholder="+1 305…" className={field} /></label>
-        <label><span className={label}>Correo</span><input name="email" type="email" className={field} /></label>
+        <label><span className={label}>{tr("Cliente *")}</span><input name="name" required className={field} /></label>
+        <label><span className={label}>{tr("Teléfono")}</span><input name="phone" type="tel" placeholder="+1 305…" className={field} /></label>
+        <label><span className={label}>{tr("Correo")}</span><input name="email" type="email" className={field} /></label>
       </div>
       <div className="grid gap-3 sm:grid-cols-3">
-        <label><span className={label}>Marca *</span><input name="brand" required placeholder="Rolex" className={field} /></label>
-        <label><span className={label}>Modelo</span><input name="model" placeholder="Submariner Date" className={field} /></label>
-        <label><span className={label}>Referencia</span><input name="reference" placeholder="126610LN" className={field} /></label>
+        <label><span className={label}>{tr("Marca *")}</span><input name="brand" required placeholder={tr("Rolex")} className={field} /></label>
+        <label><span className={label}>{tr("Modelo")}</span><input name="model" placeholder={tr("Submariner Date")} className={field} /></label>
+        <label><span className={label}>{tr("Referencia")}</span><input name="reference" placeholder="126610LN" className={field} /></label>
       </div>
       <div className="grid gap-3 sm:grid-cols-[180px_1fr]">
-        <label><span className={label}>Cuánto pide</span><input name="asking" placeholder="$14,000" className={field} /></label>
-        <label><span className={label}>Detalles</span><input name="details" placeholder="Año, estado, caja y papeles…" className={field} /></label>
+        <label><span className={label}>{tr("Cuánto pide")}</span><input name="asking" placeholder="$14,000" className={field} /></label>
+        <label><span className={label}>{tr("Detalles")}</span><input name="details" placeholder={tr("Año, estado, caja y papeles…")} className={field} /></label>
       </div>
       <label>
-        <span className={label}>Fotos (hasta 10)</span>
+        <span className={label}>{tr("Fotos (hasta 10)")}</span>
         <input type="file" accept="image/*" multiple onChange={(e) => setFiles([...(e.target.files ?? [])].slice(0, 10))} className="text-sm text-stone" />
       </label>
       <div className="flex flex-wrap items-center gap-3">
-        <button disabled={pending} className="bg-ivory px-5 py-2.5 text-[0.68rem] tracking-[0.22em] uppercase text-ink hover:bg-brass disabled:opacity-60">{pending ? "Guardando…" : "Guardar oferta"}</button>
-        <button type="button" onClick={() => setOpen(false)} className="text-xs text-stone underline hover:text-ivory">Cerrar</button>
+        <button disabled={pending} className="bg-ivory px-5 py-2.5 text-[0.68rem] tracking-[0.22em] uppercase text-ink hover:bg-brass disabled:opacity-60">{pending ? tr("Guardando…") : tr("Guardar oferta")}</button>
+        <button type="button" onClick={() => setOpen(false)} className="text-xs text-stone underline hover:text-ivory">{tr("Cerrar")}</button>
         {msg?.error && <p className="text-sm text-red-200/90">{msg.error}</p>}
       </div>
     </form>

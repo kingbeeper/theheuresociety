@@ -1,5 +1,7 @@
 "use client";
 
+
+import { useTr } from "@/components/admin/AdminLang";
 import Script from "next/script";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -14,6 +16,7 @@ type FB = {
 type PageChoice = { id: string; name: string; instagram: string | null };
 
 export function ConnectMeta({ appId, scopes, configId, label = "Conectar Instagram y Facebook" }: { appId: string; scopes: string[]; configId?: string; label?: string }) {
+  const tr = useTr();
   const router = useRouter();
   const [ready, setReady] = useState(false);
   const [status, setStatus] = useState<{ kind: "idle" | "working" | "error" | "done"; text?: string }>({ kind: "idle" });
@@ -45,7 +48,7 @@ export function ConnectMeta({ appId, scopes, configId, label = "Conectar Instagr
     setChoices(null);
     setStatus({
       kind: "done",
-      text: `Conectado: ${j.page}${j.instagram ? ` · @${j.instagram}` : " (sin Instagram vinculado)"}${j.subscribed ? "" : " · los mensajes llegarán cuando Meta apruebe la app"}`,
+      text: `${tr("Conectado:")} ${j.page}${j.instagram ? ` · @${j.instagram}` : tr(" (sin Instagram vinculado)")}${j.subscribed ? "" : tr(" · los mensajes llegarán cuando Meta apruebe la app")}`,
     });
     router.refresh();
   }
@@ -55,7 +58,7 @@ export function ConnectMeta({ appId, scopes, configId, label = "Conectar Instagr
     if (!FB) return;
     FB.login(
       (r) => {
-        if (!r.authResponse?.accessToken) return setStatus({ kind: "error", text: "No se completó el inicio de sesión con Facebook." });
+        if (!r.authResponse?.accessToken) return setStatus({ kind: "error", text: tr("No se completó el inicio de sesión con Facebook.") });
         token.current = r.authResponse.accessToken;
         void connect();
       },
@@ -72,14 +75,14 @@ export function ConnectMeta({ appId, scopes, configId, label = "Conectar Instagr
         disabled={!ready || status.kind === "working"}
         className="bg-ivory px-5 py-2.5 text-[0.68rem] tracking-[0.22em] uppercase text-ink hover:bg-brass disabled:opacity-60"
       >
-        {ready ? label : "Cargando…"}
+        {ready ? label : tr("Cargando…")}
       </button>
       {choices && (
         <div className="mt-4 space-y-2">
-          <p className="text-sm text-stone">Administras varias páginas. ¿Cuál es la de The Heure Society?</p>
+          <p className="text-sm text-stone">{tr("Administras varias páginas. ¿Cuál es la de The Heure Society?")}</p>
           {choices.map((p) => (
             <button key={p.id} type="button" onClick={() => connect(p.id)} className="block w-full border border-line px-4 py-2.5 text-left text-sm hover:border-brass">
-              {p.name} {p.instagram ? <span className="text-stone">· @{p.instagram}</span> : <span className="text-stone">· sin Instagram</span>}
+              {p.name} {p.instagram ? <span className="text-stone">· @{p.instagram}</span> : <span className="text-stone">{tr("· sin Instagram")}</span>}
             </button>
           ))}
         </div>
@@ -90,20 +93,21 @@ export function ConnectMeta({ appId, scopes, configId, label = "Conectar Instagr
 }
 
 export function SyncButton() {
+  const tr = useTr();
   const router = useRouter();
   const [state, setState] = useState<{ busy: boolean; text?: string }>({ busy: false });
   async function sync() {
-    setState({ busy: true, text: "Actualizando métricas… puede tardar un minuto." });
+    setState({ busy: true, text: tr("Actualizando métricas… puede tardar un minuto.") });
     const res = await fetch("/api/social/sync", { method: "POST" });
     const j = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; warnings?: string[] };
-    setState({ busy: false, text: j.ok ? `Actualizado${j.warnings?.length ? ` (${j.warnings.length} métricas no disponibles)` : ""}.` : j.error ?? "No se pudo actualizar." });
+    setState({ busy: false, text: j.ok ? `${tr("Actualizado")}${j.warnings?.length ? tr(" ({n} métricas no disponibles)", { n: j.warnings.length }) : ""}.` : j.error ?? tr("No se pudo actualizar.") });
     router.refresh();
   }
   return (
     <div className="flex items-center gap-3">
       {state.text && <span className="text-xs text-stone">{state.text}</span>}
       <button type="button" onClick={sync} disabled={state.busy} className="border border-line px-4 py-2 text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:border-ivory/40 hover:text-ivory disabled:opacity-50">
-        {state.busy ? "Actualizando…" : "Actualizar"}
+        {state.busy ? tr("Actualizando…") : tr("Actualizar")}
       </button>
     </div>
   );

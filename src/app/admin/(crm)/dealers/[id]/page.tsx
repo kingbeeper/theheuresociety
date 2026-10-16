@@ -1,3 +1,4 @@
+import { tr } from "@/lib/admin-i18n";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
@@ -39,25 +40,25 @@ export default async function DealerPage({ params }: PageProps<"/admin/dealers/[
 
   return (
     <>
-      <Link href="/admin/dealers?ver=dealers" className="text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">← Mis dealers</Link>
+      <Link href="/admin/dealers?ver=dealers" className="text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">{tr("← Mis dealers")}</Link>
       <PageTitle
         eyebrow={company ? `Dealer · ${company}` : "Dealer"}
         title={d.name ?? "Sin nombre"}
         action={
           <div className="flex flex-wrap gap-2">
-            {wa && <a href={wa.replace(/\?text=$/, "")} target="_blank" rel="noreferrer" className="border border-emerald-300/40 px-4 py-2.5 text-[0.66rem] tracking-[0.2em] uppercase text-emerald-200 hover:bg-emerald-300/10">📲 WhatsApp</a>}
-            <Link href={`/admin/leads/${d.id}`} className="border border-line px-4 py-2.5 text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">Ficha completa</Link>
+            {wa && <a href={wa.replace(/\?text=$/, "")} target="_blank" rel="noreferrer" className="border border-emerald-300/40 px-4 py-2.5 text-[0.66rem] tracking-[0.2em] uppercase text-emerald-200 hover:bg-emerald-300/10">{tr("📲 WhatsApp")}</a>}
+            <Link href={`/admin/leads/${d.id}`} className="border border-line px-4 py-2.5 text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">{tr("Ficha completa")}</Link>
           </div>
         }
       />
-      {!isDealer && <p className="mb-4 text-sm text-amber-200">Este cliente ya no tiene la etiqueta «Dealer»: no sale en la lista ni recibe pedidos.</p>}
-      <p className="mb-6 text-sm text-stone">{[d.phone, d.email].filter(Boolean).join(" · ") || "Sin teléfono ni correo"} · en el CRM desde {fmtDate(d.created_at)}</p>
+      {!isDealer && <p className="mb-4 text-sm text-amber-200">{tr("Este cliente ya no tiene la etiqueta «Dealer»: no sale en la lista ni recibe pedidos.")}</p>}
+      <p className="mb-6 text-sm text-stone">{[d.phone, d.email].filter(Boolean).join(" · ") || tr("Sin teléfono ni correo")} {tr("· en el CRM desde")} {fmtDate(d.created_at)}</p>
 
       <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
-        <div className={tile}><p className="text-[0.6rem] tracking-[0.2em] uppercase text-stone">Pedidos</p><p className="mt-1 text-xl">{s.asked}</p></div>
-        <div className={tile}><p className="text-[0.6rem] tracking-[0.2em] uppercase text-stone">Respondió</p><p className="mt-1 text-xl">{s.asked ? `${Math.round((s.answered / s.asked) * 100)}%` : "—"}</p></div>
-        <div className={tile}><p className="text-[0.6rem] tracking-[0.2em] uppercase text-stone">La tenía</p><p className="mt-1 text-xl">{s.has}</p></div>
-        <div className={tile}><p className="text-[0.6rem] tracking-[0.2em] uppercase text-stone">Mejor oferta</p><p className="mt-1 text-xl">{s.best ? money(s.best.price!) : "—"}</p>{s.best && <p className="truncate text-xs text-stone">{s.best.query}</p>}</div>
+        <div className={tile}><p className="text-[0.6rem] tracking-[0.2em] uppercase text-stone">{tr("Pedidos")}</p><p className="mt-1 text-xl">{s.asked}</p></div>
+        <div className={tile}><p className="text-[0.6rem] tracking-[0.2em] uppercase text-stone">{tr("Respondió")}</p><p className="mt-1 text-xl">{s.asked ? `${Math.round((s.answered / s.asked) * 100)}%` : "—"}</p></div>
+        <div className={tile}><p className="text-[0.6rem] tracking-[0.2em] uppercase text-stone">{tr("La tenía")}</p><p className="mt-1 text-xl">{s.has}</p></div>
+        <div className={tile}><p className="text-[0.6rem] tracking-[0.2em] uppercase text-stone">{tr("Mejor oferta")}</p><p className="mt-1 text-xl">{s.best ? money(s.best.price!) : "—"}</p>{s.best && <p className="truncate text-xs text-stone">{s.best.query}</p>}</div>
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
@@ -66,11 +67,11 @@ export default async function DealerPage({ params }: PageProps<"/admin/dealers/[
             {requests.length ? (
               <ul className="divide-y divide-line/60">
                 {requests.map((r) => (
-                  <DealerRequestRow key={r.id} r={r} dealer={d} title={<>{r.query}<span className="text-xs text-stone"> · {fmtDate(r.asked_at)}{r.budget ? ` · hasta ${money(r.budget)}` : ""}</span>{r.document_id && <Link href={`/admin/documentos/${r.document_id}`} className="ml-1 text-xs text-brass hover:text-ivory">encargo →</Link>}</>} />
+                  <DealerRequestRow key={r.id} r={r} dealer={d} title={<>{r.query}<span className="text-xs text-stone"> · {fmtDate(r.asked_at)}{r.budget ? tr(" · hasta {m}", { m: money(r.budget) }) : ""}</span>{r.document_id && <Link href={`/admin/documentos/${r.document_id}`} className="ml-1 text-xs text-brass hover:text-ivory">{tr("encargo →")}</Link>}</>} />
                 ))}
               </ul>
             ) : (
-              <p className="text-sm text-stone">Todavía no se le ha pedido nada.</p>
+              <p className="text-sm text-stone">{tr("Todavía no se le ha pedido nada.")}</p>
             )}
           </Card>
 
@@ -81,13 +82,13 @@ export default async function DealerPage({ params }: PageProps<"/admin/dealers/[
                   <li key={i.id} className="flex flex-wrap justify-between gap-2 py-2">
                     <Link href={`/admin/inventario/${i.id}`} className="hover:text-brass">{i.sku} · {[i.brand, i.model, i.reference].filter(Boolean).join(" ")}</Link>
                     <span className="text-xs text-stone">
-                      {i.supplier_customer_id === d.id ? `nos lo dio (${ACQUISITION[i.acquisition as Acquisition] ?? i.acquisition}${showCosts && i.cost ? ` · ${money(i.cost)}` : ""})` : `nos lo compró${i.sale_price ? ` · ${money(i.sale_price)}` : ""}`} · {ITEM_STATUS[i.status as ItemStatus] ?? i.status}
+                      {i.supplier_customer_id === d.id ? `${tr("nos lo dio")} (${tr(ACQUISITION[i.acquisition as Acquisition] ?? i.acquisition)}${showCosts && i.cost ? ` · ${money(i.cost)}` : ""})` : `${tr("nos lo compró")}${i.sale_price ? ` · ${money(i.sale_price)}` : ""}`} · {tr(ITEM_STATUS[i.status as ItemStatus] ?? i.status)}
                     </span>
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="text-sm text-stone">Aún no hay relojes comprados, en memo o vendidos a este dealer.</p>
+              <p className="text-sm text-stone">{tr("Aún no hay relojes comprados, en memo o vendidos a este dealer.")}</p>
             )}
           </Card>
 
@@ -96,13 +97,13 @@ export default async function DealerPage({ params }: PageProps<"/admin/dealers/[
               <ul className="divide-y divide-line/60 text-sm">
                 {docs.map((x) => (
                   <li key={x.id} className="flex flex-wrap justify-between gap-2 py-2">
-                    <Link href={`/admin/documentos/${x.id}`} className="hover:text-brass">{KIND_LABEL[x.kind as DocKind]} {x.number}</Link>
+                    <Link href={`/admin/documentos/${x.id}`} className="hover:text-brass">{tr(KIND_LABEL[x.kind as DocKind])} {x.number}</Link>
                     <span className="text-xs text-stone">{STATUS_LABEL[x.kind as DocKind]?.[x.status as never] ?? x.status}{x.total ? ` · ${money(x.total)}` : ""} · {fmtDate(x.created_at)}</span>
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="text-sm text-stone">Sin documentos (memos, compras, facturas…) con este dealer.</p>
+              <p className="text-sm text-stone">{tr("Sin documentos (memos, compras, facturas…) con este dealer.")}</p>
             )}
           </Card>
         </div>
@@ -127,7 +128,7 @@ export default async function DealerPage({ params }: PageProps<"/admin/dealers/[
                 ))}
               </ul>
             ) : (
-              <p className="text-sm text-stone">Sin movimientos.</p>
+              <p className="text-sm text-stone">{tr("Sin movimientos.")}</p>
             )}
           </Card>
         </div>

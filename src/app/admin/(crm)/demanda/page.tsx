@@ -1,3 +1,4 @@
+import { tr } from "@/lib/admin-i18n";
 import Link from "next/link";
 import { connection } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
@@ -16,15 +17,14 @@ export default async function DemandPage() {
     <>
       <PageTitle eyebrow="CRM" title="Demanda frente a inventario" />
       <p className="-mt-4 mb-6 max-w-2xl text-sm text-stone">
-        Lo que buscan tus clientes (búsquedas «avísenme» y el «qué busca» de los leads abiertos de los últimos 6 meses), agrupado por modelo,
-        frente a lo que tienes disponible. Arriba, lo que conviene comprar.
+        {tr("Lo que buscan tus clientes (búsquedas «avísenme» y el «qué busca» de los leads abiertos de los últimos 6 meses), agrupado por modelo, frente a lo que tienes disponible. Arriba, lo que conviene comprar.")}
       </p>
 
       {rows.length ? (
         <ul className="divide-y divide-line/60 border border-line">
           {rows.map((r) => {
             const gap = r.people.length - r.stock.length;
-            const signal = gap > 0 ? { text: `Comprar · faltan ${gap}`, cls: "text-emerald-200 border-emerald-300/40" } : r.people.length === 0 ? { text: "Sin demanda", cls: "text-amber-200 border-amber-300/40" } : { text: "Cubierto", cls: "text-stone border-line" };
+            const signal = gap > 0 ? { text: tr("Comprar · faltan {n}", { n: gap }), cls: "text-emerald-200 border-emerald-300/40" } : r.people.length === 0 ? { text: "Sin demanda", cls: "text-amber-200 border-amber-300/40" } : { text: "Cubierto", cls: "text-stone border-line" };
             return (
               <li key={r.family}>
                 <details className="group">
@@ -37,23 +37,23 @@ export default async function DemandPage() {
                       </span>
                       <span className="flex items-center gap-2">
                         <span className="h-1.5 bg-ivory/40" style={{ width: `${(r.stock.length / max) * 100}%`, minWidth: r.stock.length ? 4 : 0 }} />
-                        {r.stock.length} en stock
+                        {r.stock.length} {tr("en stock")}
                       </span>
                     </span>
-                    <span className={`border px-2 py-1 text-[0.6rem] tracking-[0.14em] uppercase ${signal.cls}`}>{signal.text}</span>
+                    <span className={`border px-2 py-1 text-[0.6rem] tracking-[0.14em] uppercase ${signal.cls}`}>{tr(signal.text)}</span>
                   </summary>
                   <div className="grid gap-4 px-4 pb-4 text-sm sm:grid-cols-2">
                     <div>
-                      <p className="mb-1 text-[0.6rem] tracking-[0.16em] uppercase text-stone">Lo buscan</p>
+                      <p className="mb-1 text-[0.6rem] tracking-[0.16em] uppercase text-stone">{tr("Lo buscan")}</p>
                       {r.people.length ? r.people.map((p) => (
-                        <p key={p.id}><Link href={`/admin/leads/${p.id}`} className="hover:text-brass">{p.name ?? "Sin nombre"}</Link> <span className="text-xs text-stone">· {p.query}</span></p>
-                      )) : <p className="text-stone">Nadie por ahora.</p>}
+                        <p key={p.id}><Link href={`/admin/leads/${p.id}`} className="hover:text-brass">{p.name ?? tr("Sin nombre")}</Link> <span className="text-xs text-stone">· {p.query}</span></p>
+                      )) : <p className="text-stone">{tr("Nadie por ahora.")}</p>}
                     </div>
                     <div>
-                      <p className="mb-1 text-[0.6rem] tracking-[0.16em] uppercase text-stone">En stock</p>
+                      <p className="mb-1 text-[0.6rem] tracking-[0.16em] uppercase text-stone">{tr("En stock")}</p>
                       {r.stock.length ? r.stock.map((s) => (
                         <p key={s.id}><Link href={`/admin/inventario/${s.id}`} className="hover:text-brass">{s.sku}</Link> <span className="text-xs text-stone">· {s.title}</span></p>
-                      )) : <p className="text-stone">Ninguno.</p>}
+                      )) : <p className="text-stone">{tr("Ninguno.")}</p>}
                     </div>
                   </div>
                 </details>
@@ -62,7 +62,7 @@ export default async function DemandPage() {
           })}
         </ul>
       ) : (
-        <p className="border border-line bg-forest/60 p-8 text-center text-sm text-stone">Todavía no hay búsquedas de clientes ni relojes en stock para comparar.</p>
+        <p className="border border-line bg-forest/60 p-8 text-center text-sm text-stone">{tr("Todavía no hay búsquedas de clientes ni relojes en stock para comparar.")}</p>
       )}
     </>
   );

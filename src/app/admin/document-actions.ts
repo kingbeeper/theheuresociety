@@ -1,5 +1,6 @@
 "use server";
 
+import { tr } from "@/lib/admin-i18n";
 import { redirect } from "next/navigation";
 import { refresh } from "next/cache";
 import { requireAdmin } from "@/lib/admin-auth";
@@ -46,9 +47,9 @@ function parseLines(raw: string | null): DocLine[] {
 export async function saveDocument(id: string | null, _: unknown, f: FormData) {
   const user = await requireAdmin("documentos");
   const kind = (text(f, "kind") ?? "quote") as DocKind;
-  if (!(kind in KIND_LABEL)) return { error: "Tipo de documento no válido." };
+  if (!(kind in KIND_LABEL)) return { error: tr("Tipo de documento no válido.") };
   const items = parseLines(text(f, "items"));
-  if (!items.length) return { error: "Añade al menos un reloj o una línea." };
+  if (!items.length) return { error: tr("Añade al menos un reloj o una línea.") };
 
   // Cliente: uno del CRM, o uno nuevo que queda creado como lead
   let customerId = text(f, "customer_id");
@@ -56,7 +57,7 @@ export async function saveDocument(id: string | null, _: unknown, f: FormData) {
     const c = await upsertLead({ name: text(f, "client_name"), phone: text(f, "client_phone"), email: text(f, "client_email"), source: "walk_in", intent: kind === "memo" ? null : "buy", notify: false });
     customerId = c.id;
   }
-  if (!customerId && !text(f, "client_name")) return { error: "Falta el cliente." };
+  if (!customerId && !text(f, "client_name")) return { error: tr("Falta el cliente.") };
 
   const fields = {
     kind,
@@ -92,8 +93,8 @@ export async function saveDocument(id: string | null, _: unknown, f: FormData) {
   }
 
   const before = await getDoc(id);
-  if (!before) return { error: "No existe." };
-  if (!["draft", "sent"].includes(before.status)) return { error: "Este documento ya está cerrado y no se puede editar." };
+  if (!before) return { error: tr("No existe.") };
+  if (!["draft", "sent"].includes(before.status)) return { error: tr("Este documento ya está cerrado y no se puede editar.") };
   const totals = docTotals(fields);
   const { error } = await adminDb().from("documents").update({ ...fields, kind: before.kind, subtotal: totals.subtotal, total: totals.total, updated_at: new Date().toISOString() }).eq("id", id);
   if (error) return { error: error.message };
@@ -149,7 +150,7 @@ export async function convertToInvoice(id: string) {
 export async function markPaid(id: string, _: unknown, f: FormData) {
   const user = await requireAdmin("documentos");
   const d = await getDoc(id);
-  if (!d || d.kind !== "invoice" || d.status === "paid" || d.status === "void") return { error: "Esta factura no se puede marcar como pagada." };
+  if (!d || d.kind !== "invoice" || d.status === "paid" || d.status === "void") return { error: tr("Esta factura no se puede marcar como pagada.") };
   await payInvoice(d, text(f, "payment_method"), date(f, "paid_at") ?? today(), user);
   refresh();
   return { ok: true };
@@ -168,9 +169,9 @@ export async function convertToProforma(id: string) {
 export async function proformaPaymentAction(id: string, _: unknown, f: FormData) {
   const user = await requireAdmin("documentos");
   const d = await getDoc(id);
-  if (!d || d.kind !== "proforma" || !["draft", "sent"].includes(d.status)) return { error: "Esta proforma ya está cerrada." };
+  if (!d || d.kind !== "proforma" || !["draft", "sent"].includes(d.status)) return { error: tr("Esta proforma ya está cerrada.") };
   const amount = num(f, "amount");
-  if (amount <= 0) return { error: "Indica el importe del depósito." };
+  if (amount <= 0) return { error: tr("Indica el importe del depósito.") };
   await addProformaPayment(d, { date: date(f, "paid_at") ?? today(), amount, method: text(f, "payment_method") }, user);
   refresh();
   return { ok: true };
@@ -180,7 +181,7 @@ export async function proformaPaymentAction(id: string, _: unknown, f: FormData)
 export async function closeProformaAction(id: string, _: unknown, f: FormData) {
   const user = await requireAdmin("documentos");
   const d = await getDoc(id);
-  if (!d || d.kind !== "proforma" || !["draft", "sent"].includes(d.status)) return { error: "Esta proforma ya está cerrada." };
+  if (!d || d.kind !== "proforma" || !["draft", "sent"].includes(d.status)) return { error: tr("Esta proforma ya está cerrada.") };
   if (d.status === "draft") await issueDoc(d, user);
   const invoice = await closeProforma({ ...d, status: "sent" }, { date: date(f, "paid_at") ?? today(), method: text(f, "payment_method") }, user);
   redirect(`/admin/documentos/${invoice.id}`);
@@ -190,7 +191,7 @@ export async function closeProformaAction(id: string, _: unknown, f: FormData) {
 export async function markDepositReceived(id: string, _: unknown, f: FormData) {
   const user = await requireAdmin("documentos");
   const d = await getDoc(id);
-  if (!d || d.kind !== "sourcing" || d.deposit_paid_at || !["draft", "sent"].includes(d.status)) return { error: "Este anticipo ya está registrado." };
+  if (!d || d.kind !== "sourcing" || d.deposit_paid_at || !["draft", "sent"].includes(d.status)) return { error: tr("Este anticipo ya está registrado.") };
   await depositReceived(d, text(f, "payment_method"), date(f, "paid_at") ?? today(), user);
   refresh();
   return { ok: true };
@@ -208,14 +209,14 @@ export async function refundSourcing(id: string) {
 export async function convertSourcing(id: string, _: unknown, f: FormData) {
   const user = await requireAdmin("documentos");
   const d = await getDoc(id);
-  if (!d || d.kind !== "sourcing" || d.status !== "sent") return { error: "Este encargo ya está cerrado." };
+  if (!d || d.kind !== "sourcing" || d.status !== "sent") return { error: tr("Este encargo ya está cerrado.") };
   const price = num(f, "price");
-  if (price <= 0) return { error: "Indica el precio final del reloj." };
+  if (price <= 0) return { error: tr("Indica el precio final del reloj.") };
   const itemId = text(f, "item_id");
   let line: DocLine = { title: d.items[0]?.title ?? "Timepiece", details: d.items[0]?.details ?? null, serial: text(f, "serial"), qty: 1, price };
   if (itemId) {
     const { data: i } = await adminDb().from("inventory_items").select("id, sku, brand, model, reference, serial, condition, comes_with, papers_date").eq("id", itemId).maybeSingle();
-    if (!i) return { error: "Ese reloj ya no está en el inventario." };
+    if (!i) return { error: tr("Ese reloj ya no está en el inventario.") };
     line = {
       item_id: i.id, sku: i.sku, serial: i.serial, qty: 1, price,
       title: [i.brand, i.model, i.reference].filter(Boolean).join(" "),

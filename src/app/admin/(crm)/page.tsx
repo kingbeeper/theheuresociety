@@ -1,3 +1,4 @@
+import { tr, trParts } from "@/lib/admin-i18n";
 import Link from "next/link";
 import { connection } from "next/server";
 import { adminDb } from "@/lib/supabase";
@@ -57,14 +58,14 @@ export default async function Dashboard({ searchParams }: PageProps<"/admin">) {
     <>
       <PageTitle eyebrow="The Heure Society" title="Panel" />
       {(await searchParams)["sin-permiso"] && (
-        <p className="mb-6 border border-amber-300/40 bg-amber-300/5 p-4 text-sm">No tienes permiso para esa sección. Pídeselo a un administrador.</p>
+        <p className="mb-6 border border-amber-300/40 bg-amber-300/5 p-4 text-sm">{tr("No tienes permiso para esa sección. Pídeselo a un administrador.")}</p>
       )}
 
       <div className="grid grid-cols-2 gap-px border border-line bg-line lg:grid-cols-6">
         {kpis.map((k) => (
           <Link key={k.label} href={k.href} className="bg-forest px-5 py-6 transition-colors hover:bg-moss">
             <p className="font-display text-3xl font-light sm:text-4xl">{k.value}</p>
-            <p className="mt-2 text-[0.62rem] leading-snug tracking-[0.18em] uppercase text-stone">{k.label}</p>
+            <p className="mt-2 text-[0.62rem] leading-snug tracking-[0.18em] uppercase text-stone">{trParts(k.label)}</p>
           </Link>
         ))}
       </div>
@@ -75,7 +76,7 @@ export default async function Dashboard({ searchParams }: PageProps<"/admin">) {
             {byStage.map(([s, n]) => (
               <li key={s}>
                 <Link href={`/admin/leads?stage=${s}`} className="flex items-center gap-3 text-sm hover:text-brass">
-                  <span className="w-28 shrink-0 text-stone">{STAGE_LABEL[s]}</span>
+                  <span className="w-28 shrink-0 text-stone">{tr(STAGE_LABEL[s])}</span>
                   <span className="h-2 flex-1 bg-ink">
                     <span className="block h-full bg-brass/70" style={{ width: `${all.length ? Math.max((n / all.length) * 100, n ? 3 : 0) : 0}%` }} />
                   </span>
@@ -85,7 +86,7 @@ export default async function Dashboard({ searchParams }: PageProps<"/admin">) {
             ))}
           </ul>
           <p className="mt-5 text-xs text-stone">
-            Conversión: {all.length ? Math.round((won / all.length) * 100) : 0}% de los leads han terminado en venta o compra.
+            {tr("Conversión:")} {all.length ? Math.round((won / all.length) * 100) : 0}{tr("% de los leads han terminado en venta o compra.")}
           </p>
         </Card>
 
@@ -94,13 +95,13 @@ export default async function Dashboard({ searchParams }: PageProps<"/admin">) {
             <ul className="space-y-2.5 text-sm">
               {bySource.map(([s, n]) => (
                 <li key={s} className="flex justify-between border-b border-line/60 pb-2">
-                  <span className="text-stone">{SOURCE_LABEL[s] ?? s}</span>
+                  <span className="text-stone">{tr(SOURCE_LABEL[s] ?? s)}</span>
                   <span className="tabular-nums">{n}</span>
                 </li>
               ))}
             </ul>
           ) : (
-            <p className="text-sm text-stone">Todavía no hay leads esta semana.</p>
+            <p className="text-sm text-stone">{tr("Todavía no hay leads esta semana.")}</p>
           )}
         </Card>
 
@@ -112,7 +113,7 @@ export default async function Dashboard({ searchParams }: PageProps<"/admin">) {
                   <div>
                     <p>{fmtDateTime(a.starts_at as string)}</p>
                     <p className="text-xs text-stone">
-                      {a.kind === "office" ? "Oficina" : "Videollamada"} · {a.status === "confirmed" ? "confirmada" : "pendiente de confirmar"}
+                      {a.kind === "office" ? tr("Oficina") : tr("Videollamada")} · {a.status === "confirmed" ? "confirmada" : tr("pendiente de confirmar")}
                     </p>
                   </div>
                   {a.customer_id ? (
@@ -124,7 +125,7 @@ export default async function Dashboard({ searchParams }: PageProps<"/admin">) {
               ))}
             </ul>
           ) : (
-            <p className="text-sm text-stone">No hay citas próximas.</p>
+            <p className="text-sm text-stone">{tr("No hay citas próximas.")}</p>
           )}
         </Card>
 
@@ -133,20 +134,20 @@ export default async function Dashboard({ searchParams }: PageProps<"/admin">) {
             <ul className="space-y-3 text-sm">
               {follow.slice(0, 8).map((f) => (
                 <li key={f.taskId ?? f.id} className="border-b border-line/60 pb-3">
-                  <Link href={`/admin/leads/${f.id}`} className="hover:text-brass">{f.taskId ? "⭐" : f.scheduled ? "⏰" : "💤"} {f.name ?? "Sin nombre"}</Link>
+                  <Link href={`/admin/leads/${f.id}`} className="hover:text-brass">{f.taskId ? "⭐" : f.scheduled ? "⏰" : "💤"} {f.name ?? tr("Sin nombre")}</Link>
                   <p className="text-xs text-stone">{f.reason}</p>
                   {f.taskId && (
                     <div className="mt-1.5 flex gap-3 text-[0.62rem] tracking-[0.16em] uppercase">
-                      {f.wa && <a href={f.wa} target="_blank" rel="noreferrer" className="text-brass hover:text-ivory">WhatsApp</a>}
-                      <form action={completeTaskAction.bind(null, f.taskId)}><button className="text-stone hover:text-ivory">✓ Hecho</button></form>
+                      {f.wa && <a href={f.wa} target="_blank" rel="noreferrer" className="text-brass hover:text-ivory">{tr("WhatsApp")}</a>}
+                      <form action={completeTaskAction.bind(null, f.taskId)}><button className="text-stone hover:text-ivory">{tr("✓ Hecho")}</button></form>
                     </div>
                   )}
                 </li>
               ))}
-              {follow.length > 8 && <li className="text-xs text-stone">…y {follow.length - 8} más</li>}
+              {follow.length > 8 && <li className="text-xs text-stone">{tr("…y")} {follow.length - 8} {tr("más")}</li>}
             </ul>
           ) : (
-            <p className="text-sm text-stone">Todo al día.</p>
+            <p className="text-sm text-stone">{tr("Todo al día.")}</p>
           )}
         </Card>
 
@@ -156,14 +157,14 @@ export default async function Dashboard({ searchParams }: PageProps<"/admin">) {
               {best.map((b, i) => (
                 <li key={b.id} className="flex items-baseline justify-between gap-3 border-b border-line/60 pb-2">
                   <Link href={`/admin/leads/${b.id}`} className="min-w-0 truncate hover:text-brass">
-                    <span className="text-stone">{i + 1}.</span> {b.vip ? "⭐ " : ""}{b.name ?? "Sin nombre"}
+                    <span className="text-stone">{i + 1}.</span> {b.vip ? "⭐ " : ""}{b.name ?? tr("Sin nombre")}
                   </Link>
                   <span className="shrink-0 tabular-nums text-stone">{money(b.spent)} · {b.purchases}</span>
                 </li>
               ))}
             </ul>
           ) : (
-            <p className="text-sm text-stone">Aparecerán al registrar ventas con comprador en el inventario.</p>
+            <p className="text-sm text-stone">{tr("Aparecerán al registrar ventas con comprador en el inventario.")}</p>
           )}
         </Card>
 
@@ -173,16 +174,16 @@ export default async function Dashboard({ searchParams }: PageProps<"/admin">) {
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-[0.6rem] tracking-[0.16em] uppercase text-stone">
-                  <th className="pb-2 font-normal">Canal del comprador</th>
-                  <th className="pb-2 text-right font-normal">Ventas</th>
-                  <th className="pb-2 text-right font-normal">Facturado</th>
-                  <th className="pb-2 text-right font-normal">Ganancia</th>
+                  <th className="pb-2 font-normal">{tr("Canal del comprador")}</th>
+                  <th className="pb-2 text-right font-normal">{tr("Ventas")}</th>
+                  <th className="pb-2 text-right font-normal">{tr("Facturado")}</th>
+                  <th className="pb-2 text-right font-normal">{tr("Ganancia")}</th>
                 </tr>
               </thead>
               <tbody>
                 {channels.map((r) => (
                   <tr key={r.source} className="border-t border-line/60">
-                    <td className="py-2">{r.source === "unknown" ? "Sin comprador en el CRM" : SOURCE_LABEL[r.source] ?? r.source}</td>
+                    <td className="py-2">{r.source === "unknown" ? tr("Sin comprador en el CRM") : tr(SOURCE_LABEL[r.source] ?? r.source)}</td>
                     <td className="py-2 text-right tabular-nums">{r.count}</td>
                     <td className="py-2 text-right tabular-nums">{money(r.revenue)}</td>
                     <td className="py-2 text-right tabular-nums">{money(r.profit)}</td>
@@ -191,7 +192,7 @@ export default async function Dashboard({ searchParams }: PageProps<"/admin">) {
               </tbody>
             </table>
           ) : (
-            <p className="text-sm text-stone">Aún no hay ventas registradas en el inventario. Al registrar una venta, el canal sale del origen del comprador.</p>
+            <p className="text-sm text-stone">{tr("Aún no hay ventas registradas en el inventario. Al registrar una venta, el canal sale del origen del comprador.")}</p>
           )}
         </Card>
         )}
@@ -202,7 +203,7 @@ export default async function Dashboard({ searchParams }: PageProps<"/admin">) {
               {(recent.data as Customer[]).map((c) => (
                 <li key={c.id}>
                   <Link href={`/admin/leads/${c.id}`} className="grid grid-cols-[1fr_auto] items-center gap-3 py-3 hover:text-brass sm:grid-cols-[1.2fr_1fr_auto_auto]">
-                    <span className="truncate">{c.name ?? c.phone ?? c.email ?? "Sin nombre"}</span>
+                    <span className="truncate">{c.name ?? c.phone ?? c.email ?? tr("Sin nombre")}</span>
                     <span className="hidden truncate text-sm text-stone sm:block">{c.interests ?? "—"}</span>
                     <SourceTag source={c.source} />
                     <StageBadge stage={c.stage} />
@@ -211,7 +212,7 @@ export default async function Dashboard({ searchParams }: PageProps<"/admin">) {
               ))}
             </ul>
           ) : (
-            <p className="text-sm text-stone">Aún no hay leads. Llegarán desde la web, WhatsApp o los puedes añadir a mano.</p>
+            <p className="text-sm text-stone">{tr("Aún no hay leads. Llegarán desde la web, WhatsApp o los puedes añadir a mano.")}</p>
           )}
         </Card>
 
@@ -228,7 +229,7 @@ export default async function Dashboard({ searchParams }: PageProps<"/admin">) {
               ))}
             </ul>
           ) : (
-            <p className="text-sm text-stone">Nada pendiente.</p>
+            <p className="text-sm text-stone">{tr("Nada pendiente.")}</p>
           )}
         </Card>
       </div>

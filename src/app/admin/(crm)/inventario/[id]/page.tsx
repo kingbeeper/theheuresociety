@@ -1,3 +1,4 @@
+import { tr, trParts } from "@/lib/admin-i18n";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
@@ -62,23 +63,23 @@ export default async function ItemPage({ params, searchParams }: PageProps<"/adm
 
   return (
     <>
-      <Link href="/admin/inventario" className="text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">← Inventario</Link>
+      <Link href="/admin/inventario" className="text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">{tr("← Inventario")}</Link>
       <PageTitle
         eyebrow={`${item.sku} · ${ACQUISITION[item.acquisition]}`}
         title={`${item.brand} ${item.model ?? ""}`.trim()}
         action={
           <div className="flex flex-wrap gap-2">
-            {web.data?.slug && <a href={`/es/watches/${web.data.slug}`} target="_blank" rel="noreferrer" className={ghostButtonClass}>Ver en la web</a>}
-            <a href={`/api/certificate/${item.id}`} target="_blank" rel="noreferrer" className={ghostButtonClass}>Certificado</a>
-            <a href={`/admin/etiquetas?ids=${item.id}`} target="_blank" rel="noreferrer" className={ghostButtonClass}>Etiqueta QR</a>
-            <Link href={`/admin/tareas?reloj=${item.id}`} className={ghostButtonClass}>+ Tarea</Link>
+            {web.data?.slug && <a href={`/es/watches/${web.data.slug}`} target="_blank" rel="noreferrer" className={ghostButtonClass}>{tr("Ver en la web")}</a>}
+            <a href={`/api/certificate/${item.id}`} target="_blank" rel="noreferrer" className={ghostButtonClass}>{tr("Certificado")}</a>
+            <a href={`/admin/etiquetas?ids=${item.id}`} target="_blank" rel="noreferrer" className={ghostButtonClass}>{tr("Etiqueta QR")}</a>
+            <Link href={`/admin/tareas?reloj=${item.id}`} className={ghostButtonClass}>{tr("+ Tarea")}</Link>
             {available && (
               <form action={setReserved.bind(null, item.id, item.status !== "reserved")}>
                 <button className={ghostButtonClass}>{item.status === "reserved" ? "Quitar reserva" : "Reservar"}</button>
               </form>
             )}
             {!available && (
-              <form action={reopenItem.bind(null, item.id)}><button className={ghostButtonClass}>Volver a stock</button></form>
+              <form action={reopenItem.bind(null, item.id)}><button className={ghostButtonClass}>{tr("Volver a stock")}</button></form>
             )}
           </div>
         }
@@ -89,20 +90,20 @@ export default async function ItemPage({ params, searchParams }: PageProps<"/adm
           ["Estado", ITEM_STATUS[item.status]],
           ...(showCosts ? [[owner ? "A pagar al dueño" : "Costo", money(item.cost)], ["Costo total", item.cost == null ? "—" : money(totalCost(item))]] : []),
           [item.status === "sold" ? "Venta" : "Precio previsto", money(item.status === "sold" ? item.sale_price : item.asking_price)],
-          [item.status === "sold" && showCosts ? "Margen" : "Días en stock", item.status === "sold" && showCosts ? (m ? `${money(m.amount)} · ${m.onSale != null ? Math.round(m.onSale * 100) : "—"}%` : "—") : days == null ? "—" : `${days} días`],
+          [item.status === "sold" && showCosts ? "Margen" : "Días en stock", item.status === "sold" && showCosts ? (m ? `${money(m.amount)} · ${m.onSale != null ? Math.round(m.onSale * 100) : "—"}%` : "—") : days == null ? "—" : tr("{n} días", { n: days })],
         ].map(([l, v]) => (
           <div key={l} className="bg-forest px-5 py-4">
             <p className="font-display text-2xl font-light">{v}</p>
-            <p className="mt-1 text-[0.6rem] tracking-[0.16em] uppercase text-stone">{l}</p>
+            <p className="mt-1 text-[0.6rem] tracking-[0.16em] uppercase text-stone">{trParts(l)}</p>
           </div>
         ))}
       </div>
 
       {counting && (
         <form action={markCountedAction.bind(null, counting.id, item.id, !counting.found.includes(item.id))} className="mt-6 flex flex-wrap items-center justify-between gap-3 border border-brass/50 bg-brass/5 p-4 text-sm">
-          <span>📋 Conteo de inventario en curso</span>
+          <span>{tr("📋 Conteo de inventario en curso")}</span>
           <button className={counting.found.includes(item.id) ? "text-[0.66rem] tracking-[0.18em] uppercase text-emerald-200" : "bg-ivory px-5 py-2.5 text-[0.68rem] tracking-[0.22em] uppercase text-ink hover:bg-brass"}>
-            {counting.found.includes(item.id) ? "✓ Contado (deshacer)" : "✓ Contado"}
+            {counting.found.includes(item.id) ? tr("✓ Contado (deshacer)") : tr("✓ Contado")}
           </button>
         </form>
       )}
@@ -121,29 +122,29 @@ export default async function ItemPage({ params, searchParams }: PageProps<"/adm
                 <div className="text-sm">
                   <p className="font-display text-2xl">{money(item.market_low)} – {money(item.market_high)}</p>
                   <p className="text-xs text-stone">
-                    Típico {money(item.market_typical)}{item.market_listings ? ` · ${item.market_listings} anuncio(s)` : ""} · revisado {fmtDate(item.market_checked_at)}
+                    {tr("Típico")} {money(item.market_typical)}{item.market_listings ? ` · ${item.market_listings} anuncio(s)` : ""} {tr("· revisado")} {fmtDate(item.market_checked_at)}
                   </p>
                   {(() => {
                     const v = priceVsMarket({ asking_price: item.asking_price, market_low: item.market_low ?? null, market_high: item.market_high ?? null, market_typical: item.market_typical ?? null });
                     if (!v) return null;
                     return (
                       <p className={`mt-2 text-sm ${v.state === "high" ? "text-amber-200" : v.state === "low" ? "text-sky-200" : "text-emerald-200"}`}>
-                        {v.state === "high" ? `⬆️ Tu precio (${money(item.asking_price)}) está por encima del mercado: ~${money(v.diff)} sobre el típico.` : v.state === "low" ? `⬇️ Tu precio (${money(item.asking_price)}) está por debajo del mercado: podrías pedir ~${money(v.diff)} más.` : `✓ Tu precio (${money(item.asking_price)}) está dentro del mercado.`}
+                        {v.state === "high" ? tr("⬆️ Tu precio ({p}) está por encima del mercado: ~{d} sobre el típico.", { p: money(item.asking_price), d: money(v.diff) }) : v.state === "low" ? tr("⬇️ Tu precio ({p}) está por debajo del mercado: podrías pedir ~{d} más.", { p: money(item.asking_price), d: money(v.diff) }) : `✓ Tu precio (${money(item.asking_price)}) está dentro del mercado.`}
                       </p>
                     );
                   })()}
                   {item.market_note && <p className="mt-2 text-xs text-stone">{item.market_note}</p>}
                   {(item.market_sources ?? []).length > 0 && (
                     <div className="mt-2 flex flex-wrap gap-3 text-xs">
-                      {(item.market_sources ?? []).map((u, k) => <a key={k} href={u} target="_blank" rel="noreferrer" className="text-brass underline hover:text-ivory">Fuente {k + 1}</a>)}
+                      {(item.market_sources ?? []).map((u, k) => <a key={k} href={u} target="_blank" rel="noreferrer" className="text-brass underline hover:text-ivory">{tr("Fuente")} {k + 1}</a>)}
                     </div>
                   )}
                 </div>
               ) : (
-                <p className="text-sm text-stone">{item.market_checked_at ? "No se encontraron anuncios comparables." : "Aún sin revisar: se revisa solo cada 5 días."}</p>
+                <p className="text-sm text-stone">{item.market_checked_at ? tr("No se encontraron anuncios comparables.") : tr("Aún sin revisar: se revisa solo cada 5 días.")}</p>
               )}
               <form action={marketCheckAction.bind(null, item.id)} className="mt-3">
-                <button className="border border-line px-3 py-1.5 text-[0.62rem] tracking-[0.18em] uppercase text-stone hover:text-ivory">Revisar ahora (Chrono24, WatchCharts…)</button>
+                <button className="border border-line px-3 py-1.5 text-[0.62rem] tracking-[0.18em] uppercase text-stone hover:text-ivory">{tr("Revisar ahora (Chrono24, WatchCharts…)")}</button>
               </form>
             </Card>
           )}
@@ -155,15 +156,15 @@ export default async function ItemPage({ params, searchParams }: PageProps<"/adm
               ) : (
                 <form action={setLocation.bind(null, item.id)} className="grid gap-3 sm:grid-cols-[200px_1fr_auto] sm:items-end">
                   <select name="location" defaultValue={item.location ?? ""} className={fieldClass}>
-                    <option value="">— Sin indicar —</option>
-                    {Object.entries(LOCATIONS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+                    <option value="">{tr("— Sin indicar —")}</option>
+                    {Object.entries(LOCATIONS).map(([k, l]) => <option key={k} value={k}>{tr(l)}</option>)}
                   </select>
-                  <input name="location_note" defaultValue={item.location_note ?? ""} placeholder="Detalle (cajón 2, con Juan…)" className={fieldClass} />
-                  <button className={ghostButtonClass}>Guardar</button>
+                  <input name="location_note" defaultValue={item.location_note ?? ""} placeholder={tr("Detalle (cajón 2, con Juan…)")} className={fieldClass} />
+                  <button className={ghostButtonClass}>{tr("Guardar")}</button>
                 </form>
               )}
-              {item.last_counted_at && <p className="mt-2 text-xs text-stone">Último conteo: {fmtDateTime(item.last_counted_at)}</p>}
-              {!away.get(item.id) && item.location && <p className="mt-2 text-xs text-stone">📍 {LOCATIONS[item.location as Location]}{item.location_note ? ` · ${item.location_note}` : ""}</p>}
+              {item.last_counted_at && <p className="mt-2 text-xs text-stone">{tr("Último conteo:")} {fmtDateTime(item.last_counted_at)}</p>}
+              {!away.get(item.id) && item.location && <p className="mt-2 text-xs text-stone">📍 {tr(LOCATIONS[item.location as Location])}{item.location_note ? ` · ${item.location_note}` : ""}</p>}
             </Card>
           )}
 
@@ -172,26 +173,26 @@ export default async function ItemPage({ params, searchParams }: PageProps<"/adm
               {openService ? (
                 <>
                   <p className="text-sm">
-                    {openService.provider}{openService.work ? ` · ${openService.work}` : ""} · desde {fmtDate(`${openService.sent_at}T12:00:00`)}
-                    {openService.expected_at && <span className="text-stone"> · vuelve ~{fmtDate(`${openService.expected_at}T12:00:00`)}</span>}
+                    {openService.provider}{openService.work ? ` · ${openService.work}` : ""} {tr("· desde")} {fmtDate(`${openService.sent_at}T12:00:00`)}
+                    {openService.expected_at && <span className="text-stone"> {tr("· vuelve ~")}{fmtDate(`${openService.expected_at}T12:00:00`)}</span>}
                   </p>
                   <form action={returnFromServiceAction.bind(null, openService.id)} className="mt-4 grid gap-3 sm:grid-cols-[160px_1fr_auto] sm:items-end">
-                    <label><span className="mb-1.5 block text-[0.62rem] tracking-[0.22em] uppercase text-stone">Costo (USD)</span><input name="cost" inputMode="decimal" className={fieldClass} /></label>
-                    <label><span className="mb-1.5 block text-[0.62rem] tracking-[0.22em] uppercase text-stone">Notas</span><input name="notes" placeholder="Qué se hizo" className={fieldClass} /></label>
-                    <button className={ghostButtonClass}>Ya volvió</button>
+                    <label><span className="mb-1.5 block text-[0.62rem] tracking-[0.22em] uppercase text-stone">{tr("Costo (USD)")}</span><input name="cost" inputMode="decimal" className={fieldClass} /></label>
+                    <label><span className="mb-1.5 block text-[0.62rem] tracking-[0.22em] uppercase text-stone">{tr("Notas")}</span><input name="notes" placeholder={tr("Qué se hizo")} className={fieldClass} /></label>
+                    <button className={ghostButtonClass}>{tr("Ya volvió")}</button>
                   </form>
-                  <p className="mt-2 text-xs text-stone">El costo se suma a los gastos del reloj (y a su margen).</p>
+                  <p className="mt-2 text-xs text-stone">{tr("El costo se suma a los gastos del reloj (y a su margen).")}</p>
                 </>
               ) : available ? (
                 <form action={sendToServiceAction.bind(null, item.id)} className="grid gap-3 sm:grid-cols-3 sm:items-end">
                   <label>
-                    <span className="mb-1.5 block text-[0.62rem] tracking-[0.22em] uppercase text-stone">Relojero *</span>
+                    <span className="mb-1.5 block text-[0.62rem] tracking-[0.22em] uppercase text-stone">{tr("Relojero *")}</span>
                     <input name="provider" list="providers" required className={fieldClass} />
                     <datalist id="providers">{knownProviders.map((p) => <option key={p} value={p} />)}</datalist>
                   </label>
-                  <label><span className="mb-1.5 block text-[0.62rem] tracking-[0.22em] uppercase text-stone">Trabajo</span><input name="work" placeholder="Servicio, pulido…" className={fieldClass} /></label>
-                  <label><span className="mb-1.5 block text-[0.62rem] tracking-[0.22em] uppercase text-stone">Vuelve aprox.</span><input name="expected_at" type="date" className={fieldClass} /></label>
-                  <button className={`${ghostButtonClass} sm:col-span-3 sm:justify-self-start`}>🔧 Enviar al relojero</button>
+                  <label><span className="mb-1.5 block text-[0.62rem] tracking-[0.22em] uppercase text-stone">{tr("Trabajo")}</span><input name="work" placeholder={tr("Servicio, pulido…")} className={fieldClass} /></label>
+                  <label><span className="mb-1.5 block text-[0.62rem] tracking-[0.22em] uppercase text-stone">{tr("Vuelve aprox.")}</span><input name="expected_at" type="date" className={fieldClass} /></label>
+                  <button className={`${ghostButtonClass} sm:col-span-3 sm:justify-self-start`}>{tr("🔧 Enviar al relojero")}</button>
                 </form>
               ) : null}
               {services.filter((s) => s.returned_at).length > 0 && (
@@ -217,14 +218,14 @@ export default async function ItemPage({ params, searchParams }: PageProps<"/adm
             ) : null}
             {available && (
               <div className="flex flex-wrap gap-2">
-                <Link href={`/admin/documentos/nuevo?tipo=quote&reloj=${item.id}`} className={ghostButtonClass}>+ Cotización</Link>
-                <Link href={`/admin/documentos/nuevo?tipo=memo&reloj=${item.id}`} className={ghostButtonClass}>+ Memo</Link>
-                <Link href={`/admin/documentos/nuevo?tipo=invoice&reloj=${item.id}`} className={ghostButtonClass}>+ Factura</Link>
+                <Link href={`/admin/documentos/nuevo?tipo=quote&reloj=${item.id}`} className={ghostButtonClass}>{tr("+ Cotización")}</Link>
+                <Link href={`/admin/documentos/nuevo?tipo=memo&reloj=${item.id}`} className={ghostButtonClass}>{tr("+ Memo")}</Link>
+                <Link href={`/admin/documentos/nuevo?tipo=invoice&reloj=${item.id}`} className={ghostButtonClass}>{tr("+ Factura")}</Link>
                 {(item.acquisition === "purchase" || item.acquisition === "trade") && (
-                  <Link href={`/admin/documentos/nuevo?tipo=purchase&reloj=${item.id}${item.supplier_customer_id ? `&cliente=${item.supplier_customer_id}` : ""}`} className={ghostButtonClass}>+ Contrato de compra</Link>
+                  <Link href={`/admin/documentos/nuevo?tipo=purchase&reloj=${item.id}${item.supplier_customer_id ? `&cliente=${item.supplier_customer_id}` : ""}`} className={ghostButtonClass}>{tr("+ Contrato de compra")}</Link>
                 )}
                 {item.acquisition === "consignment" && (
-                  <Link href={`/admin/documentos/nuevo?tipo=consignment&reloj=${item.id}${item.supplier_customer_id ? `&cliente=${item.supplier_customer_id}` : ""}`} className={ghostButtonClass}>+ Contrato de consignación</Link>
+                  <Link href={`/admin/documentos/nuevo?tipo=consignment&reloj=${item.id}${item.supplier_customer_id ? `&cliente=${item.supplier_customer_id}` : ""}`} className={ghostButtonClass}>{tr("+ Contrato de consignación")}</Link>
                 )}
               </div>
             )}
@@ -236,24 +237,24 @@ export default async function ItemPage({ params, searchParams }: PageProps<"/adm
             <Card title="Venta">
               <p className="text-sm">
                 {fmtDate(item.sale_date!)} · {money(item.sale_price)} · {item.payment_method ?? "—"} ·{" "}
-                {item.buyer_customer_id ? <Link href={`/admin/leads/${item.buyer_customer_id}`} className="text-brass hover:text-ivory">{item.buyer_name ?? "Cliente"}</Link> : item.buyer_name ?? "—"}
+                {item.buyer_customer_id ? <Link href={`/admin/leads/${item.buyer_customer_id}`} className="text-brass hover:text-ivory">{item.buyer_name ?? tr("Cliente")}</Link> : item.buyer_name ?? "—"}
               </p>
               {paidInvoice ? (
                 <div className="mt-3 flex flex-wrap gap-2">
-                  <a href={`/d/${paidInvoice.token}/pdf`} target="_blank" rel="noreferrer" className={ghostButtonClass}>Descargar factura {paidInvoice.number}</a>
-                  <Link href={`/admin/documentos/${paidInvoice.id}`} className={ghostButtonClass}>Ver en Documentos</Link>
+                  <a href={`/d/${paidInvoice.token}/pdf`} target="_blank" rel="noreferrer" className={ghostButtonClass}>{tr("Descargar factura")} {paidInvoice.number}</a>
+                  <Link href={`/admin/documentos/${paidInvoice.id}`} className={ghostButtonClass}>{tr("Ver en Documentos")}</Link>
                 </div>
               ) : (
-                <p className="mt-3 text-xs text-stone">Esta venta se registró sin factura (antes de enlazar ventas y documentos).</p>
+                <p className="mt-3 text-xs text-stone">{tr("Esta venta se registró sin factura (antes de enlazar ventas y documentos).")}</p>
               )}
               {owner && showCosts && (
                 <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4 text-sm">
                   {item.owner_paid_at ? (
-                    <p className="text-emerald-200">Pagado al dueño el {fmtDate(item.owner_paid_at)}</p>
+                    <p className="text-emerald-200">{tr("Pagado al dueño el")} {fmtDate(item.owner_paid_at)}</p>
                   ) : (
                     <>
-                      <p className="text-amber-200">Pendiente de pagar al dueño: {money(item.cost)}</p>
-                      <form action={markOwnerPaid.bind(null, item.id)}><button className={ghostButtonClass}>Marcar como pagado</button></form>
+                      <p className="text-amber-200">{tr("Pendiente de pagar al dueño:")} {money(item.cost)}</p>
+                      <form action={markOwnerPaid.bind(null, item.id)}><button className={ghostButtonClass}>{tr("Marcar como pagado")}</button></form>
                     </>
                   )}
                 </div>
@@ -263,7 +264,7 @@ export default async function ItemPage({ params, searchParams }: PageProps<"/adm
 
           {available && (
             <Card id="devolucion" title={owner ? `Devolver ${item.acquisition === "consignment" ? "al consignatario" : "al dealer"}` : "Devolución"} className={accion === "devolver" ? focus : ""}>
-              {item.acquisition === "memo" && item.memo_due && <p className="mb-3 text-sm text-stone">Memo: devolver antes del {fmtDate(item.memo_due)}.</p>}
+              {item.acquisition === "memo" && item.memo_due && <p className="mb-3 text-sm text-stone">{tr("Memo: devolver antes del")} {fmtDate(item.memo_due)}.</p>}
               <ReturnForm item={item} today={today} />
             </Card>
           )}
@@ -279,7 +280,7 @@ export default async function ItemPage({ params, searchParams }: PageProps<"/adm
           </Card>
 
           <form action={deleteItem.bind(null, item.id)} className="text-right">
-            <button className="text-xs text-stone underline hover:text-red-200">Eliminar del inventario (solo si fue un error)</button>
+            <button className="text-xs text-stone underline hover:text-red-200">{tr("Eliminar del inventario (solo si fue un error)")}</button>
           </form>
         </div>
 
@@ -293,7 +294,7 @@ export default async function ItemPage({ params, searchParams }: PageProps<"/adm
                 <p className="mt-0.5 text-sm">{e.body as string}</p>
               </li>
             ))}
-            {!events.data?.length && <p className="text-sm text-stone">Sin movimientos.</p>}
+            {!events.data?.length && <p className="text-sm text-stone">{tr("Sin movimientos.")}</p>}
           </ol>
         </Card>
       </div>

@@ -1,3 +1,4 @@
+import { tr } from "@/lib/admin-i18n";
 import Link from "next/link";
 import { connection } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
@@ -20,8 +21,8 @@ export default async function NewDocumentPage({ searchParams }: PageProps<"/admi
 
   return (
     <>
-      <Link href="/admin/documentos" className="text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">← Documentos</Link>
-      <PageTitle eyebrow="Documentos" title={kind === "memo" ? "Nuevo memo" : kind === "consignment" ? "Nuevo contrato de consignación" : kind === "purchase" ? "Nuevo contrato de compra" : kind === "sourcing" ? "Nuevo encargo" : kind === "proforma" ? "Nueva factura proforma" : `Nueva ${KIND_LABEL[kind].toLowerCase()}`} />
+      <Link href="/admin/documentos" className="text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">{tr("← Documentos")}</Link>
+      <PageTitle eyebrow="Documentos" title={kind === "memo" ? "Nuevo memo" : kind === "consignment" ? "Nuevo contrato de consignación" : kind === "purchase" ? "Nuevo contrato de compra" : kind === "sourcing" ? "Nuevo encargo" : kind === "proforma" ? "Nueva factura proforma" : tr(`Nueva ${KIND_LABEL[kind].toLowerCase()}`)} />
       <Card>
         <DocumentForm
           kind={kind}

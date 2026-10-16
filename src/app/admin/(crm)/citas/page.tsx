@@ -1,3 +1,4 @@
+import { tr } from "@/lib/admin-i18n";
 import Link from "next/link";
 import { connection } from "next/server";
 import { adminDb } from "@/lib/supabase";
@@ -59,7 +60,7 @@ export default async function CitasPage({ searchParams }: PageProps<"/admin/cita
       <li key={a.id as string} className="grid gap-3 border-b border-line/60 py-4 md:grid-cols-[180px_1fr_auto] md:items-center">
         <div>
           <p className="font-display text-xl">{fmtDateTime(a.starts_at as string)}</p>
-          <p className="text-xs text-stone">{a.kind === "office" ? "Oficina" : "Videollamada"} · {SOURCE[a.source as string] ?? a.source}</p>
+          <p className="text-xs text-stone">{a.kind === "office" ? tr("Oficina") : tr("Videollamada")} · {SOURCE[a.source as string] ?? a.source}</p>
         </div>
         <div className="text-sm">
           {a.customer_id ? (
@@ -68,25 +69,25 @@ export default async function CitasPage({ searchParams }: PageProps<"/admin/cita
             <span>{a.name as string}</span>
           )}
           <span className="text-stone"> · {(a.phone as string) ?? (a.email as string) ?? ""}</span>
-          {(a.pieces as string[])?.length > 0 && <p className="text-xs text-stone">Quiere ver: {(a.pieces as string[]).map(name).join(", ")}</p>}
-          {Boolean(a.note) && <p className="text-xs text-stone">Nota: {a.note as string}</p>}
+          {(a.pieces as string[])?.length > 0 && <p className="text-xs text-stone">{tr("Quiere ver:")} {(a.pieces as string[]).map(name).join(", ")}</p>}
+          {Boolean(a.note) && <p className="text-xs text-stone">{tr("Nota:")} {a.note as string}</p>}
           {actions && <RescheduleForm id={a.id as string} date={local(a.starts_at as string).d} time={local(a.starts_at as string).t} />}
           <AppointmentFollowUp id={a.id as string} followups={follow.get(a.id as string) ?? []} outcome={(a.outcome as string | null) ?? null} outcomes={outcomes} today={today} open={sp.cita === a.id} />
           <p className={`mt-1 text-[0.62rem] tracking-[0.18em] uppercase ${a.status === "confirmed" ? "text-emerald-200" : a.status === "cancelled" ? "text-stone/60" : "text-amber-200"}`}>
-            {STATUS[a.status as keyof typeof STATUS]}
+            {tr(STATUS[a.status as keyof typeof STATUS])}
           </p>
         </div>
         {actions && (
           <div className="flex flex-wrap gap-2">
             {a.status !== "confirmed" && (
-              <form action={setAppointmentStatus.bind(null, a.id as string, "confirmed")}><button className={ghostButtonClass}>Confirmar</button></form>
+              <form action={setAppointmentStatus.bind(null, a.id as string, "confirmed")}><button className={ghostButtonClass}>{tr("Confirmar")}</button></form>
             )}
             {phone && (
               <a href={`https://wa.me/${phone}?text=${encodeURIComponent(confirmText(a))}`} target="_blank" rel="noreferrer" className={ghostButtonClass}>
-                Avisar por WhatsApp
+                {tr("Avisar por WhatsApp")}
               </a>
             )}
-            <form action={setAppointmentStatus.bind(null, a.id as string, "cancelled")}><button className={ghostButtonClass}>Cancelar</button></form>
+            <form action={setAppointmentStatus.bind(null, a.id as string, "cancelled")}><button className={ghostButtonClass}>{tr("Cancelar")}</button></form>
           </div>
         )}
       </li>
@@ -97,28 +98,27 @@ export default async function CitasPage({ searchParams }: PageProps<"/admin/cita
     <>
       <PageTitle eyebrow="CRM" title="Citas" />
       <details id="nueva" open={Boolean(preset)} className="mb-6 border border-line bg-forest/60">
-        <summary className="cursor-pointer px-5 py-4 text-[0.66rem] tracking-[0.24em] uppercase text-brass">+ Nueva cita</summary>
+        <summary className="cursor-pointer px-5 py-4 text-[0.66rem] tracking-[0.24em] uppercase text-brass">{tr("+ Nueva cita")}</summary>
         <div className="border-t border-line px-5 py-5">
           <AppointmentForm customers={customerOptions} watches={watchOptions} customerId={preset} today={today} />
         </div>
       </details>
       <section className="border border-line bg-forest/60 px-5">
-        <h2 className="pt-5 text-[0.66rem] tracking-[0.24em] uppercase text-stone">Próximas</h2>
-        {upcoming.length ? <ul>{upcoming.map((a) => row(a, true))}</ul> : <p className="py-6 text-sm text-stone">No hay citas próximas.</p>}
+        <h2 className="pt-5 text-[0.66rem] tracking-[0.24em] uppercase text-stone">{tr("Próximas")}</h2>
+        {upcoming.length ? <ul>{upcoming.map((a) => row(a, true))}</ul> : <p className="py-6 text-sm text-stone">{tr("No hay citas próximas.")}</p>}
       </section>
       <section className="mt-6 border border-line bg-forest/40 px-5">
-        <h2 className="pt-5 text-[0.66rem] tracking-[0.24em] uppercase text-stone">Últimos 30 días y canceladas</h2>
-        {past.length ? <ul>{past.map((a) => row(a, false))}</ul> : <p className="py-6 text-sm text-stone">Nada todavía.</p>}
+        <h2 className="pt-5 text-[0.66rem] tracking-[0.24em] uppercase text-stone">{tr("Últimos 30 días y canceladas")}</h2>
+        {past.length ? <ul>{past.map((a) => row(a, false))}</ul> : <p className="py-6 text-sm text-stone">{tr("Nada todavía.")}</p>}
       </section>
       {feed && (
         <Card title="Ver las citas en el calendario del teléfono" className="mt-6">
           <p className="text-sm text-stone">
-            Suscríbete una vez y todas las citas (web, WhatsApp, Instagram y las que añadas aquí) aparecen solas en tu calendario, con aviso una hora antes.
-            Es una dirección privada: no la compartas.
+            {tr("Suscríbete una vez y todas las citas (web, WhatsApp, Instagram y las que añadas aquí) aparecen solas en tu calendario, con aviso una hora antes. Es una dirección privada: no la compartas.")}
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
-            <a href={feed.replace(/^https?:/, "webcal:")} className={ghostButtonClass}>Añadir al iPhone / Mac</a>
-            <a href={`https://calendar.google.com/calendar/r?cid=${encodeURIComponent(feed.replace(/^https?:/, "webcal:"))}`} target="_blank" rel="noreferrer" className={ghostButtonClass}>Añadir a Google Calendar</a>
+            <a href={feed.replace(/^https?:/, "webcal:")} className={ghostButtonClass}>{tr("Añadir al iPhone / Mac")}</a>
+            <a href={`https://calendar.google.com/calendar/r?cid=${encodeURIComponent(feed.replace(/^https?:/, "webcal:"))}`} target="_blank" rel="noreferrer" className={ghostButtonClass}>{tr("Añadir a Google Calendar")}</a>
           </div>
         </Card>
       )}

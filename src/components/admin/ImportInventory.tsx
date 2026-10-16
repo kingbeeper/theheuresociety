@@ -1,10 +1,13 @@
 "use client";
 
+
+import { useTr } from "@/components/admin/AdminLang";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 
 // Botón «Importar Excel»: sube la hoja INVENTORY CONTROL (.xlsx) y la carga en el inventario
 export function ImportInventory() {
+  const tr = useTr();
   const router = useRouter();
   const input = useRef<HTMLInputElement>(null);
   const [msg, setMsg] = useState<string | null>(null);
@@ -20,7 +23,7 @@ export function ImportInventory() {
     setBusy(false);
     setMsg(
       j.ok
-        ? `${j.created} reloj(es) importados${j.skipped ? ` · ${j.skipped} ya estaban (mismo número de serie)` : ""}${j.notes?.length ? ` · ${j.notes.length} fila(s) con error` : ""}`
+        ? `${tr("{n} reloj(es) importados", { n: j.created ?? 0 })}${j.skipped ? tr(" · {n} ya estaban (mismo número de serie)", { n: j.skipped }) : ""}${j.notes?.length ? tr(" · {n} fila(s) con error", { n: j.notes.length }) : ""}`
         : j.error ?? "No se pudo importar."
     );
     if (input.current) input.current.value = "";
@@ -37,7 +40,7 @@ export function ImportInventory() {
         onClick={() => input.current?.click()}
         className="border border-line px-4 py-2 text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:border-ivory/40 hover:text-ivory disabled:opacity-50"
       >
-        Importar Excel
+        {tr("Importar Excel")}
       </button>
     </div>
   );

@@ -1,3 +1,4 @@
+import { tr } from "@/lib/admin-i18n";
 import { Suspense } from "react";
 import QRCode from "qrcode";
 import { connection } from "next/server";
@@ -46,7 +47,7 @@ async function Labels({ searchParams }: { searchParams: Promise<Record<string, s
         @media screen{.label{outline:1px dashed #c9c2b3}}
       `}</style>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3 print:hidden">
-        <p className="text-sm text-[#333]">{labels.length} etiqueta(s) · hoja carta de 30 etiquetas (2,625 × 1 in, tipo Avery 5160)</p>
+        <p className="text-sm text-[#333]">{labels.length} {tr("etiqueta(s) · hoja carta de 30 etiquetas (2,625 × 1 in, tipo Avery 5160)")}</p>
         <PrintLabels />
       </div>
       <div className="sheet">

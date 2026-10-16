@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { SOURCE_LABEL, STAGE_LABEL, type Stage } from "@/lib/crm";
+import { dateLocale, tr, trParts } from "@/lib/admin-i18n";
 
 // Piezas pequeñas del CRM
 
@@ -16,21 +17,21 @@ const STAGE_STYLE: Record<Stage, string> = {
 export function StageBadge({ stage }: { stage: Stage }) {
   return (
     <span className={`inline-block whitespace-nowrap border px-2 py-0.5 text-[0.62rem] tracking-[0.16em] uppercase ${STAGE_STYLE[stage]}`}>
-      {STAGE_LABEL[stage]}
+      {tr(STAGE_LABEL[stage])}
     </span>
   );
 }
 
 export function SourceTag({ source }: { source: string }) {
-  return <span className="whitespace-nowrap text-xs text-stone">{SOURCE_LABEL[source] ?? source}</span>;
+  return <span className="whitespace-nowrap text-xs text-stone">{tr(SOURCE_LABEL[source] ?? source)}</span>;
 }
 
 export function PageTitle({ eyebrow, title, action }: { eyebrow?: string; title: string; action?: React.ReactNode }) {
   return (
     <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
       <div>
-        {eyebrow && <p className="eyebrow">{eyebrow}</p>}
-        <h1 className="mt-2 font-display text-3xl font-light sm:text-4xl">{title}</h1>
+        {eyebrow && <p className="eyebrow">{trParts(eyebrow)}</p>}
+        <h1 className="mt-2 font-display text-3xl font-light sm:text-4xl">{trParts(title)}</h1>
       </div>
       {action}
     </div>
@@ -42,10 +43,10 @@ export function Card({ title, children, href, className = "", id }: { title?: st
     <section id={id} className={`scroll-mt-6 border border-line bg-forest/60 p-5 ${className}`}>
       {title && (
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-[0.66rem] tracking-[0.24em] uppercase text-stone">{title}</h2>
+          <h2 className="text-[0.66rem] tracking-[0.24em] uppercase text-stone">{trParts(title)}</h2>
           {href && (
             <Link href={href} className="text-[0.62rem] tracking-[0.2em] uppercase text-brass hover:text-ivory">
-              Ver todo →
+              {tr("Ver todo →")}
             </Link>
           )}
         </div>
@@ -58,16 +59,16 @@ export function Card({ title, children, href, className = "", id }: { title?: st
 // Fechas en hora de Miami
 const TZ = "America/New_York";
 export const fmtDateTime = (iso: string) =>
-  new Intl.DateTimeFormat("es-ES", { timeZone: TZ, weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(iso));
-export const fmtDate = (iso: string) => new Intl.DateTimeFormat("es-ES", { timeZone: TZ, day: "numeric", month: "short", year: "numeric" }).format(new Date(iso));
+  new Intl.DateTimeFormat(dateLocale(), { timeZone: TZ, weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(iso));
+export const fmtDate = (iso: string) => new Intl.DateTimeFormat(dateLocale(), { timeZone: TZ, day: "numeric", month: "short", year: "numeric" }).format(new Date(iso));
 
 export function ago(iso: string, now: number) {
   const m = Math.round((now - new Date(iso).getTime()) / 60000);
-  if (m < 60) return `hace ${Math.max(m, 1)} min`;
+  if (m < 60) return tr("hace {n} min", { n: Math.max(m, 1) });
   const h = Math.round(m / 60);
-  if (h < 24) return `hace ${h} h`;
+  if (h < 24) return tr("hace {n} h", { n: h });
   const d = Math.round(h / 24);
-  return d < 30 ? `hace ${d} d` : fmtDate(iso);
+  return d < 30 ? tr("hace {n} d", { n: d }) : fmtDate(iso);
 }
 
 export const money = (n: number | null | undefined) =>

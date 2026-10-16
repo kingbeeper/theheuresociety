@@ -1,3 +1,4 @@
+import { tr, trParts } from "@/lib/admin-i18n";
 import Link from "next/link";
 import { connection } from "next/server";
 import { adminDb } from "@/lib/supabase";
@@ -41,25 +42,25 @@ export default async function DocumentsPage({ searchParams }: PageProps<"/admin/
         title="Documentos"
         action={
           <div className="flex flex-wrap gap-2">
-            <Link href="/admin/documentos/ajustes" className={ghostButtonClass}>Ajustes</Link>
-            <Link href="/admin/documentos/nuevo?tipo=quote" className={ghostButtonClass}>+ Cotización</Link>
-            <Link href="/admin/documentos/nuevo?tipo=memo" className={ghostButtonClass}>+ Memo</Link>
-            <Link href="/admin/documentos/nuevo?tipo=consignment" className={ghostButtonClass}>+ Consignación</Link>
-            <Link href="/admin/documentos/nuevo?tipo=purchase" className={ghostButtonClass}>+ Compra</Link>
-            <Link href="/admin/documentos/nuevo?tipo=sourcing" className={ghostButtonClass}>+ Encargo</Link>
-            <Link href="/admin/documentos/nuevo?tipo=proforma" className={ghostButtonClass}>+ Proforma</Link>
-            <Link href="/admin/documentos/nuevo?tipo=invoice" className={buttonClass}>+ Factura</Link>
+            <Link href="/admin/documentos/ajustes" className={ghostButtonClass}>{tr("Ajustes")}</Link>
+            <Link href="/admin/documentos/nuevo?tipo=quote" className={ghostButtonClass}>{tr("+ Cotización")}</Link>
+            <Link href="/admin/documentos/nuevo?tipo=memo" className={ghostButtonClass}>{tr("+ Memo")}</Link>
+            <Link href="/admin/documentos/nuevo?tipo=consignment" className={ghostButtonClass}>{tr("+ Consignación")}</Link>
+            <Link href="/admin/documentos/nuevo?tipo=purchase" className={ghostButtonClass}>{tr("+ Compra")}</Link>
+            <Link href="/admin/documentos/nuevo?tipo=sourcing" className={ghostButtonClass}>{tr("+ Encargo")}</Link>
+            <Link href="/admin/documentos/nuevo?tipo=proforma" className={ghostButtonClass}>{tr("+ Proforma")}</Link>
+            <Link href="/admin/documentos/nuevo?tipo=invoice" className={buttonClass}>{tr("+ Factura")}</Link>
           </div>
         }
       />
-      {error && <p className="mb-6 border border-amber-300/40 bg-amber-300/5 p-4 text-sm">Falta ejecutar la migración <code>2026-10-14-documents.sql</code> en Supabase.</p>}
+      {error && <p className="mb-6 border border-amber-300/40 bg-amber-300/5 p-4 text-sm">{tr("Falta ejecutar la migración")} <code>2026-10-14-documents.sql</code> {tr("en Supabase.")}</p>}
 
       <div className="grid grid-cols-2 gap-px border border-line bg-line lg:grid-cols-5">
         {kpis.map((k) => (
           <Link key={k.label} href={`/admin/documentos${k.href}`} className="bg-forest px-5 py-5 hover:bg-moss">
             <p className="break-words font-display text-2xl font-light sm:text-3xl">{k.value}</p>
-            <p className="mt-1 text-[0.6rem] tracking-[0.16em] uppercase text-stone">{k.label}</p>
-            <p className="mt-1 text-xs text-stone/80">{k.sub}</p>
+            <p className="mt-1 text-[0.6rem] tracking-[0.16em] uppercase text-stone">{trParts(k.label)}</p>
+            <p className="mt-1 text-xs text-stone/80">{trParts(k.sub)}</p>
           </Link>
         ))}
       </div>
@@ -71,7 +72,7 @@ export default async function DocumentsPage({ searchParams }: PageProps<"/admin/
             href={k === "all" ? "/admin/documentos" : `/admin/documentos?tipo=${k}`}
             className={`whitespace-nowrap border-b-2 px-3 py-2 text-[0.64rem] tracking-[0.16em] uppercase ${tab === k ? "border-brass text-ivory" : "border-transparent text-stone hover:text-ivory"}`}
           >
-            {k === "all" ? "Todos" : KIND_PLURAL[k]} <span className="text-stone/70">{k === "all" ? docs.length : docs.filter((d) => d.kind === k).length}</span>
+            {k === "all" ? tr("Todos") : tr(KIND_PLURAL[k])} <span className="text-stone/70">{k === "all" ? docs.length : docs.filter((d) => d.kind === k).length}</span>
           </Link>
         ))}
       </div>
@@ -89,7 +90,7 @@ export default async function DocumentsPage({ searchParams }: PageProps<"/admin/
                   </div>
                   <p className="mt-0.5 truncate text-sm text-stone">{d.client_name ?? "—"} · {d.items.map((l) => l.title).join(", ")}</p>
                   <p className={`mt-1 text-[0.62rem] tracking-[0.14em] uppercase ${late ? "text-red-200" : STATUS_STYLE[d.status]}`}>
-                    {late ? (d.kind === "memo" ? "Memo vencido" : d.kind === "consignment" || d.kind === "sourcing" ? "Plazo cumplido" : "Vencida") : STATUS_LABEL[d.kind][d.status]} · {fmtDate(`${d.issue_date}T12:00:00`)}
+                    {late ? (d.kind === "memo" ? tr("Memo vencido") : d.kind === "consignment" || d.kind === "sourcing" ? tr("Plazo cumplido") : tr("Vencida")) : STATUS_LABEL[d.kind][d.status]} · {fmtDate(`${d.issue_date}T12:00:00`)}
                   </p>
                 </Link>
               </li>
@@ -103,12 +104,12 @@ export default async function DocumentsPage({ searchParams }: PageProps<"/admin/
           <table className="w-full min-w-[720px] text-sm">
             <thead className="bg-forest text-left text-[0.62rem] tracking-[0.2em] uppercase text-stone">
               <tr>
-                <th className="px-4 py-3 font-normal">Número</th>
-                <th className="px-4 py-3 font-normal">Cliente</th>
-                <th className="px-4 py-3 font-normal">Relojes</th>
-                <th className="px-4 py-3 font-normal">Fecha</th>
-                <th className="px-4 py-3 text-right font-normal">Total</th>
-                <th className="px-4 py-3 font-normal">Estado</th>
+                <th className="px-4 py-3 font-normal">{tr("Número")}</th>
+                <th className="px-4 py-3 font-normal">{tr("Cliente")}</th>
+                <th className="px-4 py-3 font-normal">{tr("Relojes")}</th>
+                <th className="px-4 py-3 font-normal">{tr("Fecha")}</th>
+                <th className="px-4 py-3 text-right font-normal">{tr("Total")}</th>
+                <th className="px-4 py-3 font-normal">{tr("Estado")}</th>
               </tr>
             </thead>
             <tbody>
@@ -122,7 +123,7 @@ export default async function DocumentsPage({ searchParams }: PageProps<"/admin/
                     <td className="px-4 py-3 text-stone">{fmtDate(`${d.issue_date}T12:00:00`)}</td>
                     <td className="px-4 py-3 text-right tabular-nums">{usd(d.total)}</td>
                     <td className={`px-4 py-3 text-[0.66rem] tracking-[0.14em] uppercase ${late ? "text-red-200" : STATUS_STYLE[d.status]}`}>
-                      {late ? (d.kind === "memo" ? "Memo vencido" : d.kind === "consignment" || d.kind === "sourcing" ? "Plazo cumplido" : "Vencida") : STATUS_LABEL[d.kind][d.status]}
+                      {late ? (d.kind === "memo" ? tr("Memo vencido") : d.kind === "consignment" || d.kind === "sourcing" ? tr("Plazo cumplido") : tr("Vencida")) : STATUS_LABEL[d.kind][d.status]}
                     </td>
                   </tr>
                 );
@@ -131,7 +132,7 @@ export default async function DocumentsPage({ searchParams }: PageProps<"/admin/
           </table>
         </div>
       ) : (
-        !error && <p className="mt-6 text-sm text-stone">Aún no hay documentos. Crea una cotización, un memo o una factura con los botones de arriba, o desde la ficha de un reloj o de un cliente.</p>
+        !error && <p className="mt-6 text-sm text-stone">{tr("Aún no hay documentos. Crea una cotización, un memo o una factura con los botones de arriba, o desde la ficha de un reloj o de un cliente.")}</p>
       )}
     </>
   );

@@ -1,3 +1,4 @@
+import { tr, trParts } from "@/lib/admin-i18n";
 import Link from "next/link";
 import { QuickReturn } from "@/components/admin/QuickReturn";
 import { todayInMiami } from "@/lib/booking";
@@ -20,8 +21,8 @@ function QuickActions({ id, status, owner, today }: { id: string; status: string
   const btn = "whitespace-nowrap border px-2.5 py-1 text-[0.6rem] tracking-[0.16em] uppercase";
   return (
     <div className="flex gap-1.5">
-      <Link href={`/admin/inventario/${id}?accion=vender#venta`} className={`${btn} border-emerald-300/40 text-emerald-200 hover:bg-emerald-300/10`}>Vender</Link>
-      <QuickReturn id={id} label={owner ? "Devolver al dueño" : "Devolver"} today={today} />
+      <Link href={`/admin/inventario/${id}?accion=vender#venta`} className={`${btn} border-emerald-300/40 text-emerald-200 hover:bg-emerald-300/10`}>{tr("Vender")}</Link>
+      <QuickReturn id={id} label={owner ? tr("Devolver al dueño") : tr("Devolver")} today={today} />
     </div>
   );
 }
@@ -71,12 +72,12 @@ export default async function InventarioPage({ searchParams }: PageProps<"/admin
   ];
 
   const allKpis = [
-    { label: "Relojes disponibles", value: String(s.inStock), sub: s.consignedCount ? `${s.consignedCount} en consignación/memo` : "" },
+    { label: "Relojes disponibles", value: String(s.inStock), sub: s.consignedCount ? tr("{n} en consignación/memo", { n: s.consignedCount }) : "" },
     { label: "Capital invertido", value: money(s.capital), sub: "costo + gastos del stock propio" },
     { label: "Valor a la venta", value: money(s.stockValue), sub: "precio previsto del stock" },
-    { label: "Ventas del mes", value: money(s.salesMonth), sub: `${s.soldMonthCount} reloj(es)` },
+    { label: "Ventas del mes", value: money(s.salesMonth), sub: tr("{n} reloj(es)", { n: s.soldMonthCount }) },
     { label: "Ganancia del mes", value: money(s.profitMonth), sub: "venta − costo − gastos" },
-    { label: "Margen medio · 90 d", value: s.avgMargin == null ? "—" : `${Math.round(s.avgMargin * 100)}%`, sub: s.avgDays == null ? "" : `se venden en ${s.avgDays} días de media` },
+    { label: "Margen medio · 90 d", value: s.avgMargin == null ? "—" : `${Math.round(s.avgMargin * 100)}%`, sub: s.avgDays == null ? "" : tr("se venden en {n} días de media", { n: s.avgDays }) },
   ];
   const kpis = showCosts ? allKpis : allKpis.filter((k) => !["Capital invertido", "Ganancia del mes", "Margen medio · 90 d"].includes(k.label));
 
@@ -89,11 +90,11 @@ export default async function InventarioPage({ searchParams }: PageProps<"/admin
           <div className="flex flex-wrap gap-2">
             {showCosts && <ImportInventory />}
             {/* Descarga de archivo: enlace normal, no navegación de Next */}
-            {showCosts && <a href="/api/inventory/export" download className={ghostButtonClass}>Exportar a Excel</a>}
-            <Link href="/admin/inventario/serial" className={ghostButtonClass}>Buscar serial</Link>
-            <Link href="/admin/inventario/conteo" className={ghostButtonClass}>Conteo</Link>
-            <a href="/admin/etiquetas" target="_blank" rel="noreferrer" className={ghostButtonClass}>Etiquetas QR</a>
-            <Link href="/admin/inventario/nuevo" className={buttonClass}>+ Añadir reloj</Link>
+            {showCosts && <a href="/api/inventory/export" download className={ghostButtonClass}>{tr("Exportar a Excel")}</a>}
+            <Link href="/admin/inventario/serial" className={ghostButtonClass}>{tr("Buscar serial")}</Link>
+            <Link href="/admin/inventario/conteo" className={ghostButtonClass}>{tr("Conteo")}</Link>
+            <a href="/admin/etiquetas" target="_blank" rel="noreferrer" className={ghostButtonClass}>{tr("Etiquetas QR")}</a>
+            <Link href="/admin/inventario/nuevo" className={buttonClass}>{tr("+ Añadir reloj")}</Link>
           </div>
         }
       />
@@ -102,8 +103,8 @@ export default async function InventarioPage({ searchParams }: PageProps<"/admin
         {kpis.map((k) => (
           <div key={k.label} className="bg-forest px-5 py-5">
             <p className="break-words font-display text-2xl font-light sm:text-3xl">{k.value}</p>
-            <p className="mt-1 text-[0.6rem] tracking-[0.16em] uppercase text-stone">{k.label}</p>
-            {k.sub && <p className="mt-1 text-xs text-stone/80">{k.sub}</p>}
+            <p className="mt-1 text-[0.6rem] tracking-[0.16em] uppercase text-stone">{trParts(k.label)}</p>
+            {k.sub && <p className="mt-1 text-xs text-stone/80">{trParts(k.sub)}</p>}
           </div>
         ))}
       </div>
@@ -113,19 +114,19 @@ export default async function InventarioPage({ searchParams }: PageProps<"/admin
         <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           {showCosts && s.owed.length > 0 && (
             <Link href="/admin/inventario?status=owed" className="border border-amber-300/40 bg-amber-300/5 p-4 text-sm hover:border-amber-200">
-              💵 <b>{money(s.owedAmount)}</b> pendientes de pagar a dueños ({s.owed.length} venta/s de consignación o memo)
+              💵 <b>{money(s.owedAmount)}</b> {tr("pendientes de pagar a dueños (")}{s.owed.length} {tr("venta/s de consignación o memo)")}
             </Link>
           )}
           {s.memoDue.length > 0 && (
-            <div className="border border-red-300/40 bg-red-300/5 p-4 text-sm">⏳ {s.memoDue.length} memo(s) por devolver en 7 días o vencidos</div>
+            <div className="border border-red-300/40 bg-red-300/5 p-4 text-sm">⏳ {s.memoDue.length} {tr("memo(s) por devolver en 7 días o vencidos")}</div>
           )}
           {s.aged.length > 0 && (
             <Link href="/admin/inventario?status=aged" className="border border-line bg-forest/60 p-4 text-sm hover:border-brass/60">
-              🕰 {s.aged.length} reloj(es) con más de 90 días en stock: revisa el precio
+              🕰 {s.aged.length} {tr("reloj(es) con más de 90 días en stock: revisa el precio")}
             </Link>
           )}
           {showCosts && s.missingCost.length > 0 && (
-            <div className="border border-line bg-forest/60 p-4 text-sm">✎ {s.missingCost.length} reloj(es) sin costo: complétalo para calcular el margen</div>
+            <div className="border border-line bg-forest/60 p-4 text-sm">✎ {s.missingCost.length} {tr("reloj(es) sin costo: complétalo para calcular el margen")}</div>
           )}
         </div>
       )}
@@ -139,13 +140,13 @@ export default async function InventarioPage({ searchParams }: PageProps<"/admin
                 href={`/admin/inventario?status=${k}${q ? `&q=${encodeURIComponent(q)}` : ""}`}
                 className={`whitespace-nowrap border-b-2 px-3 py-2 text-[0.64rem] tracking-[0.16em] uppercase ${tab === k ? "border-brass text-ivory" : "border-transparent text-stone hover:text-ivory"}`}
               >
-                {l} <span className="text-stone/70">{n}</span>
+                {tr(l)} <span className="text-stone/70">{n}</span>
               </Link>
             ))}
           </div>
           <form action="/admin/inventario" className="flex gap-2">
             <input type="hidden" name="status" value={tab} />
-            <input name="q" defaultValue={q} placeholder="Buscar ref, serie, marca, cliente…" className={`${fieldClass} w-64`} />
+            <input name="q" defaultValue={q} placeholder={tr("Buscar ref, serie, marca, cliente…")} className={`${fieldClass} w-64`} />
           </form>
         </div>
 
@@ -164,8 +165,8 @@ export default async function InventarioPage({ searchParams }: PageProps<"/admin
                     <p className="truncate text-xs text-stone">{[i.sku, i.reference && `Ref. ${i.reference}`, ACQUISITION[i.acquisition], i.location && `📍 ${LOCATIONS[i.location as Location]}`].filter(Boolean).join(" · ")}</p>
                     <p className="mt-1 flex justify-between gap-3 text-xs">
                       <span className={STATUS_STYLE[i.status]}>
-                        {ITEM_STATUS[i.status]}
-                        {i.status === "sold" && isOwnerStock(i.acquisition) && !i.owner_paid_at && <span className="text-amber-200"> · dueño sin pagar</span>}
+                        {tr(ITEM_STATUS[i.status])}
+                        {i.status === "sold" && isOwnerStock(i.acquisition) && !i.owner_paid_at && <span className="text-amber-200"> {tr("· dueño sin pagar")}</span>}
                       </span>
                       <span className={`tabular-nums text-stone ${(d ?? 0) > 90 && i.status !== "sold" ? "text-amber-200" : ""}`}>
                         {showCosts ? (m ? `Margen ${money(m.amount)}` : `Costo ${money(i.cost)}`) : ""}{d != null ? `${showCosts ? " · " : ""}${d} d` : ""}
@@ -185,15 +186,15 @@ export default async function InventarioPage({ searchParams }: PageProps<"/admin
               <thead className="text-left text-[0.6rem] tracking-[0.16em] uppercase text-stone">
                 <tr>
                   <th className="pb-2 font-normal">SKU</th>
-                  <th className="pb-2 font-normal">Reloj</th>
-                  <th className="pb-2 font-normal">Entrada</th>
-                  <th className="pb-2 text-right font-normal">Días</th>
-                  {showCosts && <th className="pb-2 text-right font-normal">Costo</th>}
-                  <th className="pb-2 text-right font-normal">Precio</th>
-                  <th className="pb-2 text-right font-normal">Venta</th>
-                  {showCosts && <th className="pb-2 text-right font-normal">Margen</th>}
-                  <th className="pb-2 pl-4 font-normal">Estado</th>
-                  <th className="pb-2 pl-3 font-normal"><span className="sr-only">Acciones</span></th>
+                  <th className="pb-2 font-normal">{tr("Reloj")}</th>
+                  <th className="pb-2 font-normal">{tr("Entrada")}</th>
+                  <th className="pb-2 text-right font-normal">{tr("Días")}</th>
+                  {showCosts && <th className="pb-2 text-right font-normal">{tr("Costo")}</th>}
+                  <th className="pb-2 text-right font-normal">{tr("Precio")}</th>
+                  <th className="pb-2 text-right font-normal">{tr("Venta")}</th>
+                  {showCosts && <th className="pb-2 text-right font-normal">{tr("Margen")}</th>}
+                  <th className="pb-2 pl-4 font-normal">{tr("Estado")}</th>
+                  <th className="pb-2 pl-3 font-normal"><span className="sr-only">{tr("Acciones")}</span></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line/60">
@@ -210,7 +211,7 @@ export default async function InventarioPage({ searchParams }: PageProps<"/admin
                         <p className="text-xs text-stone">{[i.reference && `Ref. ${i.reference}`, i.serial && `S/N ${i.serial}`, i.location && `📍 ${LOCATIONS[i.location as Location]}`].filter(Boolean).join(" · ")}</p>
                       </td>
                       <td className="py-2.5 text-xs">
-                        {ACQUISITION[i.acquisition]}
+                        {tr(ACQUISITION[i.acquisition])}
                         <p className="text-stone">{i.purchase_date ? fmtDate(i.purchase_date) : "—"}</p>
                       </td>
                       <td className={`py-2.5 text-right tabular-nums ${(d ?? 0) > 90 && i.status !== "sold" ? "text-amber-200" : ""}`}>{d ?? "—"}</td>
@@ -223,8 +224,8 @@ export default async function InventarioPage({ searchParams }: PageProps<"/admin
                         </td>
                       )}
                       <td className={`py-2.5 pl-4 text-xs ${STATUS_STYLE[i.status]}`}>
-                        {ITEM_STATUS[i.status]}
-                        {i.status === "sold" && isOwnerStock(i.acquisition) && !i.owner_paid_at && <span className="block text-amber-200">dueño sin pagar</span>}
+                        {tr(ITEM_STATUS[i.status])}
+                        {i.status === "sold" && isOwnerStock(i.acquisition) && !i.owner_paid_at && <span className="block text-amber-200">{tr("dueño sin pagar")}</span>}
                         {i.status === "sold" && i.buyer_name && <span className="block text-stone">{i.buyer_name}</span>}
                       </td>
                       <td className="py-2.5 pl-3">
@@ -238,7 +239,7 @@ export default async function InventarioPage({ searchParams }: PageProps<"/admin
           </div>
         ) : (
           <p className="py-8 text-center text-sm text-stone">
-            {items.length ? "Nada con estos filtros." : "El inventario está vacío. Añade el primer reloj o importa la hoja de Excel."}
+            {items.length ? tr("Nada con estos filtros.") : tr("El inventario está vacío. Añade el primer reloj o importa la hoja de Excel.")}
           </p>
         )}
       </Card>

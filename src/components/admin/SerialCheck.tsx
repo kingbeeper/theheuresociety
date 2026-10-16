@@ -1,5 +1,7 @@
 "use client";
 
+
+import { useTr } from "@/components/admin/AdminLang";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -9,6 +11,7 @@ import { useEffect, useState } from "react";
 type Row = { event: string; label: string; event_date: string; party: string | null; watch: string | null; item_id: string | null; sku: string | null; document_id: string | null; doc_number: string | null };
 
 export function SerialWarning({ value, itemId, docId }: { value: string | null | undefined; itemId?: string | null; docId?: string | null }) {
+  const tr = useTr();
   const [rows, setRows] = useState<Row[] | null>(null);
   const serial = (value ?? "").replace(/[^a-z0-9]/gi, "");
 
@@ -32,11 +35,11 @@ export function SerialWarning({ value, itemId, docId }: { value: string | null |
   if (serial.length < 4 || !rows?.length) return null;
   return (
     <div className="mt-2 border border-amber-300/50 bg-amber-300/5 p-3 text-xs">
-      <p className="font-semibold text-amber-200">⚠️ Este reloj ya pasó por el sistema</p>
+      <p className="font-semibold text-amber-200">{tr("⚠️ Este reloj ya pasó por el sistema")}</p>
       <ul className="mt-1.5 space-y-1">
         {rows.map((r, i) => (
           <li key={i}>
-            <span className="tabular-nums text-stone">{r.event_date}</span> · {r.label}
+            <span className="tabular-nums text-stone">{r.event_date}</span> · {tr(r.label)}
             {r.party ? ` · ${r.party}` : ""}
             {r.item_id && r.sku ? <> · <Link href={`/admin/inventario/${r.item_id}`} className="underline hover:text-ivory">{r.sku}</Link></> : null}
             {r.document_id && r.doc_number ? <> · <Link href={`/admin/documentos/${r.document_id}`} className="underline hover:text-ivory">{r.doc_number}</Link></> : null}

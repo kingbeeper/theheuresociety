@@ -1,3 +1,4 @@
+import { tr } from "@/lib/admin-i18n";
 import { CUSTOMER_TAGS } from "@/lib/crm-labels";
 import { connection } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
@@ -27,13 +28,13 @@ export default async function NewsletterPage({ searchParams }: PageProps<"/admin
       <PageTitle eyebrow="CRM" title="Correos de novedades" />
       {!configured && (
         <div className="mb-6 border border-amber-300/40 bg-amber-300/5 p-4 text-sm leading-relaxed">
-          <p className="font-medium">Falta activar el envío de correos</p>
+          <p className="font-medium">{tr("Falta activar el envío de correos")}</p>
           <ol className="mt-2 list-decimal space-y-1 pl-5 text-stone">
-            <li>Crea una cuenta en resend.com y verifica tu dominio (te da unos registros DNS para copiar en tu proveedor de dominio).</li>
-            <li>Crea una API key y ponla en <code>.env.local</code> como <code>RESEND_API_KEY</code>, con <code>EMAIL_FROM=The Heure Society &lt;hola@tudominio.com&gt;</code>.</li>
-            <li>Ejecuta <code>node scripts/vercel-env.mjs</code> para pasarlas a Vercel.</li>
+            <li>{tr("Crea una cuenta en resend.com y verifica tu dominio (te da unos registros DNS para copiar en tu proveedor de dominio).")}</li>
+            <li>{tr("Crea una API key y ponla en")} <code>.env.local</code> como <code>RESEND_API_KEY</code>{tr(", con")} <code>{tr("EMAIL_FROM=The Heure Society &lt;hola@tudominio.com&gt;")}</code>.</li>
+            <li>{tr("Ejecuta")} <code>{tr("node scripts/vercel-env.mjs")}</code> {tr("para pasarlas a Vercel.")}</li>
           </ol>
-          <p className="mt-2 text-stone">Mientras tanto puedes preparar el correo y ver la vista previa.</p>
+          <p className="mt-2 text-stone">{tr("Mientras tanto puedes preparar el correo y ver la vista previa.")}</p>
         </div>
       )}
 
@@ -46,32 +47,32 @@ export default async function NewsletterPage({ searchParams }: PageProps<"/admin
                   <label key={w.id} className="flex items-center gap-3 border-b border-line/60 pb-2 text-sm">
                     <input type="checkbox" name="w" value={w.id} defaultChecked={chosen.includes(w.id)} className="h-4 w-4" />
                     <span className="min-w-0 flex-1 truncate">{w.brand} {w.model} <span className="text-stone">· {w.reference}</span></span>
-                    <span className="shrink-0 text-xs text-stone">{w.price == null ? "a consultar" : money(w.price)}</span>
+                    <span className="shrink-0 text-xs text-stone">{w.price == null ? tr("a consultar") : money(w.price)}</span>
                   </label>
                 ))}
                 <label className="mt-2 flex items-center gap-2 text-sm text-stone">
-                  <input type="checkbox" name="marca" value="1" defaultChecked={byBrand} className="h-4 w-4" /> Solo a clientes interesados en estas marcas
+                  <input type="checkbox" name="marca" value="1" defaultChecked={byBrand} className="h-4 w-4" /> {tr("Solo a clientes interesados en estas marcas")}
                 </label>
                 <div className="flex flex-wrap items-center gap-3 text-sm text-stone">
-                  <span>Solo a clientes con la etiqueta:</span>
+                  <span>{tr("Solo a clientes con la etiqueta:")}</span>
                   {CUSTOMER_TAGS.map((t) => (
                     <label key={t} className="flex items-center gap-1.5"><input type="checkbox" name="etiqueta" value={t} defaultChecked={tags.includes(t)} className="h-4 w-4" />{t}</label>
                   ))}
                 </div>
                 <input type="hidden" name="idioma" value={lang} />
-                <button className="mt-2 justify-self-start border border-line px-4 py-2 text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">Actualizar</button>
+                <button className="mt-2 justify-self-start border border-line px-4 py-2 text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">{tr("Actualizar")}</button>
               </form>
             ) : (
-              <p className="text-sm text-stone">No hay relojes publicados en los últimos 60 días.</p>
+              <p className="text-sm text-stone">{tr("No hay relojes publicados en los últimos 60 días.")}</p>
             )}
           </Card>
 
           <Card title={`2 · Destinatarios · ${people.length}`}>
             <p className="text-sm text-stone">
-              Clientes con correo que no se han dado de baja{tags.length ? `, con la etiqueta ${tags.join(" o ")}` : ""}{byBrand ? `, interesados en ${[...new Set(selected.map((w) => w.brand))].join(", ") || "—"}` : ""}
-              {byBrand ? " (por lo que buscan, sus avisos o lo que compraron)" : ""}.
+              {tr("Clientes con correo que no se han dado de baja")}{tags.length ? tr(", con la etiqueta {t}", { t: tags.join(tr(" o ")) }) : ""}{byBrand ? tr(", interesados en {b}", { b: [...new Set(selected.map((w) => w.brand))].join(", ") || "—" }) : ""}
+              {byBrand ? tr(" (por lo que buscan, sus avisos o lo que compraron)") : ""}.
             </p>
-            {people.length > 0 && <p className="mt-2 text-xs text-stone">{people.slice(0, 15).map((p) => p.name ?? p.email).join(" · ")}{people.length > 15 ? ` · y ${people.length - 15} más` : ""}</p>}
+            {people.length > 0 && <p className="mt-2 text-xs text-stone">{people.slice(0, 15).map((p) => p.name ?? p.email).join(" · ")}{people.length > 15 ? tr(" · y {n} más", { n: people.length - 15 }) : ""}</p>}
           </Card>
 
           <Card title="3 · Enviar">
@@ -83,11 +84,11 @@ export default async function NewsletterPage({ searchParams }: PageProps<"/admin
           <div className="mb-3 flex gap-3 text-[0.62rem] tracking-[0.18em] uppercase">
             {(["es", "en"] as const).map((l) => (
               <a key={l} href={`?${new URLSearchParams([...chosen.map((id) => ["w", id]), ["marca", byBrand ? "1" : "0"], ["idioma", l]]).toString()}`} className={lang === l ? "text-brass" : "text-stone hover:text-ivory"}>
-                {l === "es" ? "Español" : "Inglés"}
+                {l === "es" ? tr("Español") : tr("Inglés")}
               </a>
             ))}
           </div>
-          <iframe title="Vista previa del correo" srcDoc={preview} className="h-[720px] w-full border border-line bg-ink" sandbox="" />
+          <iframe title={tr("Vista previa del correo")} srcDoc={preview} className="h-[720px] w-full border border-line bg-ink" sandbox="" />
         </Card>
       </div>
     </>

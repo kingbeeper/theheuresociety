@@ -1,5 +1,7 @@
 "use client";
 
+
+import { useTr } from "@/components/admin/AdminLang";
 import Link from "next/link";
 import { useOptimistic, useTransition } from "react";
 import { STAGE_LABEL, type Stage } from "@/lib/crm-labels";
@@ -13,6 +15,7 @@ const COLUMNS: Stage[] = ["new", "contacted", "qualified", "appointment", "negot
 const money = (n: number) => (n ? `$${Math.round(n).toLocaleString("en-US")}` : "");
 
 export function PipelineBoard({ cards }: { cards: PipelineCard[] }) {
+  const tr = useTr();
   const [, start] = useTransition();
   const [list, move] = useOptimistic(cards, (state, { id, stage }: { id: string; stage: Stage }) => state.map((c) => (c.id === id ? { ...c, stage } : c)));
   const change = (id: string, stage: Stage) =>
@@ -36,10 +39,10 @@ export function PipelineBoard({ cards }: { cards: PipelineCard[] }) {
                 if (id && list.find((c) => c.id === id)?.stage !== stage) change(id, stage);
               }}
               className="min-h-[60vh] border border-line bg-forest/50"
-              aria-label={STAGE_LABEL[stage]}
+              aria-label={tr(STAGE_LABEL[stage])}
             >
               <header className="sticky top-0 border-b border-line bg-forest px-3 py-2.5">
-                <p className="text-[0.62rem] tracking-[0.2em] uppercase text-brass">{STAGE_LABEL[stage]} · {col.length}</p>
+                <p className="text-[0.62rem] tracking-[0.2em] uppercase text-brass">{tr(STAGE_LABEL[stage])} · {col.length}</p>
                 <p className="text-xs tabular-nums text-stone">{money(total) || "—"}</p>
               </header>
               <ul className="grid gap-2 p-2">
@@ -60,10 +63,10 @@ export function PipelineBoard({ cards }: { cards: PipelineCard[] }) {
                     <select
                       value={c.stage}
                       onChange={(e) => change(c.id, e.target.value as Stage)}
-                      aria-label="Mover a otra etapa"
+                      aria-label={tr("Mover a otra etapa")}
                       className="mt-2 w-full border border-line bg-ink px-1.5 py-1 text-[0.7rem] text-stone md:hidden"
                     >
-                      {[...COLUMNS, "lost" as Stage].map((s) => <option key={s} value={s}>{STAGE_LABEL[s]}</option>)}
+                      {[...COLUMNS, "lost" as Stage].map((s) => <option key={s} value={s}>{tr(STAGE_LABEL[s])}</option>)}
                     </select>
                   </li>
                 ))}

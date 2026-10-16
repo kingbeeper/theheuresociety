@@ -6,6 +6,7 @@ import {
   AtSign, CalendarDays, Wallet, Handshake, Receipt, ListTodo, ChartColumn, FileText, HandCoins, LayoutDashboard, Mail, TrendingUp, UserCog, UserCheck, Users, Watch, type LucideIcon,
 } from "lucide-react";
 import type { Section } from "@/lib/crm-perms";
+import { useTr } from "@/components/admin/AdminLang";
 
 // Menú del CRM: cada usuario ve solo las secciones para las que tiene permiso
 const ITEMS: { href: string; label: string; icon: LucideIcon; section?: Section }[] = [
@@ -29,6 +30,7 @@ const ITEMS: { href: string; label: string; icon: LucideIcon; section?: Section 
 
 export function AdminNav({ allowed }: { allowed: Section[] }) {
   const path = usePathname();
+  const tr = useTr();
   return (
     <nav className="flex gap-1 overflow-x-auto px-3 pb-3 md:flex-col md:overflow-visible md:px-3 md:pb-0">
       {ITEMS.filter((i) => !i.section || allowed.includes(i.section)).map((i) => {
@@ -43,7 +45,7 @@ export function AdminNav({ allowed }: { allowed: Section[] }) {
             }`}
           >
             <Icon aria-hidden className={`h-4 w-4 shrink-0 ${on ? "text-brass" : "text-stone/80 group-hover:text-brass"}`} strokeWidth={1.5} />
-            {i.label}
+            {tr(i.label)}
           </Link>
         );
       })}

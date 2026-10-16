@@ -1,5 +1,6 @@
 "use server";
 
+import { tr } from "@/lib/admin-i18n";
 import { refresh } from "next/cache";
 import { authClient, ownerEmails, requireUser } from "@/lib/admin-auth";
 import { adminDb } from "@/lib/supabase";
@@ -44,10 +45,10 @@ async function accessLink(email: string) {
 export async function addUser(_: unknown, f: FormData) {
   const me = await requireUser("usuarios");
   const email = text(f, "email")?.toLowerCase();
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: "Correo no válido." };
-  if (ownerEmails().includes(email)) return { error: "Ese correo ya es superadministrador." };
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: tr("Correo no válido.") };
+  if (ownerEmails().includes(email)) return { error: tr("Ese correo ya es superadministrador.") };
   const { role, permissions } = permissionsFrom(f);
-  if (role === "staff" && !permissions.length) return { error: "Elige al menos un permiso." };
+  if (role === "staff" && !permissions.length) return { error: tr("Elige al menos un permiso.") };
   const { error } = await adminDb()
     .from("crm_users")
     .upsert({ email, name: text(f, "name"), role, permissions, ...extras(f), active: true, invited_by: me.email, updated_at: new Date().toISOString() }, { onConflict: "email" });
@@ -90,8 +91,8 @@ export async function newAccessLink(email: string) {
 export async function changePassword(_: unknown, f: FormData) {
   await requireUser();
   const password = String(f.get("password") ?? "");
-  if (password.length < 10) return { error: "Mínimo 10 caracteres." };
-  if (password !== String(f.get("confirm") ?? "")) return { error: "Las dos contraseñas no coinciden." };
+  if (password.length < 10) return { error: tr("Mínimo 10 caracteres.") };
+  if (password !== String(f.get("confirm") ?? "")) return { error: tr("Las dos contraseñas no coinciden.") };
   const { error } = await (await authClient()).auth.updateUser({ password });
   if (error) return { error: error.message };
   return { ok: true };

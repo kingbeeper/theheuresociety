@@ -1,5 +1,6 @@
 "use server";
 
+import { tr } from "@/lib/admin-i18n";
 import { redirect } from "next/navigation";
 import { refresh } from "next/cache";
 import { authClient, isAllowed, requireAdmin } from "@/lib/admin-auth";
@@ -15,15 +16,23 @@ import { addAppointment, addFollowupNote, clashText, completeCall, followupAppoi
 export async function signIn(_: unknown, form: FormData) {
   const email = String(form.get("email") ?? "").trim().toLowerCase();
   const password = String(form.get("password") ?? "");
-  if (!(await isAllowed(email))) return { error: "Correo o contraseña incorrectos." };
+  if (!(await isAllowed(email))) return { error: tr("Correo o contraseña incorrectos.") };
   const { error } = await (await authClient()).auth.signInWithPassword({ email, password });
-  if (error) return { error: "Correo o contraseña incorrectos." };
+  if (error) return { error: tr("Correo o contraseña incorrectos.") };
   redirect("/admin");
 }
 
 export async function signOut() {
   await (await authClient()).auth.signOut();
   redirect("/admin/login");
+}
+
+// Idioma del CRM (ES / EN) para este usuario en este dispositivo
+export async function setLangAction(lang: "es" | "en") {
+  const { cookies } = await import("next/headers");
+  const { LANG_COOKIE } = await import("@/lib/admin-i18n");
+  (await cookies()).set(LANG_COOKIE, lang === "en" ? "en" : "es", { path: "/admin", maxAge: 60 * 60 * 24 * 365, sameSite: "lax", httpOnly: true, secure: true });
+  refresh();
 }
 
 const text = (form: FormData, key: string) => {
@@ -260,7 +269,7 @@ export async function rescheduleAppointment(id: string, _: unknown, form: FormDa
   const user = await requireAdmin("citas");
   const date = text(form, "date");
   const time = text(form, "time");
-  if (!date || !time) return { error: "Falta la fecha o la hora." };
+  if (!date || !time) return { error: tr("Falta la fecha o la hora.") };
   const startsAt = miamiToUtc(date, time);
   const clash = await slotClash(startsAt, id);
   if (clash && form.get("force") !== "on") return { error: clashText(clash), clash: true };
@@ -403,9 +412,9 @@ export async function mergeAction(keepId: string, dropId: string) {
 export async function askDealersAction(_: unknown, form: FormData) {
   const user = await requireAdmin("leads");
   const query = text(form, "query");
-  if (!query) return { error: "Escribe qué reloj buscas." };
+  if (!query) return { error: tr("Escribe qué reloj buscas.") };
   const ids = form.getAll("dealer").map(String).filter(Boolean);
-  if (!ids.length) return { error: "Elige al menos un dealer." };
+  if (!ids.length) return { error: tr("Elige al menos un dealer.") };
   const budget = Number(String(form.get("budget") ?? "").replace(/[^\d.]/g, "")) || null;
   const { askDealers } = await import("@/lib/dealers");
   await askDealers(query.slice(0, 300), budget, ids, text(form, "document_id"), user);
@@ -438,9 +447,9 @@ export async function addDealerAction(_: unknown, form: FormData) {
   const phone = text(form, "phone");
   const email = text(form, "email");
   const company = text(form, "company");
-  if (!name) return { error: "Escribe el nombre del dealer." };
-  if (!phone && !email) return { error: "Pon al menos el teléfono (WhatsApp) o el correo." };
-  if (phone && !normalizePhone(phone)) return { error: "El teléfono no parece válido. Escríbelo con código de país, p. ej. +1 305 555 1234." };
+  if (!name) return { error: tr("Escribe el nombre del dealer.") };
+  if (!phone && !email) return { error: tr("Pon al menos el teléfono (WhatsApp) o el correo.") };
+  if (phone && !normalizePhone(phone)) return { error: tr("El teléfono no parece válido. Escríbelo con código de país, p. ej. +1 305 555 1234.") };
   const { addDealer } = await import("@/lib/dealers");
   const c = await addDealer({ name, phone, email, company }, user);
   refresh();
@@ -452,7 +461,7 @@ export async function addDealerAction(_: unknown, form: FormData) {
 export async function createOfferAction(input: { kind: string; name: string; phone?: string; email?: string; brand: string; model?: string; reference?: string; asking?: string; details?: string; photos: { type: string }[] }) {
   const user = await requireAdmin("compras");
   const kind = ["sell", "trade", "consign"].includes(input.kind) ? input.kind : "sell";
-  if (!input.name?.trim() || !input.brand?.trim()) return { error: "Faltan el nombre del cliente y la marca del reloj." };
+  if (!input.name?.trim() || !input.brand?.trim()) return { error: tr("Faltan el nombre del cliente y la marca del reloj.") };
   const { createOffer } = await import("@/lib/offers");
   const r = await createOffer({ ...input, kind: kind as "sell" | "trade" | "consign" }, user);
   refresh();

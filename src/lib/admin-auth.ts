@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createServerClient } from "@supabase/ssr";
 import { adminDb } from "./supabase";
 import { ALL_SECTIONS, can, type CrmUser, type Section } from "./crm-perms";
+import { LANG_COOKIE, setAdminLang } from "./admin-i18n";
 
 // Acceso al CRM: sesión de Supabase Auth (correo y contraseña).
 // Superadministradores: los correos de CRM_ADMIN_EMAILS (separados por comas), con todos los permisos.
@@ -42,6 +43,9 @@ export const isAllowed = async (email?: string | null) => Boolean(await crmUser(
 
 const sessionUser = cache(async () => {
   const { data } = await (await authClient()).auth.getUser();
+  // Idioma del CRM elegido por el usuario (ES / EN): queda fijado para toda la petición
+  const lang = (await cookies()).get(LANG_COOKIE)?.value;
+  setAdminLang(lang === "en" ? "en" : "es");
   return crmUser(data.user?.email);
 });
 

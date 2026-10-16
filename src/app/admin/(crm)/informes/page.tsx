@@ -1,3 +1,4 @@
+import { tr, trParts, dateLocale } from "@/lib/admin-i18n";
 import Link from "next/link";
 import { connection } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
@@ -16,7 +17,7 @@ export default async function ReportsPage({ searchParams }: PageProps<"/admin/in
   const month = typeof sp.mes === "string" && /^\d{4}-\d{2}$/.test(sp.mes) ? sp.mes : current;
   const [r, commissions] = await Promise.all([monthlyReport(month), monthlyCommissions(month)]);
   const t = r.totals;
-  const label = new Intl.DateTimeFormat("es-ES", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${month}-15T12:00:00Z`));
+  const label = new Intl.DateTimeFormat(dateLocale(), { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${month}-15T12:00:00Z`));
   const day = (iso: string) => fmtDate(`${iso}T12:00:00`);
 
   const kpis = [
@@ -33,14 +34,14 @@ export default async function ReportsPage({ searchParams }: PageProps<"/admin/in
     <>
       <PageTitle
         eyebrow="CRM"
-        title={`Informe de ${label}`}
+        title={`${tr("Informe de")} ${label}`}
         action={
           <div className="flex flex-wrap items-end gap-2">
             <form action="/admin/informes" className="flex gap-2">
               <input type="month" name="mes" defaultValue={month} className={`${fieldClass} w-auto`} />
-              <button className="border border-line px-4 text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">Ver</button>
+              <button className="border border-line px-4 text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">{tr("Ver")}</button>
             </form>
-            <a href={`/api/reports/monthly?mes=${month}`} download className={buttonClass}>Excel para el contador</a>
+            <a href={`/api/reports/monthly?mes=${month}`} download className={buttonClass}>{tr("Excel para el contador")}</a>
           </div>
         }
       />
@@ -49,7 +50,7 @@ export default async function ReportsPage({ searchParams }: PageProps<"/admin/in
         {kpis.map(([l, v]) => (
           <div key={l} className="bg-forest px-5 py-5">
             <p className="break-words font-display text-2xl font-light sm:text-3xl">{v}</p>
-            <p className="mt-1 text-[0.6rem] tracking-[0.16em] uppercase text-stone">{l}</p>
+            <p className="mt-1 text-[0.6rem] tracking-[0.16em] uppercase text-stone">{trParts(l)}</p>
           </div>
         ))}
       </div>
@@ -61,11 +62,11 @@ export default async function ReportsPage({ searchParams }: PageProps<"/admin/in
               {r.sales.map((s) => (
                 <li key={s.sku} className="flex justify-between gap-3 border-b border-line/60 pb-2">
                   <span className="min-w-0"><span className="text-stone">{day(s.date)} · {s.sku}</span> {s.watch}<span className="block text-xs text-stone">{s.buyer ?? "—"} · {s.payment ?? "—"}</span></span>
-                  <span className="shrink-0 text-right tabular-nums">{money(s.price)}<span className="block text-xs text-stone">{s.profit == null ? "sin costo" : `+${money(s.profit)}`}</span></span>
+                  <span className="shrink-0 text-right tabular-nums">{money(s.price)}<span className="block text-xs text-stone">{s.profit == null ? tr("sin costo") : `+${money(s.profit)}`}</span></span>
                 </li>
               ))}
             </ul>
-          ) : <p className="text-sm text-stone">Sin ventas este mes.</p>}
+          ) : <p className="text-sm text-stone">{tr("Sin ventas este mes.")}</p>}
         </Card>
 
         <Card title={`Entradas al inventario · ${r.purchases.length}`}>
@@ -74,22 +75,21 @@ export default async function ReportsPage({ searchParams }: PageProps<"/admin/in
               {r.purchases.map((p) => (
                 <li key={p.sku} className="flex justify-between gap-3 border-b border-line/60 pb-2">
                   <span className="min-w-0"><span className="text-stone">{day(p.date)} · {p.sku}</span> {p.watch}<span className="block text-xs text-stone">{p.acquisition} · {p.supplier ?? "—"}</span></span>
-                  <span className="shrink-0 tabular-nums">{p.owner ? <span className="text-xs text-stone">al vender</span> : money(p.cost)}</span>
+                  <span className="shrink-0 tabular-nums">{p.owner ? <span className="text-xs text-stone">{tr("al vender")}</span> : money(p.cost)}</span>
                 </li>
               ))}
             </ul>
-          ) : <p className="text-sm text-stone">Sin entradas este mes.</p>}
+          ) : <p className="text-sm text-stone">{tr("Sin entradas este mes.")}</p>}
         </Card>
 
         <Card title="Impuesto de ventas (Florida)">
           <dl className="grid grid-cols-[1fr_auto] gap-y-2 text-sm">
-            <dt className="text-stone">Ventas con impuesto (base)</dt><dd className="text-right tabular-nums">{money(t.taxableSales)}</dd>
-            <dt className="text-stone">Ventas exentas (facturas sin impuesto)</dt><dd className="text-right tabular-nums">{money(t.exemptSales)}</dd>
-            <dt className="border-t border-line pt-2">Impuesto cobrado</dt><dd className="border-t border-line pt-2 text-right tabular-nums">{money(t.taxCollected)}</dd>
+            <dt className="text-stone">{tr("Ventas con impuesto (base)")}</dt><dd className="text-right tabular-nums">{money(t.taxableSales)}</dd>
+            <dt className="text-stone">{tr("Ventas exentas (facturas sin impuesto)")}</dt><dd className="text-right tabular-nums">{money(t.exemptSales)}</dd>
+            <dt className="border-t border-line pt-2">{tr("Impuesto cobrado")}</dt><dd className="border-t border-line pt-2 text-right tabular-nums">{money(t.taxCollected)}</dd>
           </dl>
           <p className="mt-3 text-xs text-stone">
-            Sale de las facturas pagadas en el mes. Las ventas registradas directamente en el inventario (sin factura) no llevan el detalle del impuesto:
-            para que cuenten aquí, regístralas con una factura.
+            {tr("Sale de las facturas pagadas en el mes. Las ventas registradas directamente en el inventario (sin factura) no llevan el detalle del impuesto: para que cuenten aquí, regístralas con una factura.")}
           </p>
         </Card>
 
@@ -99,14 +99,14 @@ export default async function ReportsPage({ searchParams }: PageProps<"/admin/in
               {commissions.map((c) => (
                 <li key={c.member.email} className="border-b border-line/60 pb-2">
                   <p className="flex justify-between gap-3">
-                    <span>{c.member.name ?? c.member.email} <span className="text-xs text-stone">· {c.member.rate}% {c.member.base === "sale" ? "de la venta" : "de la ganancia"}</span></span>
+                    <span>{c.member.name ?? c.member.email} <span className="text-xs text-stone">· {c.member.rate}% {c.member.base === "sale" ? tr("de la venta") : tr("de la ganancia")}</span></span>
                     <span className="tabular-nums">{money(c.total)}</span>
                   </p>
                   <p className="text-xs text-stone">{c.sales.map((s) => `${s.sku} (${money(s.commission)})`).join(" · ")}</p>
                 </li>
               ))}
             </ul>
-          ) : <p className="text-sm text-stone">Sin ventas con vendedor este mes. El vendedor se elige al registrar la venta (y en las facturas, quien la creó).</p>}
+          ) : <p className="text-sm text-stone">{tr("Sin ventas con vendedor este mes. El vendedor se elige al registrar la venta (y en las facturas, quien la creó).")}</p>}
         </Card>
 
         <Card title="Pagos a dueños y relojero">
@@ -114,7 +114,7 @@ export default async function ReportsPage({ searchParams }: PageProps<"/admin/in
             <ul className="space-y-2 text-sm">
               {r.owners.map((o) => (
                 <li key={`o-${o.sku}`} className="flex justify-between gap-3 border-b border-line/60 pb-2">
-                  <span>💵 <span className="text-stone">{day(o.date)} · {o.sku}</span> {o.owner ?? "Dueño"}</span><span className="tabular-nums">{money(o.amount)}</span>
+                  <span>💵 <span className="text-stone">{day(o.date)} · {o.sku}</span> {o.owner ?? tr("Dueño")}</span><span className="tabular-nums">{money(o.amount)}</span>
                 </li>
               ))}
               {r.repairs.map((s, i) => (
@@ -123,11 +123,11 @@ export default async function ReportsPage({ searchParams }: PageProps<"/admin/in
                 </li>
               ))}
             </ul>
-          ) : <p className="text-sm text-stone">Nada este mes.</p>}
+          ) : <p className="text-sm text-stone">{tr("Nada este mes.")}</p>}
         </Card>
       </div>
       <p className="mt-6 text-xs text-stone">
-        El Excel trae una hoja por apartado (resumen, ventas, compras, pagos a dueños, impuesto y relojero). <Link href="/admin/inventario" className="underline hover:text-ivory">Inventario completo →</Link>
+        {tr("El Excel trae una hoja por apartado (resumen, ventas, compras, pagos a dueños, impuesto y relojero).")} <Link href="/admin/inventario" className="underline hover:text-ivory">{tr("Inventario completo →")}</Link>
       </p>
     </>
   );

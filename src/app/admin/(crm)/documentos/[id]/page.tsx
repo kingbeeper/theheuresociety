@@ -1,3 +1,4 @@
+import { tr, trParts, dateLocale } from "@/lib/admin-i18n";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
@@ -48,18 +49,18 @@ export default async function DocumentPage({ params }: PageProps<"/admin/documen
 
   return (
     <>
-      <Link href="/admin/documentos" className="text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">← Documentos</Link>
+      <Link href="/admin/documentos" className="text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">{tr("← Documentos")}</Link>
       <PageTitle
-        eyebrow={KIND_LABEL[d.kind]}
+        eyebrow={tr(KIND_LABEL[d.kind])}
         title={`${d.number} · ${d.client_name ?? ""}`}
         action={
           <div className="flex flex-wrap gap-2">
-            <a href={`/d/${d.token}`} target="_blank" rel="noreferrer" className={ghostButtonClass}>Ver</a>
+            <a href={`/d/${d.token}`} target="_blank" rel="noreferrer" className={ghostButtonClass}>{tr("Ver")}</a>
             {d.status !== "draft" && <a href={`/d/${d.token}/pdf`} target="_blank" rel="noreferrer" className={ghostButtonClass}>PDF</a>}
-            {d.id_photo_path && <a href={`/api/private/id/${d.id}`} target="_blank" rel="noreferrer" className={ghostButtonClass}>🪪 Identificación</a>}
-            {d.kind === "invoice" && d.status !== "draft" && d.items.some((l) => l.item_id) && <a href={`/d/${d.token}/certificate`} target="_blank" rel="noreferrer" className={ghostButtonClass}>Certificado</a>}
-            {phone && <a href={`https://wa.me/${phone}?text=${encodeURIComponent(message)}`} target="_blank" rel="noreferrer" className={ghostButtonClass}>Enviar por WhatsApp</a>}
-            {d.client_email && <a href={`mailto:${d.client_email}?subject=${encodeURIComponent(`${t[d.kind]} ${d.number} · The Heure Society`)}&body=${encodeURIComponent(message)}`} className={ghostButtonClass}>Enviar por correo</a>}
+            {d.id_photo_path && <a href={`/api/private/id/${d.id}`} target="_blank" rel="noreferrer" className={ghostButtonClass}>{tr("🪪 Identificación")}</a>}
+            {d.kind === "invoice" && d.status !== "draft" && d.items.some((l) => l.item_id) && <a href={`/d/${d.token}/certificate`} target="_blank" rel="noreferrer" className={ghostButtonClass}>{tr("Certificado")}</a>}
+            {phone && <a href={`https://wa.me/${phone}?text=${encodeURIComponent(message)}`} target="_blank" rel="noreferrer" className={ghostButtonClass}>{tr("Enviar por WhatsApp")}</a>}
+            {d.client_email && <a href={`mailto:${d.client_email}?subject=${encodeURIComponent(`${t[d.kind]} ${d.number} · The Heure Society`)}&body=${encodeURIComponent(message)}`} className={ghostButtonClass}>{tr("Enviar por correo")}</a>}
           </div>
         }
       />
@@ -67,25 +68,25 @@ export default async function DocumentPage({ params }: PageProps<"/admin/documen
       <div className="grid grid-cols-2 gap-px border border-line bg-line md:grid-cols-4">
         {[
           ["Estado", late ? lateLabel : STATUS_LABEL[d.kind][d.status] ?? d.status],
-          [d.kind === "consignment" ? "Neto al dueño" : d.kind === "purchase" ? "Pagado al vendedor" : sourcing ? "Precio hasta" : d.kind === "invoice" && deposit ? `Total · saldo ${usd(balanceDue(d))}` : "Total", usd(d.total)],
+          [tr(d.kind === "consignment" ? "Neto al dueño" : d.kind === "purchase" ? "Pagado al vendedor" : sourcing ? "Precio hasta" : "Total") + (d.kind === "invoice" && deposit ? ` · ${tr("saldo")} ${usd(balanceDue(d))}` : ""), usd(d.total)],
           proforma
-            ? [`Pagado · saldo ${usd(pfBalance)}`, usd(pfPaid)]
+            ? [`${tr("Pagado")} · ${tr("saldo")} ${usd(pfBalance)}`, usd(pfPaid)]
             : sourcing
             ? [d.refunded_at && d.deposit_paid_at ? "Anticipo devuelto" : d.deposit_paid_at ? `Anticipo recibido ${fmtDate(`${d.deposit_paid_at}T12:00:00`)}` : "Anticipo pendiente", usd(deposit)]
             : ["Fecha", fmtDate(`${d.issue_date}T12:00:00`)],
-          [sourcing ? "Plazo de búsqueda hasta" : d.kind === "quote" ? "Válida hasta" : d.kind === "memo" ? "Devolver antes de" : d.kind === "consignment" ? (d.status === "paid" ? "Pagada al dueño el" : "Vigente hasta") : d.status === "paid" ? "Pagada el" : "Vence", d.status === "paid" && d.paid_at ? fmtDate(`${d.paid_at}T12:00:00`) : d.due_date ? fmtDate(`${d.due_date}T12:00:00`) : "—"],
+          [tr(sourcing ? "Plazo de búsqueda hasta" : d.kind === "quote" ? "Válida hasta" : d.kind === "memo" ? "Devolver antes de" : d.kind === "consignment" ? (d.status === "paid" ? "Pagada al dueño el" : "Vigente hasta") : d.status === "paid" ? "Pagada el" : "Vence"), d.status === "paid" && d.paid_at ? fmtDate(`${d.paid_at}T12:00:00`) : d.due_date ? fmtDate(`${d.due_date}T12:00:00`) : "—"],
         ].map(([l, v]) => (
           <div key={l} className="bg-forest px-5 py-4">
             <p className={`font-display text-2xl font-light ${l === "Estado" ? (late ? "text-red-200" : STATUS_STYLE[d.status]) : ""}`}>{v}</p>
-            <p className="mt-1 text-[0.6rem] tracking-[0.16em] uppercase text-stone">{l}</p>
+            <p className="mt-1 text-[0.6rem] tracking-[0.16em] uppercase text-stone">{trParts(l)}</p>
           </div>
         ))}
       </div>
 
       {d.signed_at && (
         <p className="mt-6 border border-emerald-300/40 bg-emerald-300/5 p-4 text-sm">
-          ✍️ Firmado electrónicamente por <b>{d.signer_name}</b> el {new Intl.DateTimeFormat("es-ES", { dateStyle: "long", timeStyle: "short", timeZone: "America/New_York" }).format(new Date(d.signed_at))}
-          {d.signed_ip ? <span className="text-stone"> · IP {d.signed_ip}</span> : null}
+          {tr("✍️ Firmado electrónicamente por")} <b>{d.signer_name}</b> {tr("el")} {new Intl.DateTimeFormat(dateLocale(), { dateStyle: "long", timeStyle: "short", timeZone: "America/New_York" }).format(new Date(d.signed_at))}
+          {d.signed_ip ? <span className="text-stone"> {tr("· IP")} {d.signed_ip}</span> : null}
         </p>
       )}
 
@@ -94,44 +95,44 @@ export default async function DocumentPage({ params }: PageProps<"/admin/documen
         <div className="flex flex-wrap items-center gap-2">
           {d.status === "draft" && (
             <form action={sendDocument.bind(null, d.id)}>
-              <button className={button}>{d.kind === "memo" ? "Marcar como entregado" : d.kind === "invoice" ? "Emitir factura" : (d.kind === "consignment" || d.kind === "purchase" || sourcing) ? "Marcar como firmado" : proforma ? "Emitir proforma (reserva el reloj)" : "Marcar como enviada"}</button>
+              <button className={button}>{d.kind === "memo" ? tr("Marcar como entregado") : d.kind === "invoice" ? tr("Emitir factura") : (d.kind === "consignment" || d.kind === "purchase" || sourcing) ? tr("Marcar como firmado") : proforma ? tr("Emitir proforma (reserva el reloj)") : tr("Marcar como enviada")}</button>
             </form>
           )}
           {d.kind === "quote" && d.status === "sent" && (
             <>
-              <form action={setQuoteResult.bind(null, d.id, true)}><button className={ghostButtonClass}>Aceptada</button></form>
-              <form action={setQuoteResult.bind(null, d.id, false)}><button className={ghostButtonClass}>Rechazada</button></form>
+              <form action={setQuoteResult.bind(null, d.id, true)}><button className={ghostButtonClass}>{tr("Aceptada")}</button></form>
+              <form action={setQuoteResult.bind(null, d.id, false)}><button className={ghostButtonClass}>{tr("Rechazada")}</button></form>
             </>
           )}
           {d.kind === "quote" && ["draft", "sent", "accepted"].includes(d.status) && (
-            <form action={convertToProforma.bind(null, d.id)}><button className={button}>Aceptada: hacer proforma</button></form>
+            <form action={convertToProforma.bind(null, d.id)}><button className={button}>{tr("Aceptada: hacer proforma")}</button></form>
           )}
           {((d.kind === "quote" && ["sent", "accepted"].includes(d.status)) || (d.kind === "memo" && d.status === "sent")) && (
-            <form action={convertToInvoice.bind(null, d.id)}><button className={button}>{d.kind === "memo" ? "Se lo queda: facturar" : "Convertir en factura"}</button></form>
+            <form action={convertToInvoice.bind(null, d.id)}><button className={button}>{d.kind === "memo" ? tr("Se lo queda: facturar") : tr("Convertir en factura")}</button></form>
           )}
           {d.kind === "memo" && d.status === "sent" && (
-            <form action={returnMemo.bind(null, d.id)}><button className={ghostButtonClass}>Reloj devuelto</button></form>
+            <form action={returnMemo.bind(null, d.id)}><button className={ghostButtonClass}>{tr("Reloj devuelto")}</button></form>
           )}
           {d.kind === "consignment" && d.status === "sent" && (
             <>
-              <form action={markConsignorPaid.bind(null, d.id)}><button className={button}>Vendido: pagado al dueño</button></form>
-              <form action={returnMemo.bind(null, d.id)}><button className={ghostButtonClass}>Devuelto al dueño</button></form>
+              <form action={markConsignorPaid.bind(null, d.id)}><button className={button}>{tr("Vendido: pagado al dueño")}</button></form>
+              <form action={returnMemo.bind(null, d.id)}><button className={ghostButtonClass}>{tr("Devuelto al dueño")}</button></form>
             </>
           )}
           {sourcing && d.status === "sent" && (
-            <form action={refundSourcing.bind(null, d.id)}><button className={ghostButtonClass}>{d.deposit_paid_at ? "No se consiguió: anticipo devuelto" : "Cerrar sin conseguir"}</button></form>
+            <form action={refundSourcing.bind(null, d.id)}><button className={ghostButtonClass}>{d.deposit_paid_at ? tr("No se consiguió: anticipo devuelto") : tr("Cerrar sin conseguir")}</button></form>
           )}
           {d.status !== "void" && d.status !== "paid" && d.status !== "converted" && d.status !== "returned" && (
-            <form action={voidDocument.bind(null, d.id)}><button className={ghostButtonClass}>Anular</button></form>
+            <form action={voidDocument.bind(null, d.id)}><button className={ghostButtonClass}>{tr("Anular")}</button></form>
           )}
           {d.status === "draft" && (
-            <form action={deleteDocument.bind(null, d.id)}><button className="px-2 text-xs text-stone underline hover:text-red-200">Eliminar borrador</button></form>
+            <form action={deleteDocument.bind(null, d.id)}><button className="px-2 text-xs text-stone underline hover:text-red-200">{tr("Eliminar borrador")}</button></form>
           )}
         </div>
         {d.kind === "invoice" && d.status === "sent" && (
           <div className="mt-5 border-t border-line pt-5">
             <PaidForm id={d.id} today={today} method={d.payment_method} />
-            <p className="mt-2 text-xs text-stone">Al marcarla pagada, los relojes del inventario quedan vendidos (también en la web) y el cliente pasa a «Ganado».</p>
+            <p className="mt-2 text-xs text-stone">{tr("Al marcarla pagada, los relojes del inventario quedan vendidos (también en la web) y el cliente pasa a «Ganado».")}</p>
           </div>
         )}
         {proforma && (d.status === "draft" || d.status === "sent") && (
@@ -141,13 +142,13 @@ export default async function DocumentPage({ params }: PageProps<"/admin/documen
                 {(d.payments ?? []).map((p, i) => (
                   <li key={i}>💵 {fmtDate(`${p.date}T12:00:00`)} · <b>{usd(p.amount)}</b>{p.method ? ` · ${p.method}` : ""}</li>
                 ))}
-                <li className="text-stone">Pagado {usd(pfPaid)} de {usd(d.total)} · saldo <b className="text-ivory">{usd(pfBalance)}</b></li>
+                <li className="text-stone">{tr("Pagado")} {usd(pfPaid)} de {usd(d.total)} {tr("· saldo")} <b className="text-ivory">{usd(pfBalance)}</b></li>
               </ul>
             )}
             <ProformaPaymentForm id={d.id} today={today} />
             <div className="border-t border-line/60 pt-5">
               <CloseProformaForm id={d.id} today={today} balance={pfBalance} />
-              <p className="mt-2 text-xs text-stone">Al saldarla se registra el saldo como último pago y se crea la <b>factura pagada</b> con los depósitos descontados; el reloj queda vendido (inventario y web).</p>
+              <p className="mt-2 text-xs text-stone">{tr("Al saldarla se registra el saldo como último pago y se crea la")} <b>{tr("factura pagada")}</b> {tr("con los depósitos descontados; el reloj queda vendido (inventario y web).")}</p>
             </div>
           </div>
         )}
@@ -156,34 +157,34 @@ export default async function DocumentPage({ params }: PageProps<"/admin/documen
             <DepositForm id={d.id} today={today} />
           </div>
         )}
-        {sourcing && d.deposit_paid_at && <p className="mt-3 text-sm text-emerald-200">💵 Anticipo de {usd(deposit)} recibido el {fmtDate(`${d.deposit_paid_at}T12:00:00`)}{d.deposit_method ? ` · ${d.deposit_method}` : ""}{d.refunded_at ? ` · devuelto el ${fmtDate(`${d.refunded_at}T12:00:00`)}` : ""}</p>}
+        {sourcing && d.deposit_paid_at && <p className="mt-3 text-sm text-emerald-200">{tr("💵 Anticipo de")} {usd(deposit)} {tr("recibido el")} {fmtDate(`${d.deposit_paid_at}T12:00:00`)}{d.deposit_method ? ` · ${d.deposit_method}` : ""}{d.refunded_at ? ` · ${tr("devuelto el")} ${fmtDate(`${d.refunded_at}T12:00:00`)}` : ""}</p>}
         {sourcing && d.status === "sent" && (
           <div className="mt-5 border-t border-line pt-5">
-            <Link href={`/admin/dealers?encargo=${d.id}`} className="inline-block border border-emerald-300/40 px-4 py-2 text-[0.66rem] tracking-[0.2em] uppercase text-emerald-200 hover:bg-emerald-300/10">🤝 Pedir este reloj a mis dealers</Link>
+            <Link href={`/admin/dealers?encargo=${d.id}`} className="inline-block border border-emerald-300/40 px-4 py-2 text-[0.66rem] tracking-[0.2em] uppercase text-emerald-200 hover:bg-emerald-300/10">{tr("🤝 Pedir este reloj a mis dealers")}</Link>
           </div>
         )}
         {sourcing && d.status === "sent" && (
           <div className="mt-5 border-t border-line pt-5">
             <SourcedForm id={d.id} stock={stock} price={Number(d.total)} />
-            <p className="mt-2 text-xs text-stone">Se crea la factura con el reloj y {d.deposit_paid_at ? `el anticipo de ${usd(deposit)} descontado del saldo` : "sin anticipo (no consta como pagado)"}. Si el reloj ya está en el inventario, elígelo: quedará reservado al emitirla y vendido al pagarla.</p>
+            <p className="mt-2 text-xs text-stone">{tr("Se crea la factura con el reloj y")} {d.deposit_paid_at ? tr("el anticipo de {m} descontado del saldo", { m: usd(deposit) }) : tr("sin anticipo (no consta como pagado)")}{tr(". Si el reloj ya está en el inventario, elígelo: quedará reservado al emitirla y vendido al pagarla.")}</p>
           </div>
         )}
         {d.kind === "consignment" && d.status === "sent" && (
-          <p className="mt-3 text-xs text-stone">Registra la venta del reloj en el inventario (o con una factura). Al marcar «Devuelto al dueño», el reloj sale del inventario y de la web.</p>
+          <p className="mt-3 text-xs text-stone">{tr("Registra la venta del reloj en el inventario (o con una factura). Al marcar «Devuelto al dueño», el reloj sale del inventario y de la web.")}</p>
         )}
         {(d.kind === "memo" || d.kind === "invoice") && d.status === "draft" && (
-          <p className="mt-3 text-xs text-stone">Al {d.kind === "memo" ? "entregarlo" : "emitirla"}, los relojes del inventario quedan reservados (también en la web).</p>
+          <p className="mt-3 text-xs text-stone">{tr("Al")} {d.kind === "memo" ? "entregarlo" : "emitirla"}{tr(", los relojes del inventario quedan reservados (también en la web).")}</p>
         )}
         <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-xs text-stone">
-          {d.customer_id && <Link href={`/admin/leads/${d.customer_id}`} className="hover:text-ivory">Ficha del cliente →</Link>}
+          {d.customer_id && <Link href={`/admin/leads/${d.customer_id}`} className="hover:text-ivory">{tr("Ficha del cliente →")}</Link>}
           {d.items.filter((l) => l.item_id).map((l) => (
-            <Link key={l.item_id} href={`/admin/inventario/${l.item_id}`} className="hover:text-ivory">{l.sku ?? "Reloj"} en inventario →</Link>
+            <Link key={l.item_id} href={`/admin/inventario/${l.item_id}`} className="hover:text-ivory">{l.sku ?? tr("Reloj")} {tr("en inventario →")}</Link>
           ))}
           {(related.data ?? []).map((r) => (
-            <Link key={r.id} href={`/admin/documentos/${r.id}`} className="hover:text-ivory">{KIND_LABEL[r.kind as keyof typeof KIND_LABEL]} {r.number} →</Link>
+            <Link key={r.id} href={`/admin/documentos/${r.id}`} className="hover:text-ivory">{tr(KIND_LABEL[r.kind as keyof typeof KIND_LABEL])} {r.number} →</Link>
           ))}
         </div>
-        <p className="mt-4 break-all text-xs text-stone/80">Enlace para el cliente (privado, sin costos ni datos internos): {link}</p>
+        <p className="mt-4 break-all text-xs text-stone/80">{tr("Enlace para el cliente (privado, sin costos ni datos internos):")} {link}</p>
       </Card>
       {["invoice", "memo", "proforma", "consignment", "return", "sourcing"].includes(d.kind) && d.status !== "draft" && d.status !== "void" && <ShipmentCard d={d} />}
 
