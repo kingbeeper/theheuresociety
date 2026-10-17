@@ -322,3 +322,9 @@ export function returnTerms(of: "consignment" | "memo", lang: "en" | "es", ref: 
     ? `The Heure Society declara que ha recibido de vuelta el reloj o relojes indicados, entregados en memorándum${ref ? ` (${ref})` : ""}, en el estado descrito en este documento. Con esta devolución queda cerrado el memorándum para estos relojes.`
     : `The Heure Society acknowledges receiving back the timepiece(s) listed, delivered on memorandum${ref ? ` (${ref})` : ""}, in the condition described in this document. This return closes the memorandum for these timepieces.`;
 }
+
+// Encargo sin anticipo (solo búsqueda): términos sin depósito, en el idioma del documento
+export const SOURCING_NO_DEPOSIT_TERMS = {
+  en: "The Client asks The Heure Society to locate the timepiece described above, at a purchase price not exceeding the agreed price, within the search period shown. No deposit is required and neither party is obliged until a specific timepiece is offered and accepted. When a timepiece matching the description is located, The Heure Society will notify the Client, who may then confirm the purchase.",
+  es: "El Cliente encarga a The Heure Society la búsqueda del reloj descrito, por un precio de compra que no supere el precio acordado, dentro del plazo de búsqueda indicado. No se pide anticipo y ninguna de las partes queda obligada hasta que se ofrezca y acepte un reloj concreto. Cuando se localice un reloj que cumpla la descripción, The Heure Society avisará al Cliente, que podrá confirmar la compra.",
+} as const;

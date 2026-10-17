@@ -513,7 +513,7 @@ export async function deliver(chatId: number, d: Doc) {
   const caption = [
     `📄 <b>${KIND_LABEL[d.kind]} ${h(d.number)}</b>`,
     d.kind === "sourcing"
-      ? `${h(d.client_name ?? "")} · busca ${h(d.items[0]?.title ?? "")} hasta <b>${usd(d.total)}</b>\n💵 Anticipo ${usd(d.deposit ?? 0)}${d.deposit_paid_at ? " · recibido" : " · pendiente"}`
+      ? `${h(d.client_name ?? "")} · busca ${h(d.items[0]?.title ?? "")} hasta <b>${usd(d.total)}</b>\n${Number(d.deposit ?? 0) > 0 ? `💵 Anticipo ${usd(d.deposit ?? 0)}${d.deposit_paid_at ? " · recibido" : " · pendiente"}` : "💵 Sin anticipo (solo búsqueda)"}`
       : d.kind === "proforma"
       ? `${h(d.client_name ?? "")} · total <b>${usd(d.total)}</b> · pagado ${usd(paidSoFar(d))} · saldo <b>${usd(Math.max(0, Number(d.total) - paidSoFar(d)))}</b>`
       : `${h(d.client_name ?? "")} · <b>${usd(d.total)}</b>${d.kind === "consignment" ? " neto al dueño" : ""}`,

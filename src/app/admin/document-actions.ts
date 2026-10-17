@@ -6,8 +6,8 @@ import { refresh } from "next/cache";
 import { requireAdmin } from "@/lib/admin-auth";
 import { adminDb } from "@/lib/supabase";
 import { upsertLead } from "@/lib/crm";
-import { addProformaPayment, closeProforma, closeReturned, consignorPaid, depositReceived, toProforma, docEvent, getDoc, insertDoc, issueDoc, payInvoice, refundDeposit, reserveStock, saveDocSettings, sourcingToInvoice, toInvoice, voidDoc } from "@/lib/documents";
-import { DOC_SETTING_KEYS, INSPECTION_PARTS, KIND_LABEL, docTotals, usd, type DocKind, type DocLine, type Inspection, type PartState } from "@/lib/doc-labels";
+import { addProformaPayment, closeProforma, closeReturned, consignorPaid, depositReceived, toProforma, docEvent, getDoc, getDocSettings, insertDoc, issueDoc, payInvoice, refundDeposit, reserveStock, saveDocSettings, sourcingToInvoice, toInvoice, voidDoc } from "@/lib/documents";
+import { DOC_SETTING_KEYS, INSPECTION_PARTS, KIND_LABEL, SOURCING_NO_DEPOSIT_TERMS, docTotals, termsFor, usd, type DocKind, type DocLine, type Inspection, type PartState } from "@/lib/doc-labels";
 
 // Acciones de cotizaciones, memos y facturas. Todas comprueban la sesión.
 
@@ -137,12 +137,23 @@ export async function saveDocument(id: string | null, _: unknown, f: FormData) {
     payment_method: text(f, "payment_method"),
   };
 
+  // Encargo sin anticipo: términos de búsqueda sin depósito (si no se han personalizado)
+  if (kind === "sourcing" && f.get("no_deposit") === "on") {
+    (fields as { deposit?: number }).deposit = 0;
+    const settings = await getDocSettings();
+    const defaults = [termsFor("sourcing", "en", settings), termsFor("sourcing", "es", settings)].map((t) => t.trim());
+    if (!fields.terms || defaults.includes(fields.terms.trim())) fields.terms = SOURCING_NO_DEPOSIT_TERMS[fields.lang];
+  }
+
   // Orden de servicio: la pieza, el taller y su costo, la fecha prometida y las fotos (el estado se conserva)
   const svc = kind === "service" ? parseService(f) : null;
 
   if (!id) {
     const doc = await insertDoc({ ...fields, ...(svc && { service: (await import("@/lib/service")).newService(svc) }), created_by: user });
     await docEvent(doc, `creada por ${usd(doc.total)}`, user);
+    // Encargo: recordatorio de seguimiento en X días (Tareas, calendario y Telegram)
+    const remind = Number(text(f, "sourcing_reminder") ?? 0);
+    if (kind === "sourcing" && remind > 0) await (await import("@/lib/sourcing-followup")).sourcingReminder(doc, remind, user);
     redirect(`/admin/documentos/${doc.id}`);
   }
 

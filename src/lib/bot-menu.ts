@@ -52,7 +52,7 @@ export async function onMenuText(chatId: number, text: string, user: string) {
             { text: "📄 Proforma", callback_data: "mnew:proforma" },
           ]),
           [{ text: "🛒 Compré un reloj", callback_data: "mnew:purchase" }],
-          [{ text: "🔎 Encargo con anticipo", callback_data: "mnew:sourcing" }],
+          [{ text: "🔎 Encargo (sourcing)", callback_data: "mnew:sourcing" }],
           [{ text: "📂 Ver documentos abiertos", callback_data: "mopen:menu" }],
           [{ text: "🚚 Envíos en camino", callback_data: "dship:list" }, { text: "💰 Cobros pendientes", callback_data: "dcob:list" }],
           [{ text: "🔧 Servicios en curso (pulido, reparación)", callback_data: "dsvc:list" }],

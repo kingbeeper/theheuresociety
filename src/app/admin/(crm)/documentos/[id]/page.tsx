@@ -76,7 +76,7 @@ export default async function DocumentPage({ params }: PageProps<"/admin/documen
           proforma
             ? [`${tr("Pagado")} · ${tr("saldo")} ${usd(pfBalance)}`, usd(pfPaid)]
             : sourcing
-            ? [d.refunded_at && d.deposit_paid_at ? "Anticipo devuelto" : d.deposit_paid_at ? `Anticipo recibido ${fmtDate(`${d.deposit_paid_at}T12:00:00`)}` : "Anticipo pendiente", usd(deposit)]
+            ? [deposit <= 0 ? "Sin anticipo" : d.refunded_at && d.deposit_paid_at ? "Anticipo devuelto" : d.deposit_paid_at ? `Anticipo recibido ${fmtDate(`${d.deposit_paid_at}T12:00:00`)}` : "Anticipo pendiente", deposit > 0 ? usd(deposit) : "—"]
             : ["Fecha", fmtDate(`${d.issue_date}T12:00:00`)],
           [tr(sourcing ? "Plazo de búsqueda hasta" : d.kind === "quote" ? "Válida hasta" : d.kind === "memo" ? "Devolver antes de" : d.kind === "consignment" ? (d.status === "paid" ? "Pagada al dueño el" : "Vigente hasta") : d.status === "paid" ? "Pagada el" : "Vence"), d.status === "paid" && d.paid_at ? fmtDate(`${d.paid_at}T12:00:00`) : d.due_date ? fmtDate(`${d.due_date}T12:00:00`) : "—"],
         ].map(([l, v]) => (
@@ -188,7 +188,7 @@ export default async function DocumentPage({ params }: PageProps<"/admin/documen
             </div>
           </div>
         )}
-        {sourcing && (d.status === "draft" || d.status === "sent") && !d.deposit_paid_at && (
+        {sourcing && deposit > 0 && (d.status === "draft" || d.status === "sent") && !d.deposit_paid_at && (
           <div className="mt-5 border-t border-line pt-5">
             <DepositForm id={d.id} today={today} />
           </div>

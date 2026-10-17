@@ -2,7 +2,7 @@ import "server-only";
 import { adminDb } from "./supabase";
 import { upsertLead } from "./crm";
 import { depositReceived, getDoc, getDocSettings, insertDoc, issueDoc, refundDeposit } from "./documents";
-import { depositPct, suggestedDeposit, termsFor, usd } from "./doc-labels";
+import { SOURCING_NO_DEPOSIT_TERMS, depositPct, suggestedDeposit, termsFor, usd } from "./doc-labels";
 import { PAYMENT } from "./stock-labels";
 import { todayInMiami } from "./booking";
 import { SITE_URL } from "./seo";
@@ -12,7 +12,8 @@ import { escapeHtml as h, keyboard, sendMessage, tg } from "./telegram";
 // anticipo (sugerido según el precio) → plazo → se crea, se marca firmado y llega el PDF con el enlace.
 
 type SourcingFlow = {
-  step: "watch" | "client" | "price" | "deposit" | "days" | "confirm";
+  step: "watch" | "client" | "price" | "deposit" | "days" | "remind" | "confirm";
+  remind?: number; // recordatorio de seguimiento en X días (0 = ninguno)
   user: string;
   title?: string;
   details?: string | null;
@@ -49,14 +50,14 @@ export async function startSourcing(chatId: number, user: string) {
   await saveFlow(chatId, { step: "watch", user, lang: "en" });
   return sendMessage(
     chatId,
-    "🔎 <b>Nuevo encargo con anticipo</b>\n\n⌚ ¿Qué reloj busca el cliente?\nMarca, modelo y referencia; después de una coma, los detalles.\n<i>Ej.: Rolex Daytona 126500LN, esfera blanca, 2023 o más nuevo, caja y papeles</i>\n\n/cancelar para salir."
+    "🔎 <b>Nuevo encargo</b> (con o sin anticipo)\n\n⌚ ¿Qué reloj busca el cliente?\nMarca, modelo y referencia; después de una coma, los detalles.\n<i>Ej.: Rolex Daytona 126500LN, esfera blanca, 2023 o más nuevo, caja y papeles</i>\n\n/cancelar para salir."
   );
 }
 
 function askDeposit(chatId: number, f: SourcingFlow) {
   const s = suggestedDeposit(f.price ?? 0);
   return sendMessage(chatId, `💵 ¿Cuánto deja de <b>anticipo</b>?\nSugerido para ${usd(f.price ?? 0)}: <b>${usd(s)}</b> (${depositPct(f.price ?? 0)} %). Escribe otra cantidad si es distinta.`, {
-    reply_markup: keyboard([[{ text: `Usar ${usd(s)}`, callback_data: `dsx:dep|${s}` }]]),
+    reply_markup: keyboard([[{ text: `Usar ${usd(s)}`, callback_data: `dsx:dep|${s}` }], [{ text: "Sin anticipo (solo búsqueda)", callback_data: "dsx:dep|0" }]]),
   });
 }
 
@@ -69,8 +70,9 @@ function summary(chatId: number, f: SourcingFlow) {
       `⌚ <b>${h(f.title ?? "")}</b>${f.details ? `\n${h(f.details)}` : ""}`,
       `👤 ${h(f.name ?? "")}${f.phone ? ` · ${h(f.phone)}` : ""}`,
       `💰 Precio hasta <b>${usd(f.price ?? 0)}</b>`,
-      `💵 Anticipo <b>${usd(f.deposit ?? 0)}</b> (reembolsable si no se consigue)`,
+      f.deposit ? `💵 Anticipo <b>${usd(f.deposit)}</b> (reembolsable si no se consigue)` : "💵 Sin anticipo (solo búsqueda)",
       `📅 Plazo de búsqueda: ${f.days} días`,
+      f.remind ? `⏰ Recordatorio de seguimiento en ${f.remind} días` : "⏰ Sin recordatorio",
       `🌐 Documento en ${f.lang === "es" ? "español" : "inglés"}`,
     ].join("\n"),
     {
@@ -148,10 +150,16 @@ async function create(chatId: number, f: SourcingFlow) {
     items: [{ title: f.title ?? "", details: f.details ?? null, qty: 1, price: f.price ?? 0 }],
     deposit: f.deposit ?? 0,
     show_serial: false,
-    terms: termsFor("sourcing", f.lang, settings),
+    terms: f.deposit ? termsFor("sourcing", f.lang, settings) : SOURCING_NO_DEPOSIT_TERMS[f.lang],
     created_by: f.user,
   });
   await issueDoc(d, f.user);
+  // Recordatorio de seguimiento (llega aquí a su hora; también en Tareas y el calendario)
+  if (f.remind) {
+    const { sourcingReminder } = await import("./sourcing-followup");
+    const r = await sourcingReminder(d, f.remind, f.user, chatId);
+    if (r) await sendMessage(chatId, `⏰ Recordatorio de seguimiento para el ${r.day} a las 10:00.`);
+  }
   const { deliver } = await import("./bot-docs");
   return deliver(chatId, { ...d, status: "sent" });
 }
@@ -176,6 +184,15 @@ export async function onSourcingCallback(chatId: number, cbId: string, messageId
     if (what === "days") {
       await clearButtons();
       f.days = Number(value);
+      f.step = "remind";
+      await saveFlow(chatId, f);
+      return sendMessage(chatId, "⏰ ¿Cuándo te recuerdo darle seguimiento?", {
+        reply_markup: keyboard([[7, 14, 30].map((n) => ({ text: `En ${n} días`, callback_data: `dsx:rem|${n}` })), [{ text: "Sin recordatorio", callback_data: "dsx:rem|0" }]]),
+      });
+    }
+    if (what === "rem") {
+      await clearButtons();
+      f.remind = Number(value) || 0;
       f.step = "confirm";
       await saveFlow(chatId, f);
       return summary(chatId, f);
@@ -251,8 +268,8 @@ export async function onSourcingCallback(chatId: number, cbId: string, messageId
 export const SOURCING_ACTIONS = new Set(["dsx", "dsdp", "dsdm", "dsrf", "dsdl"]);
 
 // Botones de un encargo abierto (en el PDF que llega por Telegram)
-export const sourcingButtons = (d: { id: string; deposit_paid_at?: string | null }) => [
-  ...(!d.deposit_paid_at ? [[{ text: "💵 Anticipo recibido", callback_data: `dsdp:${d.id}` }]] : []),
+export const sourcingButtons = (d: { id: string; deposit_paid_at?: string | null; deposit?: number | null }) => [
+  ...(!d.deposit_paid_at && Number(d.deposit ?? 0) > 0 ? [[{ text: "💵 Anticipo recibido", callback_data: `dsdp:${d.id}` }]] : []),
   [{ text: "🤝 Pedir a mis dealers", callback_data: `dsdl:${d.id}` }],
   [{ text: "✅ Conseguido: facturar (en el CRM)", url: `${SITE_URL}/admin/documentos/${d.id}` }],
   [{ text: "↩️ No se consiguió: cerrar", callback_data: `dsrf:${d.id}` }],

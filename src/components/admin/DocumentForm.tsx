@@ -62,6 +62,7 @@ export function DocumentForm({
   const [termsText, setTermsText] = useState(doc?.terms ?? terms[initialKind]);
   // Encargo: de un reloj (por defecto) o de una joya, con sus datos
   const [piece, setPiece] = useState<"watch" | "jewelry">("watch");
+  const [noDeposit, setNoDeposit] = useState(Boolean(doc && doc.kind === "sourcing" && !Number(doc.deposit)));
   const [due, setDue] = useState(doc?.due_date ?? addDays(today, DUE_DAYS[initialKind]));
 
   const totals = docTotals({ items: lines, discount: Number(discount), tax_rate: Number(tax), shipping: Number(shipping) });
@@ -260,13 +261,34 @@ export function DocumentForm({
             <input type="hidden" name="tax_rate" value="0" />
             <input type="hidden" name="shipping" value="0" />
             <p className="flex justify-between font-display text-xl"><span>{tr("Precio hasta")}</span><span className="tabular-nums">{usd(totals.total)}</span></p>
-            <label className="flex items-center justify-between gap-3"><span className="text-stone">{tr("Anticipo $")}</span><input name="deposit" value={deposit} onChange={(e) => setDeposit(e.target.value)} placeholder={String(suggested || "")} inputMode="decimal" className={`${small} w-32 text-right`} /></label>
-            {suggested > 0 && (
-              <button type="button" onClick={() => setDeposit(String(suggested))} className="text-left text-xs text-brass hover:text-ivory">
-                {tr("Sugerido:")} {usd(suggested)} ({depositPct(totals.total)} {tr("% del precio) · usar")}
-              </button>
+            <label className="flex items-center gap-2 text-stone">
+              <input type="checkbox" name="no_deposit" checked={noDeposit} onChange={(e) => { setNoDeposit(e.target.checked); if (e.target.checked) setDeposit("0"); }} className="h-4 w-4" />
+              {tr("Sin anticipo (solo búsqueda)")}
+            </label>
+            {noDeposit ? (
+              <input type="hidden" name="deposit" value="0" />
+            ) : (
+              <>
+                <label className="flex items-center justify-between gap-3"><span className="text-stone">{tr("Anticipo $")}</span><input name="deposit" value={deposit} onChange={(e) => setDeposit(e.target.value)} placeholder={String(suggested || "")} inputMode="decimal" className={`${small} w-32 text-right`} /></label>
+                {suggested > 0 && (
+                  <button type="button" onClick={() => setDeposit(String(suggested))} className="text-left text-xs text-brass hover:text-ivory">
+                    {tr("Sugerido:")} {usd(suggested)} ({depositPct(totals.total)} {tr("% del precio) · usar")}
+                  </button>
+                )}
+                <p className="text-[0.7rem] text-stone/80">{tr("Hasta $15k: 20 % · hasta $50k: 15 % · hasta $150k: 10 % · más: 8 %. El anticipo se descuenta de la factura al conseguir el reloj y se devuelve íntegro si no se consigue.")}</p>
+              </>
             )}
-            <p className="text-[0.7rem] text-stone/80">{tr("Hasta $15k: 20 % · hasta $50k: 15 % · hasta $150k: 10 % · más: 8 %. El anticipo se descuenta de la factura al conseguir el reloj y se devuelve íntegro si no se consigue.")}</p>
+            {!doc && (
+              <label className="flex items-center justify-between gap-3 border-t border-line/60 pt-3">
+                <span className="text-stone">{tr("⏰ Recordatorio de seguimiento")}</span>
+                <select name="sourcing_reminder" defaultValue="14" className={`${small} w-32`}>
+                  <option value="7">{tr("en 7 días")}</option>
+                  <option value="14">{tr("en 14 días")}</option>
+                  <option value="30">{tr("en 30 días")}</option>
+                  <option value="0">{tr("Sin recordatorio")}</option>
+                </select>
+              </label>
+            )}
           </div>
         ) : (
         <div className="grid content-start gap-3 border border-line/70 p-4 text-sm">
