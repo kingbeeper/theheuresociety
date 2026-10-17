@@ -6,7 +6,7 @@ import { adminDb } from "@/lib/supabase";
 import { requireUser } from "@/lib/admin-auth";
 import { can } from "@/lib/crm-perms";
 import { daysInStock, margin, totalCost, type Item } from "@/lib/stock";
-import { ACQUISITION, ITEM_STATUS, isOwnerStock } from "@/lib/stock-labels";
+import { ACQUISITION, ITEM_STATUS, JEWELRY_TYPE, isOwnerStock, jewelrySummary } from "@/lib/stock-labels";
 import { Card, fieldClass, fmtDate, fmtDateTime, ghostButtonClass, money, PageTitle, requestTime } from "@/components/admin/ui";
 import { ItemForm, ReturnForm, SaleForm } from "@/components/admin/ItemForms";
 import { STATUS_LABEL, type DocKind, type DocStatus } from "@/lib/doc-labels";
@@ -65,7 +65,7 @@ export default async function ItemPage({ params, searchParams }: PageProps<"/adm
     <>
       <Link href="/admin/inventario" className="text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">{tr("← Inventario")}</Link>
       <PageTitle
-        eyebrow={`${item.sku} · ${ACQUISITION[item.acquisition]}`}
+        eyebrow={`${item.sku} · ${ACQUISITION[item.acquisition]}${item.category === "jewelry" ? ` · ${tr("Joya")}` : ""}`}
         title={`${item.brand} ${item.model ?? ""}`.trim()}
         action={
           <div className="flex flex-wrap gap-2">
@@ -116,7 +116,14 @@ export default async function ItemPage({ params, searchParams }: PageProps<"/adm
             </Card>
           )}
 
-          {available && (
+          {item.category === "jewelry" && item.jewelry && (
+            <Card title="💍 Joya">
+              <p className="text-sm">{tr(JEWELRY_TYPE[item.jewelry.type] ?? "Joya")}</p>
+              <p className="mt-1 text-sm text-stone">{jewelrySummary(item.jewelry) || "—"}</p>
+            </Card>
+          )}
+
+          {available && (item.category ?? "watch") === "watch" && (
             <Card title="Precio de mercado">
               {item.market_checked_at && (item.market_low || item.market_high) ? (
                 <div className="text-sm">

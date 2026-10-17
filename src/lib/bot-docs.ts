@@ -57,8 +57,8 @@ export const FLOW_COMMANDS: Record<string, FlowKind> = {
   "/proforma": "proforma",
 };
 const NAME: Record<FlowKind, string> = { ...KIND_LABEL, purchase: "Compra" };
-const ICON: Record<FlowKind, string> = { invoice: "🧾", memo: "📋", consignment: "🤝", quote: "💬", purchase: "🛒", sourcing: "🔎", proforma: "📄", return: "↩️", inspection: "🔍" };
-const DUE_DAYS: Record<DocKind, number> = { quote: 7, memo: 14, invoice: 0, consignment: 90, purchase: 0, sourcing: 60, proforma: 14, return: 0, inspection: 0 };
+const ICON: Record<FlowKind, string> = { invoice: "🧾", memo: "📋", consignment: "🤝", quote: "💬", purchase: "🛒", sourcing: "🔎", proforma: "📄", return: "↩️", inspection: "🔍", service: "🔧" };
+const DUE_DAYS: Record<DocKind, number> = { quote: 7, memo: 14, invoice: 0, consignment: 90, purchase: 0, sourcing: 60, proforma: 14, return: 0, inspection: 0, service: 14 };
 
 // ───────────────────────────── Estado (uno por chat) ─────────────────────────────
 const key = (chatId: number) => `tgdoc:${chatId}`;
@@ -325,6 +325,7 @@ function askPrice(chatId: number, flow: DocFlow) {
     proforma: "💵 ¿Precio de venta? (sin impuesto)",
     return: "",
     inspection: "",
+    service: "",
   }[flow.kind];
   const s = suggested(flow);
   return sendMessage(chatId, q, s ? { reply_markup: keyboard([[{ text: `Usar ${usd(s)}`, callback_data: `dprice:${s}` }]]) } : {});
@@ -489,7 +490,7 @@ export async function finish(chatId: number, flow: DocFlow) {
 export async function deliver(chatId: number, d: Doc) {
   const link = `${SITE_URL}/d/${d.token}`;
   const first = (d.client_name ?? "").split(" ")[0];
-  const label = d.lang === "es" ? (d.kind === "proforma" ? "factura" : KIND_LABEL[d.kind].toLowerCase()) : { quote: "quotation", memo: "memorandum", invoice: "invoice", consignment: "consignment agreement", purchase: "bill of sale", sourcing: "sourcing agreement", proforma: "invoice", return: "return receipt", inspection: "condition report" }[d.kind];
+  const label = d.lang === "es" ? (d.kind === "proforma" ? "factura" : KIND_LABEL[d.kind].toLowerCase()) : { quote: "quotation", memo: "memorandum", invoice: "invoice", consignment: "consignment agreement", purchase: "bill of sale", sourcing: "sourcing agreement", proforma: "invoice", return: "return receipt", inspection: "condition report", service: "repair order" }[d.kind];
   const msg = d.lang === "es"
     ? `Hola ${first}, le comparto su ${label} ${d.number} de The Heure Society: ${link}`
     : `Hi ${first}, here is your ${label} ${d.number} from The Heure Society: ${link}`;
@@ -540,6 +541,9 @@ export async function onCallback(chatId: number, cbId: string, messageId: number
     await clearAppraise(chatId);
     return card.startCard(chatId);
   }
+
+  // Órdenes de servicio
+  if (action === "dsvc") return (await import("./bot-service")).onServiceCallback(chatId, cbId, messageId, arg, user);
 
   // Cobros pendientes
   if (action === "dcob") return (await import("./bot-collections")).onCollectionsCallback(chatId, cbId, messageId, arg, user);

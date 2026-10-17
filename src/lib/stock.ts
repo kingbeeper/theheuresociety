@@ -14,6 +14,8 @@ export type Item = {
   sku: string;
   status: "in_stock" | "reserved" | "sold" | "returned";
   acquisition: "purchase" | "trade" | "consignment" | "memo";
+  category?: "watch" | "jewelry" | "other"; // tipo de pieza (reloj por defecto)
+  jewelry?: import("./stock-labels").Jewelry | null;
   brand: string;
   model: string | null;
   reference: string | null;

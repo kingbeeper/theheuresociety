@@ -15,13 +15,13 @@ export default async function NuevoPage({ searchParams }: PageProps<"/admin/inve
   // Desde Telegram (tarjeta de garantía leída): el alta llega rellenada
   const sp = await searchParams;
   const one = (k: string) => (typeof sp[k] === "string" ? (sp[k] as string).slice(0, 80) : undefined);
-  const prefill = { brand: one("marca"), model: one("modelo"), reference: one("ref"), serial: one("serial"), papers_date: one("papeles"), comes_with: one("serial") ? "Papers" : undefined };
+  const prefill = { brand: one("marca"), model: one("modelo"), reference: one("ref"), serial: one("serial"), papers_date: one("papeles"), comes_with: one("serial") ? "Papers" : undefined, category: one("cat") === "jewelry" ? "jewelry" : undefined };
   const { data } = await adminDb().from("watches").select("id, brand, model, reference, status").order("published_at", { ascending: false });
   const watches = (data ?? []).map((w) => ({ id: w.id as string, label: `${w.brand} ${w.model} · ${w.reference}${w.status === "sold" ? " (vendido)" : ""}` }));
   return (
     <>
       <Link href="/admin/inventario" className="text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">{tr("← Inventario")}</Link>
-      <PageTitle title="Añadir reloj" />
+      <PageTitle title={prefill.category === "jewelry" ? "Añadir joya" : "Añadir reloj"} />
       <Card><ItemForm watches={watches} showCosts={can(user, "costos")} prefill={prefill} /></Card>
     </>
   );

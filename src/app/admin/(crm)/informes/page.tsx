@@ -25,6 +25,7 @@ export default async function ReportsPage({ searchParams }: PageProps<"/admin/in
 
   const kpis = [
     ["Ventas", money(t.revenue)],
+    ["Relojes · Joyería · Servicios", `${money(t.revenueWatches)} · ${money(t.revenueJewelry)} · ${money(t.services)}`],
     ["Ganancia bruta", money(t.profit)],
     ["Compras de stock", money(t.bought)],
     ["Pagado a dueños", money(t.ownerPaid)],

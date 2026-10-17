@@ -39,7 +39,8 @@ async function SharedDocument({ params, searchParams }: { params: Promise<{ toke
   // Ficha de inspección: sin precios; el estado del reloj, fotos y la firma de su dueño
   const insp = d.kind === "inspection" ? d.inspection ?? null : null;
   const noPrice = receipt || d.kind === "inspection";
-  const twoParty = consign || purchase || sourcing || receipt || d.kind === "inspection";
+  const svc = d.kind === "service" ? d.service ?? null : null;
+  const twoParty = consign || purchase || sourcing || receipt || d.kind === "inspection" || d.kind === "service";
   const sellerId = purchase ? maskedId(d) : null;
   // Firma del cliente (imagen privada, se incrusta en la página)
   const sigBytes = d.signature_path ? await downloadPrivate(d.signature_path) : null;
@@ -155,6 +156,24 @@ async function SharedDocument({ params, searchParams }: { params: Promise<{ toke
           </tbody>
         </table>
 
+        {svc && (
+          <section className="mt-8 text-sm">
+            <p className="mb-2 text-[0.62rem] tracking-[0.24em] uppercase text-[#8a7a52]">{t.svc.piece}</p>
+            <p className="font-display text-lg">{svc.piece}</p>
+            <p className="mt-2 text-xs text-[#5d625e]">{t.svc.status}: {t.svc.states[svc.status]}{d.due_date && svc.status !== "delivered" ? ` · ${t.due.service} ${date(d.due_date)}` : ""}</p>
+            {svc.photos?.length > 0 && (
+              <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-4">
+                {svc.photos.map((_, i) => (
+                  <a key={i} href={`/api/insp-photo?t=${d.token}&i=${i}`} target="_blank" rel="noreferrer">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={`/api/insp-photo?t=${d.token}&i=${i}`} alt="" className="aspect-square w-full border border-[#d8d2c4] object-cover" />
+                  </a>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
+
         {insp && (
           <section className="mt-8 text-sm">
             <p className="mb-3 text-[0.62rem] tracking-[0.24em] uppercase text-[#8a7a52]">{insp.direction === "out" ? t.insp.titleOut : t.insp.title}</p>
@@ -242,7 +261,7 @@ async function SharedDocument({ params, searchParams }: { params: Promise<{ toke
           )}
           {twoParty && (
             <div className="mt-8 grid gap-10 sm:grid-cols-2">
-              {(d.kind === "inspection" ? t.insp.sign : purchase ? t.purchaseSign : sourcing ? t.sourcingSign : receipt ? t.returnSign[d.return_of === "memo" ? "memo" : "consignment"] : t.consignSign).map((who) => (
+              {(d.kind === "inspection" ? t.insp.sign : d.kind === "service" ? t.svc.sign : purchase ? t.purchaseSign : sourcing ? t.sourcingSign : receipt ? t.returnSign[d.return_of === "memo" ? "memo" : "consignment"] : t.consignSign).map((who) => (
                 <div key={who}>
                   <p className="border-t border-[#1b1f1c] pt-2">{who}</p>
                   <p className="mt-6 border-t border-[#1b1f1c] pt-2">{t.date}</p>

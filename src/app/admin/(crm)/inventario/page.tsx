@@ -42,6 +42,9 @@ export default async function InventarioPage({ searchParams }: PageProps<"/admin
   const sp = await searchParams;
   const tab = typeof sp.status === "string" ? sp.status : "available";
   const q = typeof sp.q === "string" ? sp.q.trim().toLowerCase() : "";
+  // Tipo de pieza: relojes por defecto; joyería, otros o todo con los botones de arriba
+  const cat = typeof sp.cat === "string" && ["watch", "jewelry", "other", "all"].includes(sp.cat) ? sp.cat : "watch";
+  const catOf = (i: Item) => i.category ?? "watch";
   const now = requestTime();
 
   const { data } = await adminDb().from("inventory_items").select("*").order("purchase_date", { ascending: false, nullsFirst: false }).order("created_at", { ascending: false });
@@ -50,6 +53,7 @@ export default async function InventarioPage({ searchParams }: PageProps<"/admin
   const s = summarize(items, now);
 
   const list = items
+    .filter((i) => cat === "all" || catOf(i) === cat)
     .filter((i) =>
       tab === "all" ? true
       : tab === "available" ? i.status === "in_stock" || i.status === "reserved"
@@ -60,7 +64,8 @@ export default async function InventarioPage({ searchParams }: PageProps<"/admin
     )
     .filter((i) => !q || [i.sku, i.brand, i.model, i.reference, i.serial, i.supplier_name, i.supplier_company, i.buyer_name].some((v) => v?.toLowerCase().includes(q)));
 
-  const count = (f: (i: Item) => boolean) => items.filter(f).length;
+  const count = (f: (i: Item) => boolean) => items.filter((i) => (cat === "all" || catOf(i) === cat) && f(i)).length;
+  const catCount = (c: string) => items.filter((i) => (i.status === "in_stock" || i.status === "reserved") && (c === "all" || catOf(i) === c)).length;
   const tabs: [string, string, number][] = [
     ["available", "Disponibles", count((i) => i.status === "in_stock" || i.status === "reserved")],
     ["sold", "Vendidos", count((i) => i.status === "sold")],
@@ -95,6 +100,7 @@ export default async function InventarioPage({ searchParams }: PageProps<"/admin
             <Link href="/admin/inventario/conteo" className={ghostButtonClass}>{tr("Conteo")}</Link>
             <Link href="/admin/inventario/mercado" className={ghostButtonClass}>{tr("📈 Mercado")}</Link>
             <a href="/admin/etiquetas" target="_blank" rel="noreferrer" className={ghostButtonClass}>{tr("Etiquetas QR")}</a>
+            <Link href="/admin/inventario/nuevo?cat=jewelry" className={ghostButtonClass}>{tr("+ Añadir joya")}</Link>
             <Link href="/admin/inventario/nuevo" className={buttonClass}>{tr("+ Añadir reloj")}</Link>
           </div>
         }
@@ -132,13 +138,20 @@ export default async function InventarioPage({ searchParams }: PageProps<"/admin
         </div>
       )}
 
-      <Card className="mt-6">
+      <div className="mt-6 flex flex-wrap gap-2">
+        {([["watch", "⌚ Relojes"], ["jewelry", "💍 Joyería"], ["other", "Otros"], ["all", "Todo"]] as const).map(([k, l]) => (
+          <Link key={k} href={`/admin/inventario?cat=${k}${tab !== "available" ? `&status=${tab}` : ""}`} className={`border px-3 py-1.5 text-[0.62rem] tracking-[0.16em] uppercase ${cat === k ? "border-brass text-brass" : "border-line text-stone hover:text-ivory"}`}>
+            {tr(l)} <span className="text-stone/70">{catCount(k)}</span>
+          </Link>
+        ))}
+      </div>
+      <Card className="mt-3">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div className="flex gap-1 overflow-x-auto">
             {tabs.map(([k, l, n]) => (
               <Link
                 key={k}
-                href={`/admin/inventario?status=${k}${q ? `&q=${encodeURIComponent(q)}` : ""}`}
+                href={`/admin/inventario?status=${k}${cat !== "watch" ? `&cat=${cat}` : ""}${q ? `&q=${encodeURIComponent(q)}` : ""}`}
                 className={`whitespace-nowrap border-b-2 px-3 py-2 text-[0.64rem] tracking-[0.16em] uppercase ${tab === k ? "border-brass text-ivory" : "border-transparent text-stone hover:text-ivory"}`}
               >
                 {tr(l)} <span className="text-stone/70">{n}</span>

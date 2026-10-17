@@ -24,7 +24,10 @@ export async function GET(request: Request) {
 
   const t = r.totals;
   const summary = sheet("Resumen", [["Concepto", "k", 42], ["Importe", "v", 18, true]], [
-    { k: "Ventas (precio de venta)", v: t.revenue },
+    { k: "Ventas (relojes, joyería y servicios)", v: t.revenue },
+    { k: "· Relojes", v: t.revenueWatches },
+    { k: "· Joyería y otros", v: t.revenueJewelry },
+    { k: "· Servicios (pulido, reparación)", v: t.services },
     { k: "Costo de lo vendido (costo + gastos)", v: t.cogs },
     { k: "Ganancia bruta", v: t.profit },
     { k: "Compras de stock propio", v: t.bought },
@@ -41,7 +44,8 @@ export async function GET(request: Request) {
   summary.insertRow(1, [`The Heure Society · Informe de ${month}`]);
   summary.getRow(1).font = { bold: true, size: 14 };
 
-  sheet("Ventas", [["Fecha", "date", 12], ["SKU", "sku", 11], ["Reloj", "watch", 40], ["Serie", "serial", 16], ["Entrada", "acquisition", 16], ["Comprador", "buyer", 24], ["Pago", "payment", 14], ["Venta", "price", 14, true], ["Costo", "cost", 14, true], ["Gastos", "extra", 12, true], ["Ganancia", "profit", 14, true]], r.sales);
+  sheet("Ventas", [["Fecha", "date", 12], ["SKU", "sku", 11], ["Tipo", "kind", 10], ["Pieza", "watch", 40], ["Serie", "serial", 16], ["Entrada", "acquisition", 16], ["Comprador", "buyer", 24], ["Pago", "payment", 14], ["Venta", "price", 14, true], ["Costo", "cost", 14, true], ["Gastos", "extra", 12, true], ["Ganancia", "profit", 14, true]], r.sales.map((x) => ({ ...x, kind: x.category === "jewelry" ? "Joya" : x.category === "other" ? "Otro" : "Reloj" })));
+  sheet("Servicios", [["Fecha", "date", 12], ["Orden", "number", 14], ["Cliente", "client", 26], ["Trabajo", "work", 40], ["Cobrado", "price", 14, true], ["Taller", "cost", 14, true], ["Ganancia", "profit", 14, true]], r.serviceOrders);
   sheet("Compras", [["Fecha", "date", 12], ["SKU", "sku", 11], ["Reloj", "watch", 40], ["Serie", "serial", 16], ["Entrada", "acquisition", 18], ["Proveedor", "supplier", 30], ["Pagado", "cost", 14, true]], r.purchases);
   sheet("Pagos a dueños", [["Fecha", "date", 12], ["SKU", "sku", 11], ["Reloj", "watch", 36], ["Dueño", "owner", 28], ["Importe", "amount", 14, true]], r.owners);
   sheet("Impuesto de ventas", [["Fecha de pago", "date", 14], ["Factura", "number", 16], ["Cliente", "client", 28], ["Base", "taxable", 14, true], ["%", "rate", 6], ["Impuesto", "tax", 14, true], ["Total", "total", 14, true]], r.taxes);

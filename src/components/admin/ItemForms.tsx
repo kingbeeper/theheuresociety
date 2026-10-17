@@ -3,7 +3,7 @@
 
 import { useTr } from "@/components/admin/AdminLang";
 import { useActionState, useState } from "react";
-import { ACQUISITION, CONDITIONS, PAYMENT } from "@/lib/stock-labels";
+import { ACQUISITION, CATEGORY, CONDITIONS, GOLD_COLORS, JEWELRY_TYPE, METALS, PAYMENT, type Category } from "@/lib/stock-labels";
 import { SOURCE_LABEL } from "@/lib/crm-labels";
 import { returnItem, saveItem, sellItem } from "@/app/admin/inventory-actions";
 import type { Item } from "@/lib/stock";
@@ -25,25 +25,59 @@ export function ItemForm({ item, watches, showCosts = true, prefill }: { item?: 
   const [acq, setAcq] = useState(item?.acquisition ?? "purchase");
   const owner = acq === "consignment" || acq === "memo";
   const v = (k: keyof Item) => (item?.[k] ?? prefill?.[k] ?? "") as string;
+  const [cat, setCat] = useState<Category>(item?.category ?? (prefill?.category as Category | undefined) ?? "watch");
+  const j = item?.jewelry ?? null;
 
   return (
     <form action={action} className="grid gap-6">
       <div className="grid gap-4">
-        <p className={section}>{tr("Reloj")}</p>
-        <WarrantyScan />
+        <div className="flex flex-wrap items-center gap-2">
+          <input type="hidden" name="category" value={cat} />
+          {(Object.keys(CATEGORY) as Category[]).map((k) => (
+            <button key={k} type="button" onClick={() => setCat(k)} className={`border px-4 py-2 text-[0.66rem] tracking-[0.2em] uppercase ${cat === k ? "border-brass text-brass" : "border-line text-stone hover:text-ivory"}`}>
+              {k === "watch" ? "⌚ " : k === "jewelry" ? "💍 " : ""}{tr(CATEGORY[k])}
+            </button>
+          ))}
+        </div>
+        {cat === "watch" && <WarrantyScan />}
+        {cat === "jewelry" && (
+          <div className="grid gap-4 sm:grid-cols-4">
+            <label>
+              <span className={label}>{tr("Tipo de joya *")}</span>
+              <select name="j_type" defaultValue={j?.type ?? "ring"} className={field}>
+                {Object.entries(JEWELRY_TYPE).map(([k, l]) => <option key={k} value={k}>{tr(l)}</option>)}
+              </select>
+            </label>
+            <label>
+              <span className={label}>{tr("Metal")}</span>
+              <input name="j_metal" list="metals" defaultValue={j?.metal ?? ""} placeholder={tr("Oro 18k")} className={field} />
+              <datalist id="metals">{METALS.map((m) => <option key={m} value={m} />)}</datalist>
+            </label>
+            <label>
+              <span className={label}>{tr("Color del oro")}</span>
+              <input name="j_color" list="gold-colors" defaultValue={j?.color ?? ""} placeholder={tr("Amarillo")} className={field} />
+              <datalist id="gold-colors">{GOLD_COLORS.map((m) => <option key={m} value={m} />)}</datalist>
+            </label>
+            <label><span className={label}>{tr("Peso (g)")}</span><input name="j_weight" inputMode="decimal" defaultValue={j?.weight ?? ""} className={field} /></label>
+            <label><span className={label}>{tr("Piedra")}</span><input name="j_stone" defaultValue={j?.stone ?? ""} placeholder={tr("Diamante, esmeralda…")} className={field} /></label>
+            <label><span className={label}>{tr("Quilates (ct)")}</span><input name="j_carats" inputMode="decimal" defaultValue={j?.carats ?? ""} placeholder="1.02" className={field} /></label>
+            <label><span className={label}>{tr("Calidad / certificado")}</span><input name="j_quality" defaultValue={j?.quality ?? ""} placeholder="G / VS1 · GIA" className={field} /></label>
+            <label><span className={label}>{tr("Talla o largo")}</span><input name="j_size" defaultValue={j?.size ?? ""} placeholder={tr("6 · 20 in")} className={field} /></label>
+          </div>
+        )}
         <div className="grid gap-4 sm:grid-cols-3">
-          <label><span className={label}>{tr("Marca *")}</span><input name="brand" defaultValue={v("brand")} required className={field} /></label>
-          <label><span className={label}>{tr("Modelo")}</span><input name="model" defaultValue={v("model")} className={field} /></label>
-          <label><span className={label}>{tr("Ref #")}</span><input name="reference" defaultValue={v("reference")} className={field} /></label>
-          <div><label htmlFor="serial" className={label}>{tr("Serial #")}</label><SerialInput id="serial" name="serial" defaultValue={v("serial")} itemId={item?.id} className={field} /></div>
-          <label><span className={label}>{tr("Fecha de papeles")}</span><input name="papers_date" type="date" defaultValue={v("papers_date")} className={field} /></label>
-          <label><span className={label}>{tr("Eslabones (Links #)")}</span><input name="links" defaultValue={v("links")} placeholder={tr("Full links, +2…")} className={field} /></label>
+          <label><span className={label}>{cat === "watch" ? tr("Marca *") : tr("Marca o diseñador")}</span><input name="brand" defaultValue={v("brand")} required={cat === "watch"} placeholder={cat === "jewelry" ? tr("Vacío: el tipo de joya") : undefined} className={field} /></label>
+          <label><span className={label}>{cat === "watch" ? tr("Modelo") : tr("Nombre")}</span><input name="model" defaultValue={v("model")} placeholder={cat === "jewelry" ? tr("Vacío: metal, piedra y talla") : undefined} className={field} /></label>
+          {cat === "watch" && <label><span className={label}>{tr("Ref #")}</span><input name="reference" defaultValue={v("reference")} className={field} /></label>}
+          <div><label htmlFor="serial" className={label}>{cat === "watch" ? tr("Serial #") : tr("N.º de serie o certificado (opcional)")}</label><SerialInput id="serial" name="serial" defaultValue={v("serial")} itemId={item?.id} className={field} /></div>
+          {cat === "watch" && <label><span className={label}>{tr("Fecha de papeles")}</span><input name="papers_date" type="date" defaultValue={v("papers_date")} className={field} /></label>}
+          {cat === "watch" && <label><span className={label}>{tr("Eslabones (Links #)")}</span><input name="links" defaultValue={v("links")} placeholder={tr("Full links, +2…")} className={field} /></label>}
           <label>
             <span className={label}>{tr("Condición")}</span>
             <input name="condition" list="conditions" defaultValue={v("condition")} className={field} />
             <datalist id="conditions">{CONDITIONS.map((c) => <option key={c} value={c} />)}</datalist>
           </label>
-          <label className="sm:col-span-2"><span className={label}>{tr("Incluye (Comes with)")}</span><input name="comes_with" defaultValue={v("comes_with")} placeholder={tr("Caja, papeles, etiquetas…")} className={field} /></label>
+          <label className="sm:col-span-2"><span className={label}>{tr("Incluye (Comes with)")}</span><input name="comes_with" defaultValue={v("comes_with")} placeholder={cat === "watch" ? tr("Caja, papeles, etiquetas…") : tr("Estuche, certificado…")} className={field} /></label>
         </div>
         <label><span className={label}>{tr("Descripción")}</span><textarea name="description" rows={2} defaultValue={v("description")} className={field} /></label>
       </div>
@@ -74,7 +108,7 @@ export function ItemForm({ item, watches, showCosts = true, prefill }: { item?: 
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <label>
+        <label className={cat === "watch" ? "" : "hidden"}>
           <span className={label}>{tr("Ficha en la web")}</span>
           <select name="watch_id" defaultValue={v("watch_id")} className={field}>
             <option value="">{tr("— Sin publicar —")}</option>

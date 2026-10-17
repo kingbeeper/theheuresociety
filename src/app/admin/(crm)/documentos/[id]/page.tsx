@@ -3,21 +3,25 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { adminDb } from "@/lib/supabase";
-import { requireAdmin } from "@/lib/admin-auth";
+import { requireUser } from "@/lib/admin-auth";
+import { can } from "@/lib/crm-perms";
 import { formOptions, getDoc, getDocSettings } from "@/lib/documents";
-import { KIND_LABEL, PRINT, STATUS_LABEL, STATUS_STYLE, balanceDue, paidSoFar, usd } from "@/lib/doc-labels";
+import { KIND_LABEL, PRINT, SERVICE_STATUS, STATUS_LABEL, STATUS_STYLE, balanceDue, paidSoFar, usd } from "@/lib/doc-labels";
+import { PAYMENT } from "@/lib/stock-labels";
+import { readyMessage } from "@/lib/service";
 import { todayInMiami } from "@/lib/booking";
 import { SITE_URL } from "@/lib/seo";
 import { Card, fmtDate, ghostButtonClass, PageTitle, requestTime } from "@/components/admin/ui";
 import { ShipmentCard } from "@/components/admin/ShipmentCard";
 import { CloseProformaForm, DepositForm, DocumentForm, PaidForm, ProformaPaymentForm, SourcedForm } from "@/components/admin/DocumentForm";
-import { convertToInvoice, convertToProforma, deleteDocument, markConsignorPaid, refundSourcing, returnMemo, sendDocument, setQuoteResult, voidDocument } from "../../../document-actions";
+import { serviceStepAction, convertToInvoice, convertToProforma, deleteDocument, markConsignorPaid, refundSourcing, returnMemo, sendDocument, setQuoteResult, voidDocument } from "../../../document-actions";
 
 export const metadata = { title: "Documento" };
 
 export default async function DocumentPage({ params }: PageProps<"/admin/documentos/[id]">) {
   await connection();
-  await requireAdmin("documentos");
+  const me = await requireUser("documentos");
+  const showCosts = can(me, "costos");
   const { id } = await params;
   const d = await getDoc(id);
   if (!d) notFound();
@@ -92,6 +96,38 @@ export default async function DocumentPage({ params }: PageProps<"/admin/documen
 
       {/* Siguiente paso según el tipo y el estado */}
       <Card className="mt-6" title="Acciones">
+        {d.kind === "service" && d.service && d.status === "sent" && (
+          <div className="mb-4 grid gap-3 border-b border-line/60 pb-4 text-sm">
+            <p>
+              🔧 {tr("Estado")}: <span className="text-brass">{tr(SERVICE_STATUS[d.service.status])}</span>
+              {d.service.provider ? <span className="text-stone"> · {d.service.provider}</span> : null}
+              {d.due_date ? <span className="text-stone"> · {tr("Lista para")} {fmtDate(`${d.due_date}T12:00:00`)}</span> : null}
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              {d.service.status === "received" && (
+                <form action={serviceStepAction.bind(null, d.id, "workshop")}><button className={ghostButtonClass}>{tr("🔧 Enviar al taller")}</button></form>
+              )}
+              {(d.service.status === "received" || d.service.status === "workshop") && (
+                <form action={serviceStepAction.bind(null, d.id, "ready")}><button className={ghostButtonClass}>{tr("✅ Está lista")}</button></form>
+              )}
+              {d.service.status === "ready" && d.client_phone && (
+                <a href={`https://wa.me/${d.client_phone.replace(/\D/g, "")}?text=${encodeURIComponent(readyMessage(d))}`} target="_blank" rel="noreferrer" className={ghostButtonClass}>{tr("📲 Avisar al cliente que está lista")}</a>
+              )}
+              <form action={serviceStepAction.bind(null, d.id, "delivered")} className="flex flex-wrap items-center gap-2">
+                {Number(d.total) > 0 && (
+                  <select name="payment_method" defaultValue="" className="border border-line bg-ink/60 px-2 py-2 text-xs">
+                    <option value="">{tr("Forma de pago")}</option>
+                    {Object.values(PAYMENT).map((p) => <option key={p} value={p}>{tr(p)}</option>)}
+                  </select>
+                )}
+                <button className={button}>{Number(d.total) > 0 ? tr("💵 Entregar y cobrar ({m})", { m: usd(d.total) }) : tr("Entregada")}</button>
+              </form>
+            </div>
+            {d.service.provider_cost != null && showCosts && Number(d.total) > 0 && (
+              <p className="text-xs text-stone">{tr("Margen: {m} (cobras {a}, el taller cuesta {c})", { m: usd(Number(d.subtotal) - Number(d.service.provider_cost)), a: usd(d.subtotal), c: usd(d.service.provider_cost) })}</p>
+            )}
+          </div>
+        )}
         <div className="flex flex-wrap items-center gap-2">
           {d.status === "draft" && (
             <form action={sendDocument.bind(null, d.id)}>
@@ -191,11 +227,12 @@ export default async function DocumentPage({ params }: PageProps<"/admin/documen
       <Card className="mt-6" title={editable ? "Editar" : "Contenido"}>
         {editable ? (
           <DocumentForm
+            showCosts={can(me, "costos")}
             doc={d}
             kind={d.kind}
             customers={customers}
             stock={[...stock, ...d.items.filter((l) => l.item_id && !stock.some((x) => x.id === l.item_id)).map((l) => ({ id: l.item_id!, sku: l.sku ?? "", title: l.title, details: l.details ?? "", serial: l.serial ?? null, price: l.price }))]}
-            terms={{ quote: s.doc_terms_quote, memo: s.doc_terms_memo, invoice: s.doc_terms_invoice, consignment: s.doc_terms_consignment, purchase: s.doc_terms_purchase, sourcing: s.doc_terms_sourcing, proforma: s.doc_terms_proforma, return: s.doc_terms_return, inspection: s.doc_terms_inspection }}
+            terms={{ quote: s.doc_terms_quote, memo: s.doc_terms_memo, invoice: s.doc_terms_invoice, consignment: s.doc_terms_consignment, purchase: s.doc_terms_purchase, sourcing: s.doc_terms_sourcing, proforma: s.doc_terms_proforma, return: s.doc_terms_return, inspection: s.doc_terms_inspection, service: s.doc_terms_service }}
             taxRate={Number(s.doc_tax_rate) || 0}
             today={today}
           />

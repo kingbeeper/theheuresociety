@@ -67,6 +67,7 @@ export async function marketPass() {
     .from("inventory_items")
     .select("id, sku, brand, model, reference, condition, comes_with, papers_date, asking_price, market_checked_at")
     .in("status", ["in_stock", "reserved"])
+    .eq("category", "watch") // el precio de mercado es solo para relojes
     .not("brand", "is", null)
     .or(`market_checked_at.is.null,market_checked_at.lt.${new Date(Date.now() - EVERY).toISOString()}`)
     .order("market_checked_at", { ascending: true, nullsFirst: true })

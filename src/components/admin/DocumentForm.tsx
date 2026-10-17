@@ -8,6 +8,8 @@ import { ID_TYPES, KIND_LABEL, depositPct, docTotals, suggestedDeposit, usd, typ
 import { PAYMENT } from "@/lib/stock-labels";
 import { SerialWarning } from "./SerialCheck";
 import { InspectionFields } from "./InspectionFields";
+import { ServiceFields } from "./ServiceFields";
+import { JewelrySourcing } from "./JewelrySourcing";
 
 const field =
   "w-full border border-line bg-ink/60 px-3 py-2.5 text-sm text-ivory placeholder:text-stone/50 outline-none transition-colors focus:border-brass/70";
@@ -19,11 +21,11 @@ export type CustomerOption = { id: string; label: string; name: string | null; e
 export type StockOption = { id: string; sku: string; title: string; details: string; serial: string | null; price: number | null; cost?: number | null };
 
 const addDays = (iso: string, n: number) => new Date(new Date(`${iso}T12:00:00Z`).getTime() + n * 86_400_000).toISOString().slice(0, 10);
-const DUE_DAYS: Record<DocKind, number> = { quote: 7, memo: 14, invoice: 0, consignment: 90, purchase: 0, sourcing: 60, proforma: 14, return: 0, inspection: 0 };
+const DUE_DAYS: Record<DocKind, number> = { quote: 7, memo: 14, invoice: 0, consignment: 90, purchase: 0, sourcing: 60, proforma: 14, return: 0, inspection: 0, service: 14 };
 const noTax = (k: DocKind) => k === "memo" || k === "consignment" || k === "purchase" || k === "sourcing" || k === "inspection";
 
 export function DocumentForm({
-  doc, kind: initialKind, customers, stock, terms, taxRate, today, presetCustomer, presetItem,
+  doc, kind: initialKind, customers, stock, terms, taxRate, today, presetCustomer, presetItem, showCosts = true,
 }: {
   doc?: Doc;
   kind: DocKind;
@@ -34,6 +36,7 @@ export function DocumentForm({
   today: string;
   presetCustomer?: string;
   presetItem?: string;
+  showCosts?: boolean;
 }) {
   const tr = useTr();
   const [state, action, pending] = useActionState(saveDocument.bind(null, doc?.id ?? null), null);
@@ -56,6 +59,8 @@ export function DocumentForm({
   const [tax, setTax] = useState(String(doc?.tax_rate ?? (noTax(initialKind) ? 0 : taxRate)));
   const [shipping, setShipping] = useState(String(doc?.shipping ?? 0));
   const [termsText, setTermsText] = useState(doc?.terms ?? terms[initialKind]);
+  // Encargo: de un reloj (por defecto) o de una joya, con sus datos
+  const [piece, setPiece] = useState<"watch" | "jewelry">("watch");
   const [due, setDue] = useState(doc?.due_date ?? addDays(today, DUE_DAYS[initialKind]));
 
   const totals = docTotals({ items: lines, discount: Number(discount), tax_rate: Number(tax), shipping: Number(shipping) });
@@ -103,7 +108,7 @@ export function DocumentForm({
         <label><span className={label}>{tr("Fecha")}</span><input name="issue_date" type="date" defaultValue={doc?.issue_date ?? today} className={field} /></label>
         {kind !== "purchase" ? (
           <label>
-            <span className={label}>{kind === "quote" ? tr("Válida hasta") : kind === "memo" ? tr("Devolver antes de") : kind === "consignment" ? tr("Vigente hasta") : sourcing ? tr("Plazo de búsqueda hasta") : kind === "proforma" ? tr("Saldar antes de") : tr("Vence")}</span>
+            <span className={label}>{kind === "quote" ? tr("Válida hasta") : kind === "memo" ? tr("Devolver antes de") : kind === "consignment" ? tr("Vigente hasta") : sourcing ? tr("Plazo de búsqueda hasta") : kind === "proforma" ? tr("Saldar antes de") : kind === "service" ? tr("Lista para") : tr("Vence")}</span>
             <input name="due_date" type="date" value={due} onChange={(e) => setDue(e.target.value)} className={field} />
           </label>
         ) : (
@@ -138,6 +143,16 @@ export function DocumentForm({
 
       <div className="grid gap-3">
         <p className={section}>{sourcing ? tr("Reloj que busca el cliente") : tr("Relojes y conceptos")}</p>
+        {sourcing && !doc && (
+          <div className="flex flex-wrap gap-2">
+            {(["watch", "jewelry"] as const).map((k) => (
+              <button key={k} type="button" onClick={() => setPiece(k)} className={`border px-4 py-2 text-[0.66rem] tracking-[0.2em] uppercase ${piece === k ? "border-brass text-brass" : "border-line text-stone hover:text-ivory"}`}>
+                {k === "watch" ? `⌚ ${tr("Reloj")}` : `💍 ${tr("Joya (p. ej. anillo de compromiso)")}`}
+              </button>
+            ))}
+          </div>
+        )}
+        {sourcing && piece === "jewelry" && <JewelrySourcing onChange={(title, details) => setLines((ls) => [{ ...(ls[0] ?? blank), title, details }, ...ls.slice(1)])} />}
         {sourcing && <p className="text-xs text-stone">{tr("Describe el reloj (marca, modelo y referencia) y en el detalle la esfera, el año mínimo, si tiene que traer caja y papeles y el estado. El precio es el")} <b>{tr("máximo acordado")}</b> {tr("con el cliente.")}</p>}
         {kind === "purchase" && (
           <div className="grid gap-4 sm:grid-cols-3">
@@ -204,6 +219,13 @@ export function DocumentForm({
           <input name="show_serial" type="checkbox" defaultChecked={doc?.show_serial ?? kind !== "quote"} className="h-4 w-4" /> {tr("Mostrar el número de serie en el documento")}
         </label>
       </div>
+
+      {kind === "service" && (
+        <div className="grid gap-3">
+          <p className={section}>{tr("Pieza y taller")}</p>
+          <ServiceFields value={doc?.service} token={doc?.token} showCosts={showCosts} />
+        </div>
+      )}
 
       {kind === "inspection" && (
         <div className="grid gap-3">

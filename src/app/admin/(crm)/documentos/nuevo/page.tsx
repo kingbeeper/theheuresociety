@@ -1,7 +1,8 @@
 import { tr } from "@/lib/admin-i18n";
 import Link from "next/link";
 import { connection } from "next/server";
-import { requireAdmin } from "@/lib/admin-auth";
+import { requireUser } from "@/lib/admin-auth";
+import { can } from "@/lib/crm-perms";
 import { formOptions, getDocSettings } from "@/lib/documents";
 import { KIND_LABEL, type DocKind } from "@/lib/doc-labels";
 import { todayInMiami } from "@/lib/booking";
@@ -12,7 +13,7 @@ export const metadata = { title: "Nuevo documento" };
 
 export default async function NewDocumentPage({ searchParams }: PageProps<"/admin/documentos/nuevo">) {
   await connection();
-  await requireAdmin("documentos");
+  const me = await requireUser("documentos");
   const sp = await searchParams;
   const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
   const tipo = one(sp.tipo);
@@ -22,13 +23,14 @@ export default async function NewDocumentPage({ searchParams }: PageProps<"/admi
   return (
     <>
       <Link href="/admin/documentos" className="text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">{tr("← Documentos")}</Link>
-      <PageTitle eyebrow="Documentos" title={kind === "memo" ? "Nuevo memo" : kind === "consignment" ? "Nuevo contrato de consignación" : kind === "purchase" ? "Nuevo contrato de compra" : kind === "sourcing" ? "Nuevo encargo" : kind === "proforma" ? "Nueva factura proforma" : kind === "inspection" ? "Nueva ficha de inspección" : tr(`Nueva ${KIND_LABEL[kind].toLowerCase()}`)} />
+      <PageTitle eyebrow="Documentos" title={kind === "memo" ? "Nuevo memo" : kind === "consignment" ? "Nuevo contrato de consignación" : kind === "purchase" ? "Nuevo contrato de compra" : kind === "sourcing" ? "Nuevo encargo" : kind === "proforma" ? "Nueva factura proforma" : kind === "inspection" ? "Nueva ficha de inspección" : kind === "service" ? "Nueva orden de servicio" : tr(`Nueva ${KIND_LABEL[kind].toLowerCase()}`)} />
       <Card>
         <DocumentForm
+            showCosts={can(me, "costos")}
           kind={kind}
           customers={customers}
           stock={stock}
-          terms={{ quote: s.doc_terms_quote, memo: s.doc_terms_memo, invoice: s.doc_terms_invoice, consignment: s.doc_terms_consignment, purchase: s.doc_terms_purchase, sourcing: s.doc_terms_sourcing, proforma: s.doc_terms_proforma, return: s.doc_terms_return, inspection: s.doc_terms_inspection }}
+          terms={{ quote: s.doc_terms_quote, memo: s.doc_terms_memo, invoice: s.doc_terms_invoice, consignment: s.doc_terms_consignment, purchase: s.doc_terms_purchase, sourcing: s.doc_terms_sourcing, proforma: s.doc_terms_proforma, return: s.doc_terms_return, inspection: s.doc_terms_inspection, service: s.doc_terms_service }}
           taxRate={Number(s.doc_tax_rate) || 0}
           today={todayInMiami(new Date(requestTime()))}
           presetCustomer={one(sp.cliente)}

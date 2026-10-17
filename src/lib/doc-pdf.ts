@@ -207,6 +207,35 @@ export async function renderDocPdf(d: Doc, s: Required<DocSettings>) {
   }
   }
 
+  // ── orden de servicio: la pieza recibida, el estado y sus fotos ──
+  const svc = d.kind === "service" ? d.service ?? null : null;
+  if (svc) {
+    y -= 24;
+    ensure(80);
+    label(t.svc.piece, M, y, { color: BRASS });
+    for (const l of wrap(svc.piece, display, 12, W - 2 * M)) {
+      y -= 16;
+      text(l, M, y, { font: display, size: 12 });
+    }
+    y -= 14;
+    text(`${t.svc.status}: ${t.svc.states[svc.status]}`, M, y, { font: light, size: 8.5, color: GRAY });
+    const photos = (svc.photos ?? []).slice(0, 8);
+    if (photos.length) {
+      const sharp = (await import("sharp")).default;
+      const size = (W - 2 * M - 3 * 10) / 4;
+      for (let i = 0; i < photos.length; i++) {
+        if (i % 4 === 0) {
+          ensure(size + 12);
+          y -= size + 8;
+        }
+        const bytes = await downloadPrivate(photos[i]);
+        if (!bytes) continue;
+        const jpg = await sharp(Buffer.from(bytes)).resize(400, 400, { fit: "cover" }).jpeg({ quality: 70 }).toBuffer();
+        page.drawImage(await pdf.embedJpg(jpg), { x: M + (i % 4) * (size + 10), y, width: size, height: size });
+      }
+    }
+  }
+
   // ── ficha de inspección: estado de cada parte, funcionamiento, set y fotos ──
   if (insp) {
     const L = d.lang;
@@ -317,8 +346,8 @@ export async function renderDocPdf(d: Doc, s: Required<DocSettings>) {
     sign(M + half + 30, y, t.date);
     if (sigImage) text(signedOn, M + half + 34, y + 4, { size: 8.5 });
   }
-  if (consign || purchase || sourcing || noPrice) {
-    const who = insp ? t.insp.sign : purchase ? t.purchaseSign : sourcing ? t.sourcingSign : receipt ? t.returnSign[d.return_of === "memo" ? "memo" : "consignment"] : t.consignSign;
+  if (consign || purchase || sourcing || noPrice || d.kind === "service") {
+    const who = insp ? t.insp.sign : svc ? t.svc.sign : purchase ? t.purchaseSign : sourcing ? t.sourcingSign : receipt ? t.returnSign[d.return_of === "memo" ? "memo" : "consignment"] : t.consignSign;
     ensure(110);
     y -= 50;
     sign(M, y, who[0], true);

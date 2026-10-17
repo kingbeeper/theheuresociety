@@ -55,6 +55,7 @@ export async function onMenuText(chatId: number, text: string, user: string) {
           [{ text: "🔎 Encargo con anticipo", callback_data: "mnew:sourcing" }],
           [{ text: "📂 Ver documentos abiertos", callback_data: "mopen:menu" }],
           [{ text: "🚚 Envíos en camino", callback_data: "dship:list" }, { text: "💰 Cobros pendientes", callback_data: "dcob:list" }],
+          [{ text: "🔧 Servicios en curso (pulido, reparación)", callback_data: "dsvc:list" }],
         ]),
       });
       return true;

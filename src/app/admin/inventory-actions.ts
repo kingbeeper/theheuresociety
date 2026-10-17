@@ -9,7 +9,7 @@ import { adminDb } from "@/lib/supabase";
 import { addEvent, notifyPriceDrop, upsertLead } from "@/lib/crm";
 import { SITE_URL } from "@/lib/seo";
 import { createStockItem, logItem, syncWebPrice, syncWebStatus, webPrice, type Item } from "@/lib/stock";
-import { ACQUISITION, ITEM_STATUS } from "@/lib/stock-labels";
+import { ACQUISITION, ITEM_STATUS, JEWELRY_TYPE, jewelrySummary, type Jewelry, type JewelryType } from "@/lib/stock-labels";
 import { SOURCE_LABEL } from "@/lib/crm-labels";
 
 // Acciones del inventario. Todas comprueban la sesión y dejan rastro en el historial del reloj.
@@ -60,6 +60,37 @@ function itemFields(f: FormData) {
     memo_due: date(f, "memo_due"),
     watch_id: text(f, "watch_id"),
     notes: text(f, "notes"),
+    ...pieceFields(f),
+  };
+}
+
+// Tipo de pieza. Una joya guarda sus datos aparte y, si no se escribe marca o modelo, se rellenan con el
+// tipo y el resumen («Anillo» · «Oro 18k amarillo · Diamante 1.02 ct»): así se ve bien en todo el CRM.
+type PieceFields = Partial<{ category: "watch" | "jewelry" | "other"; jewelry: Jewelry | null; brand: string; model: string | null; reference: string | null; papers_date: string | null; links: string | null; watch_id: string | null }>;
+function pieceFields(f: FormData): PieceFields {
+  const category = text(f, "category");
+  if (!category) return {};
+  if (category !== "jewelry") return { category: category === "other" ? ("other" as const) : ("watch" as const), jewelry: null };
+  const type = (text(f, "j_type") ?? "other") as JewelryType;
+  const jewelry: Jewelry = {
+    type: type in JEWELRY_TYPE ? type : "other",
+    metal: text(f, "j_metal"),
+    color: text(f, "j_color"),
+    stone: text(f, "j_stone"),
+    carats: text(f, "j_carats"),
+    quality: text(f, "j_quality"),
+    size: text(f, "j_size"),
+    weight: text(f, "j_weight"),
+  };
+  return {
+    category: "jewelry" as const,
+    jewelry,
+    brand: text(f, "brand") ?? JEWELRY_TYPE[jewelry.type],
+    model: text(f, "model") ?? (jewelrySummary(jewelry) || null),
+    reference: null,
+    papers_date: null,
+    links: null,
+    watch_id: null,
   };
 }
 

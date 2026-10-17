@@ -48,6 +48,21 @@ function parseInspection(f: FormData): Inspection {
   };
 }
 
+function parseService(f: FormData) {
+  let photos: string[] = [];
+  try {
+    photos = (JSON.parse(String(f.get("svc_photos") ?? "[]")) as string[]).filter((p) => typeof p === "string" && p.startsWith("inspections/")).slice(0, 12);
+  } catch {}
+  const cost = text(f, "svc_cost");
+  return {
+    piece: text(f, "svc_piece") ?? "",
+    provider: text(f, "svc_provider"),
+    provider_cost: cost ? Number(cost.replace(/[^\d.]/g, "")) || null : null,
+    promised: date(f, "due_date"),
+    photos,
+  };
+}
+
 function parseLines(raw: string | null): DocLine[] {
   try {
     const rows = JSON.parse(raw ?? "[]") as DocLine[];
@@ -112,8 +127,11 @@ export async function saveDocument(id: string | null, _: unknown, f: FormData) {
     payment_method: text(f, "payment_method"),
   };
 
+  // Orden de servicio: la pieza, el taller y su costo, la fecha prometida y las fotos (el estado se conserva)
+  const svc = kind === "service" ? parseService(f) : null;
+
   if (!id) {
-    const doc = await insertDoc({ ...fields, created_by: user });
+    const doc = await insertDoc({ ...fields, ...(svc && { service: (await import("@/lib/service")).newService(svc) }), created_by: user });
     await docEvent(doc, `creada por ${usd(doc.total)}`, user);
     redirect(`/admin/documentos/${doc.id}`);
   }
@@ -122,7 +140,7 @@ export async function saveDocument(id: string | null, _: unknown, f: FormData) {
   if (!before) return { error: tr("No existe.") };
   if (!["draft", "sent"].includes(before.status)) return { error: tr("Este documento ya está cerrado y no se puede editar.") };
   const totals = docTotals(fields);
-  const { error } = await adminDb().from("documents").update({ ...fields, kind: before.kind, subtotal: totals.subtotal, total: totals.total, updated_at: new Date().toISOString() }).eq("id", id);
+  const { error } = await adminDb().from("documents").update({ ...fields, ...(svc && before.service && { service: { ...before.service, ...svc } }), kind: before.kind, subtotal: totals.subtotal, total: totals.total, updated_at: new Date().toISOString() }).eq("id", id);
   if (error) return { error: error.message };
   // Ya entregado: si se añadieron relojes, también se reservan
   if (before.status === "sent" && (before.kind === "memo" || before.kind === "invoice")) await reserveStock({ ...before, ...fields, kind: before.kind }, user);
@@ -347,4 +365,13 @@ export async function uploadInspectionPhotoAction(base64: string) {
   const path = `inspections/${crypto.randomUUID()}.jpg`;
   await uploadPrivate(path, Buffer.from(base64, "base64"), "image/jpeg");
   return { path };
+}
+
+// Orden de servicio: al taller, lista o entregada (entregada = factura pagada)
+export async function serviceStepAction(id: string, step: "workshop" | "ready" | "delivered", f: FormData) {
+  const user = await requireAdmin("documentos");
+  const { serviceStep } = await import("@/lib/service");
+  const r = await serviceStep(id, step, user, text(f, "payment_method"));
+  refresh();
+  if (r.invoice) redirect(`/admin/documentos/${r.invoice.id}`);
 }

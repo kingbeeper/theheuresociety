@@ -44,6 +44,7 @@ export async function dealerItems(): Promise<DealerItem[]> {
     .from("inventory_items")
     .select("id, brand, model, reference, papers_date, condition, comes_with, asking_price, dealer_price, watch:watches(slug, images, year)")
     .eq("status", "in_stock")
+    .eq("category", "watch")
     .order("brand");
   type Row = { id: string; brand: string; model: string | null; reference: string | null; papers_date: string | null; condition: string | null; comes_with: string | null; asking_price: number | null; dealer_price: number | null; watch: { slug: string; images: string[]; year: number | null } | null };
   return ((data ?? []) as unknown as Row[])

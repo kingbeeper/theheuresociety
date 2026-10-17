@@ -32,6 +32,7 @@ export async function monthlyReport(month: string) {
     const m = margin(i);
     return {
       date: i.sale_date!, sku: i.sku, watch: [i.brand, i.model, i.reference].filter(Boolean).join(" "), serial: i.serial,
+      category: (i.category ?? "watch") as "watch" | "jewelry" | "other",
       acquisition: ACQUISITION[i.acquisition], buyer: i.buyer_name, payment: i.payment_method,
       price: Number(i.sale_price ?? 0), cost: Number(i.cost ?? 0), extra: Number(i.extra_costs ?? 0), profit: m?.amount ?? null,
     };
@@ -64,6 +65,21 @@ export async function monthlyReport(month: string) {
       held: d.status === "sent" && !d.refunded_at,
     }));
 
+  // Servicios (pulido, reparación): facturas pagadas en el mes que vienen de una orden de servicio
+  const paidInvoices = (invoices.data ?? []) as Doc[];
+  const sourceIds = paidInvoices.map((d) => d.source_id).filter(Boolean) as string[];
+  const { data: orders } = sourceIds.length ? await db.from("documents").select("id, number, service").eq("kind", "service").in("id", sourceIds) : { data: [] };
+  const orderOf = new Map((orders ?? []).map((o) => [o.id as string, o]));
+  const serviceOrders = paidInvoices
+    .filter((d) => d.source_id && orderOf.has(d.source_id))
+    .map((d) => {
+      const o = orderOf.get(d.source_id!)!;
+      const t = docTotals(d);
+      const price = t.subtotal - t.discount;
+      const cost = Number((o.service as { provider_cost?: number | null } | null)?.provider_cost ?? 0);
+      return { date: d.paid_at!, number: o.number as string, client: d.client_name, work: d.items.map((l) => l.title).join(", "), price, cost, profit: price - cost };
+    });
+
   const { data: bizRows } = await db.from("business_expenses").select("spent_on, category, amount, note").gte("spent_on", start).lt("spent_on", end).order("spent_on");
   const { EXPENSE_CATEGORY } = await import("./expenses");
   const business = (bizRows ?? []).map((e) => ({ date: e.spent_on as string, category: EXPENSE_CATEGORY[e.category as string] ?? e.category, note: e.note as string | null, amount: Number(e.amount) }));
@@ -78,10 +94,15 @@ export async function monthlyReport(month: string) {
     repairs,
     deposits,
     business,
+    serviceOrders,
     totals: {
-      revenue: sum(sales, (s) => s.price),
+      revenueWatches: sum(sales.filter((s) => s.category === "watch"), (s) => s.price),
+      revenueJewelry: sum(sales.filter((s) => s.category !== "watch"), (s) => s.price),
+      services: sum(serviceOrders, (s) => s.price),
+      servicesProfit: sum(serviceOrders, (s) => s.profit),
+      revenue: sum(sales, (s) => s.price) + sum(serviceOrders, (s) => s.price),
       cogs: sum((sold.data ?? []) as Item[], (i) => totalCost(i)),
-      profit: sum(sales, (s) => s.profit),
+      profit: sum(sales, (s) => s.profit) + sum(serviceOrders, (s) => s.profit),
       bought: sum(purchases, (p) => p.cost),
       ownerPaid: sum(owners, (o) => o.amount),
       taxCollected: sum(taxes, (t) => t.tax),
