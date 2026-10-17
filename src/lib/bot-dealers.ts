@@ -48,6 +48,7 @@ export function dealersMenu(chatId: number) {
       [{ text: "🔎 Pedir una pieza a mis dealers", callback_data: "ddl:ask" }],
       [{ text: "⏳ Sin respuesta (anotar lo que dijeron)", callback_data: "ddl:open" }],
       [{ text: "📋 Mis dealers", callback_data: "ddl:list" }, { text: "➕ Nuevo dealer", callback_data: "ddl:new" }],
+      [{ text: "📤 Enviar mi lista de precios", callback_data: "ddl:plist" }],
     ]),
   });
 }
@@ -204,6 +205,16 @@ export async function onDealerCallback(chatId: number, cbId: string, messageId: 
     }
     case "list":
       return listDealers(chatId);
+    // Lista de precios para dealers: enlace y un botón de WhatsApp por dealer con el mensaje
+    case "plist": {
+      const { pricelistToken, pricelistUrl, pricelistMessage, dealerItems } = await import("./pricelist");
+      const url = pricelistUrl(await pricelistToken());
+      const n = (await dealerItems()).length;
+      const list = (await dealers()).filter((x) => x.wa_id || x.phone);
+      return sendMessage(chatId, `📤 <b>Lista de precios para dealers</b> · ${n} reloj(es)\n${url}\n\nToca cada dealer para enviársela por WhatsApp.`, {
+        reply_markup: keyboard(list.slice(0, 30).map((x) => [{ text: `📲 ${x.name ?? x.phone ?? "Dealer"}`.slice(0, 60), url: waLink(x, pricelistMessage(x.name, url))! }])),
+      });
+    }
     case "see":
       return showDealer(chatId, id);
     case "open":

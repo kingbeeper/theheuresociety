@@ -7,7 +7,7 @@ import { requireAdmin } from "@/lib/admin-auth";
 import { adminDb } from "@/lib/supabase";
 import { upsertLead } from "@/lib/crm";
 import { addProformaPayment, closeProforma, closeReturned, consignorPaid, depositReceived, toProforma, docEvent, getDoc, insertDoc, issueDoc, payInvoice, refundDeposit, reserveStock, saveDocSettings, sourcingToInvoice, toInvoice, voidDoc } from "@/lib/documents";
-import { DOC_SETTING_KEYS, KIND_LABEL, docTotals, usd, type DocKind, type DocLine } from "@/lib/doc-labels";
+import { DOC_SETTING_KEYS, INSPECTION_PARTS, KIND_LABEL, docTotals, usd, type DocKind, type DocLine, type Inspection, type PartState } from "@/lib/doc-labels";
 
 // Acciones de cotizaciones, memos y facturas. Todas comprueban la sesión.
 
@@ -24,6 +24,29 @@ const date = (f: FormData, k: string) => {
   return v && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null;
 };
 const today = () => new Date().toISOString().slice(0, 10);
+
+// Ficha de inspección: estado de cada parte, funcionamiento, set y fotos (rutas privadas)
+function parseInspection(f: FormData): Inspection {
+  const state = (v: FormDataEntryValue | null): PartState => (["ok", "wear", "damage", "na"].includes(String(v)) ? (String(v) as PartState) : "ok");
+  let photos: string[] = [];
+  try {
+    photos = (JSON.parse(String(f.get("insp_photos") ?? "[]")) as string[]).filter((p) => typeof p === "string" && p.startsWith("inspections/")).slice(0, 12);
+  } catch {}
+  const runs = String(f.get("insp_runs") ?? "");
+  return {
+    direction: f.get("insp_dir") === "out" ? "out" : "in",
+    parts: Object.fromEntries(INSPECTION_PARTS.map((p) => [p, state(f.get(`insp_${p}`))])),
+    runs: runs === "yes" ? true : runs === "no" ? false : null,
+    rate: text(f, "insp_rate"),
+    power_reserve: text(f, "insp_power"),
+    links: text(f, "insp_links"),
+    box: f.get("insp_box") === "on",
+    papers: f.get("insp_papers") === "on",
+    extras: text(f, "insp_extras"),
+    notes: text(f, "insp_notes"),
+    photos,
+  };
+}
 
 function parseLines(raw: string | null): DocLine[] {
   try {
@@ -71,7 +94,8 @@ export async function saveDocument(id: string | null, _: unknown, f: FormData) {
     client_address: text(f, "client_address"),
     lang: text(f, "lang") === "es" ? ("es" as const) : ("en" as const),
     issue_date: date(f, "issue_date") ?? today(),
-    due_date: kind === "purchase" ? null : date(f, "due_date"),
+    due_date: kind === "purchase" || kind === "inspection" ? null : date(f, "due_date"),
+    ...(kind === "inspection" && { inspection: parseInspection(f) }),
     ...(kind === "sourcing" && { deposit: Math.max(0, num(f, "deposit")) }),
     ...(kind === "purchase" && {
       seller_id_type: text(f, "seller_id_type"),
@@ -313,4 +337,14 @@ export async function appraiseTradeAction(title: string, details: string | null)
   const m = await checkMarket({ id: "trade", sku: "", brand: words.shift()!, model: words.join(" ") || null, reference, condition: null, comes_with: details, papers_date: null, asking_price: null }).catch(() => null);
   if (!m?.typical) return { error: tr("No se encontraron anuncios comparables.") };
   return { typical: m.typical, low: m.low, high: m.high, suggested: Math.round((m.typical * 0.85) / 50) * 50 };
+}
+
+// Foto de la ficha de inspección (ya reducida en el navegador): al almacenamiento privado
+export async function uploadInspectionPhotoAction(base64: string) {
+  await requireAdmin("documentos");
+  if (!base64 || base64.length > 1_400_000) return { error: tr("La foto es demasiado grande.") };
+  const { uploadPrivate } = await import("@/lib/private-files");
+  const path = `inspections/${crypto.randomUUID()}.jpg`;
+  await uploadPrivate(path, Buffer.from(base64, "base64"), "image/jpeg");
+  return { path };
 }

@@ -7,6 +7,7 @@ import { ACQUISITION, CONDITIONS, PAYMENT } from "@/lib/stock-labels";
 import { SOURCE_LABEL } from "@/lib/crm-labels";
 import { returnItem, saveItem, sellItem } from "@/app/admin/inventory-actions";
 import type { Item } from "@/lib/stock";
+import { WarrantyScan } from "./WarrantyScan";
 import { SerialInput } from "./SerialCheck";
 
 const field =
@@ -18,17 +19,18 @@ const section = "text-[0.66rem] tracking-[0.24em] uppercase text-brass";
 type WatchOption = { id: string; label: string };
 
 // Ficha del reloj y de su entrada (mismos datos que la plantilla de Excel, más lo que faltaba)
-export function ItemForm({ item, watches, showCosts = true }: { item?: Item; watches: WatchOption[]; showCosts?: boolean }) {
+export function ItemForm({ item, watches, showCosts = true, prefill }: { item?: Item; watches: WatchOption[]; showCosts?: boolean; prefill?: Partial<Record<keyof Item, string | undefined>> }) {
   const tr = useTr();
   const [state, action, pending] = useActionState(saveItem.bind(null, item?.id ?? null), null);
   const [acq, setAcq] = useState(item?.acquisition ?? "purchase");
   const owner = acq === "consignment" || acq === "memo";
-  const v = (k: keyof Item) => (item?.[k] ?? "") as string;
+  const v = (k: keyof Item) => (item?.[k] ?? prefill?.[k] ?? "") as string;
 
   return (
     <form action={action} className="grid gap-6">
       <div className="grid gap-4">
         <p className={section}>{tr("Reloj")}</p>
+        <WarrantyScan />
         <div className="grid gap-4 sm:grid-cols-3">
           <label><span className={label}>{tr("Marca *")}</span><input name="brand" defaultValue={v("brand")} required className={field} /></label>
           <label><span className={label}>{tr("Modelo")}</span><input name="model" defaultValue={v("model")} className={field} /></label>
@@ -67,6 +69,7 @@ export function ItemForm({ item, watches, showCosts = true }: { item?: Item; wat
             </>
           )}
           <label><span className={label}>{tr("Precio de venta previsto (USD)")}</span><input name="asking_price" inputMode="decimal" defaultValue={v("asking_price")} className={field} /></label>
+          <label><span className={label}>{tr("Precio para dealers (USD)")}</span><input name="dealer_price" inputMode="decimal" defaultValue={v("dealer_price")} placeholder={tr("Vacío: el de venta con el descuento de dealer")} className={field} /></label>
         </div>
       </div>
 

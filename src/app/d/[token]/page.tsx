@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { adminDb } from "@/lib/supabase";
 import { getDocSettings } from "@/lib/documents";
-import { PRINT, SIGNABLE, balanceDue, docTotals, maskedId, paidSoFar, usd, type Doc } from "@/lib/doc-labels";
+import { INSPECTION_PARTS, PART_LABEL, PRINT, SIGNABLE, STATE_LABEL, balanceDue, docTotals, maskedId, paidSoFar, usd, type Doc } from "@/lib/doc-labels";
 import { PrintButton } from "./PrintButton";
 import { SignaturePad } from "./SignaturePad";
 import { downloadPrivate } from "@/lib/private-files";
@@ -36,7 +36,10 @@ async function SharedDocument({ params, searchParams }: { params: Promise<{ toke
   const sourcing = d.kind === "sourcing";
   const deposit = Number(d.deposit ?? 0);
   const receipt = d.kind === "return";
-  const twoParty = consign || purchase || sourcing || receipt;
+  // Ficha de inspección: sin precios; el estado del reloj, fotos y la firma de su dueño
+  const insp = d.kind === "inspection" ? d.inspection ?? null : null;
+  const noPrice = receipt || d.kind === "inspection";
+  const twoParty = consign || purchase || sourcing || receipt || d.kind === "inspection";
   const sellerId = purchase ? maskedId(d) : null;
   // Firma del cliente (imagen privada, se incrusta en la página)
   const sigBytes = d.signature_path ? await downloadPrivate(d.signature_path) : null;
@@ -117,7 +120,7 @@ async function SharedDocument({ params, searchParams }: { params: Promise<{ toke
               <p className="font-display text-lg leading-tight">{l.title}</p>
               {l.details && <p className="mt-1 text-xs text-[#5d625e]">{l.details}</p>}
               {d.show_serial && l.serial && <p className="mt-1 text-xs text-[#5d625e]">{t.serial}: {l.serial}</p>}
-              {!receipt && (
+              {!noPrice && (
                 <p className="mt-2 flex justify-between text-sm tabular-nums">
                   <span className="text-[#5d625e]">{l.qty} × {usd(l.price)}</span>
                   <span>{usd(l.qty * l.price)}</span>
@@ -132,8 +135,8 @@ async function SharedDocument({ params, searchParams }: { params: Promise<{ toke
             <tr className="border-y border-[#d8d2c4] text-left text-[0.6rem] tracking-[0.2em] uppercase text-[#5d625e]">
               <th className="py-3 font-normal">{sourcing ? t.sought : t.item}</th>
               <th className="py-3 text-center font-normal">{t.qty}</th>
-              {!receipt && <th className="py-3 pl-4 text-right font-normal">{t.price}</th>}
-              {!receipt && <th className="py-3 pl-4 text-right font-normal">{consign ? t.net : t.amount}</th>}
+              {!noPrice && <th className="py-3 pl-4 text-right font-normal">{t.price}</th>}
+              {!noPrice && <th className="py-3 pl-4 text-right font-normal">{consign ? t.net : t.amount}</th>}
             </tr>
           </thead>
           <tbody>
@@ -145,14 +148,49 @@ async function SharedDocument({ params, searchParams }: { params: Promise<{ toke
                   {d.show_serial && l.serial && <p className="mt-1 text-xs text-[#5d625e]">{t.serial}: {l.serial}</p>}
                 </td>
                 <td className="py-4 text-center tabular-nums">{l.qty}</td>
-                {!receipt && <td className="py-4 pl-4 text-right tabular-nums">{usd(l.price)}</td>}
-                {!receipt && <td className="py-4 pl-4 text-right tabular-nums">{usd(l.qty * l.price)}</td>}
+                {!noPrice && <td className="py-4 pl-4 text-right tabular-nums">{usd(l.price)}</td>}
+                {!noPrice && <td className="py-4 pl-4 text-right tabular-nums">{usd(l.qty * l.price)}</td>}
               </tr>
             ))}
           </tbody>
         </table>
 
-        <div className={`mt-6 flex justify-end ${receipt ? "hidden" : ""}`}>
+        {insp && (
+          <section className="mt-8 text-sm">
+            <p className="mb-3 text-[0.62rem] tracking-[0.24em] uppercase text-[#8a7a52]">{insp.direction === "out" ? t.insp.titleOut : t.insp.title}</p>
+            <dl className="grid grid-cols-2 gap-x-6 gap-y-1.5 sm:grid-cols-3">
+              {INSPECTION_PARTS.map((p) => (
+                <div key={p} className="flex justify-between gap-3 border-b border-[#d8d2c4] py-1.5">
+                  <dt className="text-[#5d625e]">{PART_LABEL[d.lang][p]}</dt>
+                  <dd className={insp.parts?.[p] === "damage" ? "text-[#9b2c2c]" : ""}>{STATE_LABEL[d.lang][insp.parts?.[p] ?? "ok"]}</dd>
+                </div>
+              ))}
+            </dl>
+            <dl className="mt-4 grid grid-cols-2 gap-x-6 gap-y-1.5 sm:grid-cols-4">
+              <div><dt className="text-[0.6rem] tracking-[0.18em] uppercase text-[#8a7a52]">{t.insp.runs}</dt><dd>{insp.runs == null ? "—" : insp.runs ? t.insp.runsYes : t.insp.runsNo}</dd></div>
+              <div><dt className="text-[0.6rem] tracking-[0.18em] uppercase text-[#8a7a52]">{t.insp.rate}</dt><dd>{insp.rate ?? "—"}</dd></div>
+              <div><dt className="text-[0.6rem] tracking-[0.18em] uppercase text-[#8a7a52]">{t.insp.power}</dt><dd>{insp.power_reserve ?? "—"}</dd></div>
+              <div><dt className="text-[0.6rem] tracking-[0.18em] uppercase text-[#8a7a52]">{t.insp.links}</dt><dd>{insp.links ?? "—"}</dd></div>
+            </dl>
+            <p className="mt-4"><span className="text-[0.6rem] tracking-[0.18em] uppercase text-[#8a7a52]">{t.insp.set}: </span>{[insp.box && t.insp.box, insp.papers && t.insp.papers, insp.extras].filter(Boolean).join(" · ") || "—"}</p>
+            {insp.notes && <p className="mt-3 whitespace-pre-line"><span className="text-[0.6rem] tracking-[0.18em] uppercase text-[#8a7a52]">{t.conditionNote}: </span>{insp.notes}</p>}
+            {insp.photos?.length > 0 && (
+              <div className="mt-4">
+                <p className="mb-2 text-[0.6rem] tracking-[0.18em] uppercase text-[#8a7a52]">{t.insp.photos}</p>
+                <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                  {insp.photos.map((_, i) => (
+                    <a key={i} href={`/api/insp-photo?t=${d.token}&i=${i}`} target="_blank" rel="noreferrer">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={`/api/insp-photo?t=${d.token}&i=${i}`} alt="" className="aspect-square w-full border border-[#d8d2c4] object-cover" />
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+          </section>
+        )}
+
+        <div className={`mt-6 flex justify-end ${noPrice ? "hidden" : ""}`}>
           <dl className="grid w-full grid-cols-[1fr_auto] gap-y-2 text-sm sm:max-w-[300px]">
             <dt className="text-[#5d625e]">{t.subtotal}</dt><dd className="text-right tabular-nums">{usd(totals.subtotal)}</dd>
             {totals.discount > 0 && (<><dt className="text-[#5d625e]">{t.discount}</dt><dd className="text-right tabular-nums">−{usd(totals.discount)}</dd></>)}
@@ -187,7 +225,7 @@ async function SharedDocument({ params, searchParams }: { params: Promise<{ toke
           {d.notes && (
             <div><p className="mb-1 text-[0.6rem] tracking-[0.2em] uppercase text-[#8a7a52]">{receipt ? t.conditionNote : t.notes}</p><p className="whitespace-pre-line">{d.notes}</p></div>
           )}
-          {d.kind !== "memo" && !consign && !receipt && (d.payment_method || (!purchase && s.doc_payment_info)) && (
+          {d.kind !== "memo" && !consign && !noPrice && (d.payment_method || (!purchase && s.doc_payment_info)) && (
             <div>
               <p className="mb-1 text-[0.6rem] tracking-[0.2em] uppercase text-[#8a7a52]">{t.payment}</p>
               <p className="whitespace-pre-line">{[d.payment_method, d.status === "paid" || purchase ? null : s.doc_payment_info].filter(Boolean).join("\n")}</p>
@@ -204,7 +242,7 @@ async function SharedDocument({ params, searchParams }: { params: Promise<{ toke
           )}
           {twoParty && (
             <div className="mt-8 grid gap-10 sm:grid-cols-2">
-              {(purchase ? t.purchaseSign : sourcing ? t.sourcingSign : receipt ? t.returnSign[d.return_of === "memo" ? "memo" : "consignment"] : t.consignSign).map((who) => (
+              {(d.kind === "inspection" ? t.insp.sign : purchase ? t.purchaseSign : sourcing ? t.sourcingSign : receipt ? t.returnSign[d.return_of === "memo" ? "memo" : "consignment"] : t.consignSign).map((who) => (
                 <div key={who}>
                   <p className="border-t border-[#1b1f1c] pt-2">{who}</p>
                   <p className="mt-6 border-t border-[#1b1f1c] pt-2">{t.date}</p>

@@ -57,8 +57,8 @@ export const FLOW_COMMANDS: Record<string, FlowKind> = {
   "/proforma": "proforma",
 };
 const NAME: Record<FlowKind, string> = { ...KIND_LABEL, purchase: "Compra" };
-const ICON: Record<FlowKind, string> = { invoice: "🧾", memo: "📋", consignment: "🤝", quote: "💬", purchase: "🛒", sourcing: "🔎", proforma: "📄", return: "↩️" };
-const DUE_DAYS: Record<DocKind, number> = { quote: 7, memo: 14, invoice: 0, consignment: 90, purchase: 0, sourcing: 60, proforma: 14, return: 0 };
+const ICON: Record<FlowKind, string> = { invoice: "🧾", memo: "📋", consignment: "🤝", quote: "💬", purchase: "🛒", sourcing: "🔎", proforma: "📄", return: "↩️", inspection: "🔍" };
+const DUE_DAYS: Record<DocKind, number> = { quote: 7, memo: 14, invoice: 0, consignment: 90, purchase: 0, sourcing: 60, proforma: 14, return: 0, inspection: 0 };
 
 // ───────────────────────────── Estado (uno por chat) ─────────────────────────────
 const key = (chatId: number) => `tgdoc:${chatId}`;
@@ -324,6 +324,7 @@ function askPrice(chatId: number, flow: DocFlow) {
     sourcing: "💵 ¿Precio máximo acordado?",
     proforma: "💵 ¿Precio de venta? (sin impuesto)",
     return: "",
+    inspection: "",
   }[flow.kind];
   const s = suggested(flow);
   return sendMessage(chatId, q, s ? { reply_markup: keyboard([[{ text: `Usar ${usd(s)}`, callback_data: `dprice:${s}` }]]) } : {});
@@ -488,7 +489,7 @@ export async function finish(chatId: number, flow: DocFlow) {
 export async function deliver(chatId: number, d: Doc) {
   const link = `${SITE_URL}/d/${d.token}`;
   const first = (d.client_name ?? "").split(" ")[0];
-  const label = d.lang === "es" ? (d.kind === "proforma" ? "factura" : KIND_LABEL[d.kind].toLowerCase()) : { quote: "quotation", memo: "memorandum", invoice: "invoice", consignment: "consignment agreement", purchase: "bill of sale", sourcing: "sourcing agreement", proforma: "invoice", return: "return receipt" }[d.kind];
+  const label = d.lang === "es" ? (d.kind === "proforma" ? "factura" : KIND_LABEL[d.kind].toLowerCase()) : { quote: "quotation", memo: "memorandum", invoice: "invoice", consignment: "consignment agreement", purchase: "bill of sale", sourcing: "sourcing agreement", proforma: "invoice", return: "return receipt", inspection: "condition report" }[d.kind];
   const msg = d.lang === "es"
     ? `Hola ${first}, le comparto su ${label} ${d.number} de The Heure Society: ${link}`
     : `Hi ${first}, here is your ${label} ${d.number} from The Heure Society: ${link}`;
@@ -529,6 +530,17 @@ export async function onCallback(chatId: number, cbId: string, messageId: number
   const clearButtons = () => tg("editMessageReplyMarkup", { chat_id: chatId, message_id: messageId, reply_markup: keyboard([]) }).catch(() => {});
 
   // Gasto general del negocio
+  // Leer tarjeta de garantía
+  if (action === "dcard") {
+    await answer();
+    await clearButtons();
+    const card = await import("./bot-card");
+    if (arg === "x") return card.clearCard(chatId).then(() => sendMessage(chatId, "Cancelado."));
+    await clearFlow(chatId);
+    await clearAppraise(chatId);
+    return card.startCard(chatId);
+  }
+
   // Cobros pendientes
   if (action === "dcob") return (await import("./bot-collections")).onCollectionsCallback(chatId, cbId, messageId, arg, user);
 

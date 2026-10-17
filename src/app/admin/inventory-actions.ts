@@ -55,6 +55,8 @@ function itemFields(f: FormData) {
     cost: money(f, "cost"),
     extra_costs: money(f, "extra_costs") ?? 0,
     asking_price: money(f, "asking_price"),
+    // Precio para la lista de dealers (solo se envía si el formulario lo trae: vacío = descuento general)
+    ...(f.has("dealer_price") && { dealer_price: money(f, "dealer_price") }),
     memo_due: date(f, "memo_due"),
     watch_id: text(f, "watch_id"),
     notes: text(f, "notes"),
@@ -316,4 +318,17 @@ export async function marketCheckAction(id: string) {
     .update({ market_checked_at: new Date().toISOString(), ...(m && { market_low: m.low, market_typical: m.typical, market_high: m.high, market_listings: m.listings, market_note: m.note, market_sources: m.sources.slice(0, 3) }) })
     .eq("id", id);
   refresh();
+}
+
+// Leer la tarjeta de garantía de una foto (ya reducida en el navegador) para rellenar el alta del reloj
+export async function readCardAction(image: { base64: string; mediaType: string }) {
+  await requireAdmin("inventario");
+  if (!image?.base64 || image.base64.length > 1_400_000) return { error: tr("La foto es demasiado grande.") };
+  const mediaType = (["image/jpeg", "image/png", "image/webp"].includes(image.mediaType) ? image.mediaType : "image/jpeg") as "image/jpeg";
+  const { readWarrantyCard } = await import("@/lib/warranty-card");
+  const card = await readWarrantyCard({ base64: image.base64, mediaType }).catch((e) => {
+    console.error("Tarjeta de garantía:", e);
+    return null;
+  });
+  return card ? { card } : { error: tr("No se pudo leer la tarjeta. Prueba con otra foto, de frente y sin reflejos.") };
 }

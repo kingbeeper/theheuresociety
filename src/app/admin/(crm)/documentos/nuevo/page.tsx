@@ -22,13 +22,13 @@ export default async function NewDocumentPage({ searchParams }: PageProps<"/admi
   return (
     <>
       <Link href="/admin/documentos" className="text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">{tr("← Documentos")}</Link>
-      <PageTitle eyebrow="Documentos" title={kind === "memo" ? "Nuevo memo" : kind === "consignment" ? "Nuevo contrato de consignación" : kind === "purchase" ? "Nuevo contrato de compra" : kind === "sourcing" ? "Nuevo encargo" : kind === "proforma" ? "Nueva factura proforma" : tr(`Nueva ${KIND_LABEL[kind].toLowerCase()}`)} />
+      <PageTitle eyebrow="Documentos" title={kind === "memo" ? "Nuevo memo" : kind === "consignment" ? "Nuevo contrato de consignación" : kind === "purchase" ? "Nuevo contrato de compra" : kind === "sourcing" ? "Nuevo encargo" : kind === "proforma" ? "Nueva factura proforma" : kind === "inspection" ? "Nueva ficha de inspección" : tr(`Nueva ${KIND_LABEL[kind].toLowerCase()}`)} />
       <Card>
         <DocumentForm
           kind={kind}
           customers={customers}
           stock={stock}
-          terms={{ quote: s.doc_terms_quote, memo: s.doc_terms_memo, invoice: s.doc_terms_invoice, consignment: s.doc_terms_consignment, purchase: s.doc_terms_purchase, sourcing: s.doc_terms_sourcing, proforma: s.doc_terms_proforma, return: s.doc_terms_return }}
+          terms={{ quote: s.doc_terms_quote, memo: s.doc_terms_memo, invoice: s.doc_terms_invoice, consignment: s.doc_terms_consignment, purchase: s.doc_terms_purchase, sourcing: s.doc_terms_sourcing, proforma: s.doc_terms_proforma, return: s.doc_terms_return, inspection: s.doc_terms_inspection }}
           taxRate={Number(s.doc_tax_rate) || 0}
           today={todayInMiami(new Date(requestTime()))}
           presetCustomer={one(sp.cliente)}

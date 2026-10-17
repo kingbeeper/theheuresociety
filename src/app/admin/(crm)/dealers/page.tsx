@@ -3,9 +3,11 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { requireUser } from "@/lib/admin-auth";
 import { adminDb } from "@/lib/supabase";
-import { companyOf, dealers, statsFor, type DealerRequest } from "@/lib/dealers";
+import { companyOf, dealers, statsFor, waLink, type DealerRequest } from "@/lib/dealers";
 import { Card, fmtDate, PageTitle } from "@/components/admin/ui";
 import { DealerAsk } from "@/components/admin/DealerAsk";
+import { dealerDiscount, dealerItems, pricelistMessage, pricelistUrl } from "@/lib/pricelist";
+import { dealerDiscountAction, pricelistAction } from "../../actions";
 import { DealerAdd } from "@/components/admin/DealerAdd";
 import { DealerRequestRow } from "@/components/admin/DealerRequestRow";
 
@@ -69,6 +71,7 @@ function DealerDirectory({ list, requests, q }: { list: Awaited<ReturnType<typeo
         </form>
         <DealerAdd open={!list.length} />
       </div>
+      <PricelistCard list={list} />
       {rows.length ? (
         <div className="overflow-x-auto border border-line">
           <table className="w-full min-w-[760px] text-sm">
@@ -161,5 +164,46 @@ function AskView({ list, requests, byId, doc, forQuery, client }: { forQuery: st
         <p className="text-sm text-stone">{tr("Todavía no has pedido nada a tus dealers.")}</p>
       )}
     </>
+  );
+}
+
+// 📤 Lista de precios para dealers: enlace privado, descuento general y envío por WhatsApp a cada dealer
+async function PricelistCard({ list }: { list: Awaited<ReturnType<typeof dealers>> }) {
+  const { data } = await adminDb().from("integration_settings").select("value").eq("key", "dealer_pricelist_token").maybeSingle();
+  const token = (data?.value as string | undefined) ?? null;
+  const [disc, items] = await Promise.all([dealerDiscount(), dealerItems().catch(() => [])]);
+  const url = token ? pricelistUrl(token) : null;
+  const reachable = list.filter((d) => d.wa_id || d.phone);
+  return (
+    <Card title="📤 Mi lista de precios para dealers">
+      <p className="mb-3 text-sm text-stone">{tr("Tu stock disponible a precio de dealer, en inglés y sin costos ni seriales. Precio de dealer: el de la ficha del reloj o, si está vacío, el de venta menos el descuento general.")}</p>
+      <form action={dealerDiscountAction} className="mb-4 flex flex-wrap items-center gap-2 text-sm">
+        <span className="text-stone">{tr("Descuento general para dealers:")}</span>
+        <input name="discount" defaultValue={disc} inputMode="decimal" className="w-16 border border-line bg-ink/60 px-2 py-1 text-right text-sm" />
+        <span className="text-stone">%</span>
+        <button className="border border-line px-2.5 py-1 text-[0.6rem] tracking-[0.16em] uppercase text-stone hover:text-ivory">{tr("Guardar")}</button>
+        <span className="text-xs text-stone">· {tr("{n} reloj(es) en la lista", { n: items.length })}</span>
+      </form>
+      {url ? (
+        <div className="grid gap-3">
+          <p className="flex flex-wrap items-center gap-3 text-xs">
+            <span className="break-all text-stone">{url}</span>
+            <a href={url} target="_blank" rel="noreferrer" className="text-brass hover:text-ivory">{tr("Ver")}</a>
+            <form action={pricelistAction.bind(null, true)}><button className="text-stone underline hover:text-ivory">{tr("Cambiar el enlace")}</button></form>
+          </p>
+          {reachable.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {reachable.map((d) => (
+                <a key={d.id} href={waLink(d, pricelistMessage(d.name, url)) ?? "#"} target="_blank" rel="noreferrer" className="border border-emerald-300/40 px-2.5 py-1 text-[0.6rem] tracking-[0.14em] uppercase text-emerald-200 hover:bg-emerald-300/10">📲 {d.name ?? d.phone}</a>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : (
+        <form action={pricelistAction.bind(null, false)}>
+          <button className="border border-line px-4 py-2 text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">{tr("Crear el enlace de la lista")}</button>
+        </form>
+      )}
+    </Card>
   );
 }

@@ -18,6 +18,7 @@ export type Customer = {
   ig_username?: string | null;
   fb_psid?: string | null;
   lang: string | null;
+  portal_token?: string | null; // enlace del portal «Mi colección»
   source: string;
   stage: Stage;
   intent: string | null;

@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { PDFDocument, degrees, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import fontkit from "@pdf-lib/fontkit";
-import { PRINT, balanceDue, docTotals, maskedId, paidSoFar, usd, type Doc, type DocSettings } from "./doc-labels";
+import { INSPECTION_PARTS, PART_LABEL, PRINT, STATE_LABEL, balanceDue, docTotals, maskedId, paidSoFar, usd, type Doc, type DocSettings } from "./doc-labels";
 import { downloadPrivate } from "./private-files";
 
 // PDF de cotizaciones, memos, facturas y consignaciones, con el mismo diseño que la página del
@@ -41,6 +41,9 @@ export async function renderDocPdf(d: Doc, s: Required<DocSettings>) {
   const sourcing = d.kind === "sourcing";
   // Acta de devolución: sin precios ni totales; quién devuelve o recibe, el estado y dos firmas
   const receipt = d.kind === "return";
+  // Ficha de inspección: tampoco lleva precios; lleva el estado del reloj, sus fotos y la firma del dueño
+  const insp = d.kind === "inspection" ? d.inspection ?? null : null;
+  const noPrice = receipt || d.kind === "inspection";
   const deposit = Number(d.deposit ?? 0);
   const sellerId = purchase ? maskedId(d) : null;
   const totals = docTotals(d);
@@ -137,7 +140,7 @@ export async function renderDocPdf(d: Doc, s: Required<DocSettings>) {
   y -= 26;
   rule(y + 12);
   label(sourcing ? t.sought : t.item, M, y);
-  if (!receipt) {
+  if (!noPrice) {
     label(t.qty, colQty, y, { align: "center" });
     label(t.price, colPrice, y, { align: "right" });
     label(consign ? t.net : t.amount, right, y, { align: "right" });
@@ -157,7 +160,7 @@ export async function renderDocPdf(d: Doc, s: Required<DocSettings>) {
       y -= 11;
       text(dl, M, y, { font: light, size: 8, color: GRAY });
     }
-    if (receipt) text(String(l.qty), right, top, { size: 9, align: "right" });
+    if (noPrice) text(String(l.qty), right, top, { size: 9, align: "right" });
     else {
       text(String(l.qty), colQty, top, { size: 9, align: "center" });
       text(usd(l.price), colPrice, top, { size: 9, align: "right" });
@@ -167,8 +170,8 @@ export async function renderDocPdf(d: Doc, s: Required<DocSettings>) {
     rule(y, M, right, SOFT);
   }
 
-  // ── totales ── (el acta de devolución no lleva)
-  if (!receipt) {
+  // ── totales ── (el acta de devolución y la ficha de inspección no llevan)
+  if (!noPrice) {
   const rows: [string, string][] = [[t.subtotal, usd(totals.subtotal)]];
   if (totals.discount > 0) rows.push([t.discount, `-${usd(totals.discount)}`]);
   if (totals.tax > 0) rows.push([`${t.tax} (${Number(d.tax_rate)}%)`, usd(totals.tax)]);
@@ -204,6 +207,69 @@ export async function renderDocPdf(d: Doc, s: Required<DocSettings>) {
   }
   }
 
+  // ── ficha de inspección: estado de cada parte, funcionamiento, set y fotos ──
+  if (insp) {
+    const L = d.lang;
+    y -= 26;
+    ensure(150);
+    label(insp.direction === "out" ? t.insp.titleOut : t.insp.title, M, y, { color: BRASS });
+    y -= 8;
+    rule(y);
+    const colW = (W - 2 * M) / 3;
+    INSPECTION_PARTS.forEach((part, i) => {
+      if (i % 3 === 0) {
+        y -= 16;
+        ensure(16);
+      }
+      const x = M + (i % 3) * colW;
+      const st = insp.parts?.[part] ?? "ok";
+      text(PART_LABEL[L][part], x, y, { font: light, size: 8.5, color: GRAY });
+      text(STATE_LABEL[L][st], x + colW - 12, y, { size: 8.5, align: "right", color: st === "damage" ? rgb(0.6, 0.15, 0.15) : INK });
+    });
+    y -= 22;
+    const facts: [string, string][] = [
+      [t.insp.runs, insp.runs == null ? "—" : insp.runs ? t.insp.runsYes : t.insp.runsNo],
+      [t.insp.rate, insp.rate ?? "—"],
+      [t.insp.power, insp.power_reserve ?? "—"],
+      [t.insp.links, insp.links ?? "—"],
+    ];
+    const fw = (W - 2 * M) / 4;
+    facts.forEach(([k, v], i) => {
+      label(k, M + i * fw, y);
+      text(v, M + i * fw, y - 12, { size: 9 });
+    });
+    y -= 30;
+    const setLine = [insp.box && t.insp.box, insp.papers && t.insp.papers, insp.extras].filter(Boolean).join(" · ") || "—";
+    label(t.insp.set, M, y);
+    text(setLine, M + 70, y, { size: 9 });
+    if (insp.notes) {
+      for (const l of wrap(insp.notes, light, 8.5, W - 2 * M)) {
+        y -= 12;
+        ensure(12);
+        text(l, M, y, { font: light, size: 8.5 });
+      }
+    }
+    // Fotos (hasta 8, en miniatura)
+    const photos = (insp.photos ?? []).slice(0, 8);
+    if (photos.length) {
+      const sharp = (await import("sharp")).default;
+      const size = (W - 2 * M - 3 * 10) / 4;
+      y -= 16;
+      label(t.insp.photos, M, y);
+      for (let i = 0; i < photos.length; i++) {
+        if (i % 4 === 0) {
+          ensure(size + 12);
+          y -= size + 8;
+        }
+        const bytes = await downloadPrivate(photos[i]);
+        if (!bytes) continue;
+        const jpg = await sharp(Buffer.from(bytes)).resize(400, 400, { fit: "cover" }).jpeg({ quality: 70 }).toBuffer();
+        const img = await pdf.embedJpg(jpg);
+        page.drawImage(img, { x: M + (i % 4) * (size + 10), y, width: size, height: size });
+      }
+    }
+  }
+
   // ── notas, pago, términos ──
   y -= 26;
   rule(y);
@@ -220,7 +286,7 @@ export async function renderDocPdf(d: Doc, s: Required<DocSettings>) {
   };
   if (d.notes) block(receipt ? t.conditionNote : t.notes, d.notes);
   const payment = [d.payment_method, d.status === "paid" || purchase ? null : s.doc_payment_info].filter(Boolean).join("\n");
-  if (d.kind !== "memo" && !consign && !receipt && payment) block(t.payment, payment);
+  if (d.kind !== "memo" && !consign && !noPrice && payment) block(t.payment, payment);
   if (d.terms) block(t.terms, d.terms);
 
   // ── firmas ──
@@ -251,8 +317,8 @@ export async function renderDocPdf(d: Doc, s: Required<DocSettings>) {
     sign(M + half + 30, y, t.date);
     if (sigImage) text(signedOn, M + half + 34, y + 4, { size: 8.5 });
   }
-  if (consign || purchase || sourcing || receipt) {
-    const who = purchase ? t.purchaseSign : sourcing ? t.sourcingSign : receipt ? t.returnSign[d.return_of === "memo" ? "memo" : "consignment"] : t.consignSign;
+  if (consign || purchase || sourcing || noPrice) {
+    const who = insp ? t.insp.sign : purchase ? t.purchaseSign : sourcing ? t.sourcingSign : receipt ? t.returnSign[d.return_of === "memo" ? "memo" : "consignment"] : t.consignSign;
     ensure(110);
     y -= 50;
     sign(M, y, who[0], true);

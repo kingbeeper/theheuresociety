@@ -8,7 +8,7 @@ import { requireAdmin } from "@/lib/admin-auth";
 import type { Customer } from "@/lib/crm";
 import { ago, Card, fmtDate, fmtDateTime, ghostButtonClass, money, SourceTag, StageBadge, requestTime } from "@/components/admin/ui";
 import { LeadForm } from "@/components/admin/LeadForm";
-import { addNote, addReminderAction, mergeAction, toggleTagAction, completeFollowUp, completeTaskAction, reminderDoneAction, setBot, setSocialBot, toggleAlert } from "../../../actions";
+import { portalLinkAction, addNote, addReminderAction, mergeAction, toggleTagAction, completeFollowUp, completeTaskAction, reminderDoneAction, setBot, setSocialBot, toggleAlert } from "../../../actions";
 import { customerTasks, taskMessage, TASK_LABEL, waLink } from "@/lib/tasks";
 import { customerValues } from "@/lib/customer-value";
 import { getDocSettings } from "@/lib/documents";
@@ -16,6 +16,7 @@ import { todayInMiami } from "@/lib/booking";
 import { CUSTOMER_TAGS, hasTag } from "@/lib/crm-labels";
 import { duplicatesOf } from "@/lib/merge";
 import { templates } from "@/lib/templates";
+import { portalUrl } from "@/lib/portal";
 import { QuickReplies } from "@/components/admin/QuickReplies";
 import { STATUS_LABEL, type DocKind, type DocStatus } from "@/lib/doc-labels";
 
@@ -199,6 +200,23 @@ export default async function LeadPage({ params }: PageProps<"/admin/leads/[id]"
             </Card>
           )}
           <Card title="Datos del cliente"><LeadForm c={c} /></Card>
+          <Card title="🔗 Mi colección (portal del cliente)">
+            {c.portal_token ? (
+              <div className="grid gap-2 text-sm">
+                <p className="break-all text-xs text-stone">{portalUrl(c.portal_token)}</p>
+                <div className="flex flex-wrap gap-2">
+                  <a href={portalUrl(c.portal_token)} target="_blank" rel="noreferrer" className={ghostButtonClass}>{tr("Ver")}</a>
+                  {waNumber && <a href={`https://wa.me/${waNumber}?text=${encodeURIComponent(c.lang === "es" ? `Hola ${(c.name ?? "").split(" ")[0]}, aquí tiene su espacio privado en The Heure Society: sus relojes, facturas y certificados, y lo que estamos buscando para usted. ${portalUrl(c.portal_token)}` : `Hi ${(c.name ?? "").split(" ")[0]}, here is your private space at The Heure Society: your timepieces, invoices and certificates, and what we're looking for on your behalf. ${portalUrl(c.portal_token)}`)}`} target="_blank" rel="noreferrer" className={ghostButtonClass}>{tr("📲 Enviar por WhatsApp")}</a>}
+                  <form action={portalLinkAction.bind(null, c.id, true)}><button className="text-xs text-stone underline hover:text-ivory">{tr("Cambiar el enlace")}</button></form>
+                </div>
+              </div>
+            ) : (
+              <form action={portalLinkAction.bind(null, c.id, false)} className="grid gap-2 text-sm">
+                <p className="text-stone">{tr("Un enlace privado donde el cliente ve los relojes que te compró con sus facturas y certificados, cuándo le toca el servicio, sus documentos y lo que buscas para él.")}</p>
+                <button className={ghostButtonClass}>{tr("Crear su enlace")}</button>
+              </form>
+            )}
+          </Card>
           <Card title="💬 Respuestas rápidas">
             <QuickReplies templates={replies.map((t) => ({ title: tr(t.title), body_es: t.body_es, body_en: t.body_en }))} watches={replyWatches} name={c.name ?? ""} phone={waNumber ?? null} defaultLang={c.lang === "en" ? "en" : "es"} payInfo={docSettings.doc_payment_info} site={(process.env.NEXT_PUBLIC_SITE_URL ?? "https://theheuresociety.vercel.app").replace(/\/$/, "")} />
             <Link href="/admin/plantillas" className="mt-3 inline-block text-xs text-stone underline hover:text-ivory">{tr("Editar las plantillas")}</Link>

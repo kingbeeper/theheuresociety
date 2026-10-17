@@ -7,6 +7,7 @@ import { appraiseTradeAction, closeProformaAction, convertSourcing, markDepositR
 import { ID_TYPES, KIND_LABEL, depositPct, docTotals, suggestedDeposit, usd, type Doc, type DocKind, type DocLine } from "@/lib/doc-labels";
 import { PAYMENT } from "@/lib/stock-labels";
 import { SerialWarning } from "./SerialCheck";
+import { InspectionFields } from "./InspectionFields";
 
 const field =
   "w-full border border-line bg-ink/60 px-3 py-2.5 text-sm text-ivory placeholder:text-stone/50 outline-none transition-colors focus:border-brass/70";
@@ -18,8 +19,8 @@ export type CustomerOption = { id: string; label: string; name: string | null; e
 export type StockOption = { id: string; sku: string; title: string; details: string; serial: string | null; price: number | null; cost?: number | null };
 
 const addDays = (iso: string, n: number) => new Date(new Date(`${iso}T12:00:00Z`).getTime() + n * 86_400_000).toISOString().slice(0, 10);
-const DUE_DAYS: Record<DocKind, number> = { quote: 7, memo: 14, invoice: 0, consignment: 90, purchase: 0, sourcing: 60, proforma: 14, return: 0 };
-const noTax = (k: DocKind) => k === "memo" || k === "consignment" || k === "purchase" || k === "sourcing";
+const DUE_DAYS: Record<DocKind, number> = { quote: 7, memo: 14, invoice: 0, consignment: 90, purchase: 0, sourcing: 60, proforma: 14, return: 0, inspection: 0 };
+const noTax = (k: DocKind) => k === "memo" || k === "consignment" || k === "purchase" || k === "sourcing" || k === "inspection";
 
 export function DocumentForm({
   doc, kind: initialKind, customers, stock, terms, taxRate, today, presetCustomer, presetItem,
@@ -118,7 +119,7 @@ export function DocumentForm({
       </div>
 
       <div className="grid gap-4">
-        <p className={section}>{kind === "consignment" ? tr("Consignante (dueño del reloj)") : kind === "purchase" ? tr("Vendedor") : tr("Cliente")}</p>
+        <p className={section}>{kind === "consignment" ? tr("Consignante (dueño del reloj)") : kind === "purchase" ? tr("Vendedor") : kind === "inspection" ? tr("Dueño del reloj") : tr("Cliente")}</p>
         <label>
           <span className={label}>{tr("Cliente del CRM")}</span>
           <select name="customer_id" value={customer} onChange={(e) => pickCustomer(e.target.value)} className={field}>
@@ -204,9 +205,16 @@ export function DocumentForm({
         </label>
       </div>
 
+      {kind === "inspection" && (
+        <div className="grid gap-3">
+          <p className={section}>{tr("Estado del reloj")}</p>
+          <InspectionFields value={doc?.inspection} token={doc?.token} />
+        </div>
+      )}
+
       <div className="grid gap-4 sm:grid-cols-[1fr_320px]">
         <div className="grid gap-4">
-          <label>
+          <label className={kind === "inspection" ? "hidden" : ""}>
             <span className={label}>{tr("Forma de pago")}</span>
             <select name="payment_method" defaultValue={doc?.payment_method ?? ""} className={field}>
               <option value="">—</option>
@@ -216,7 +224,13 @@ export function DocumentForm({
           <label><span className={label}>{tr("Notas (salen en el documento)")}</span><textarea name="notes" rows={2} defaultValue={doc?.notes ?? ""} className={field} /></label>
           <label><span className={label}>{tr("Términos")}</span><textarea name="terms" rows={4} value={termsText} onChange={(e) => setTermsText(e.target.value)} className={field} /></label>
         </div>
-        {sourcing ? (
+        {kind === "inspection" ? (
+          <div>
+            <input type="hidden" name="discount" value="0" />
+            <input type="hidden" name="tax_rate" value="0" />
+            <input type="hidden" name="shipping" value="0" />
+          </div>
+        ) : sourcing ? (
           <div className="grid content-start gap-3 border border-line/70 p-4 text-sm">
             <input type="hidden" name="discount" value="0" />
             <input type="hidden" name="tax_rate" value="0" />

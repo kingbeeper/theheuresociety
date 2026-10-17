@@ -45,6 +45,8 @@ export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   if (pathname === "/admin" || pathname.startsWith("/admin/")) return refreshAdminSession(request);
   if (pathname.startsWith("/d/")) return; // documento compartido con el cliente (sin idioma en la URL)
+  if (pathname.startsWith("/c/")) return; // portal «Mi colección» del cliente (sin idioma en la URL)
+  if (pathname.startsWith("/p/")) return; // lista de precios para dealers (sin idioma en la URL)
   const hasLocale = locales.some(
     (l) => pathname === `/${l}` || pathname.startsWith(`/${l}/`)
   );

@@ -31,6 +31,7 @@ export type Item = {
   cost: number | null;
   extra_costs: number;
   asking_price: number | null;
+  dealer_price?: number | null; // precio para la lista de dealers (vacío = venta − descuento de dealer)
   memo_due: string | null;
   trade_for_item_id: string | null;
   watch_id: string | null;

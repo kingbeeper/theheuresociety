@@ -166,6 +166,10 @@ async function handlePhoto(msg: TgMessage) {
   const chatId = msg.chat.id;
   const best = msg.photo!.reduce((a, b) => (b.width * b.height > a.width * a.height ? b : a));
 
+  // Leer tarjeta de garantía: la foto es la tarjeta
+  const card = await import("./bot-card");
+  if (await card.cardPending(chatId)) return card.onCardPhoto(chatId, best.file_id);
+
   // Tasación en curso: las fotos son del reloj a tasar
   if (await appraisePending(chatId)) return onAppraisalPhoto(chatId, best.file_id, msg.message_id, msg.caption);
 
@@ -697,6 +701,7 @@ async function handleCommand(chatId: number, text: string, user: string) {
       await (await import("./bot-dealers")).clearDealerFlow(chatId);
       await (await import("./bot-offers")).clearOffer(chatId);
       await (await import("./bot-shipping")).clearShipping(chatId);
+      await (await import("./bot-card")).clearCard(chatId);
       return sendMessage(chatId, draft || flow ? "Cancelado." : "Listo: no queda nada en curso.");
     }
 

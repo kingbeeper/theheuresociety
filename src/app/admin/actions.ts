@@ -540,3 +540,28 @@ export async function testPushAction() {
   const n = await pushTo(email, { title: "🔔 The Heure Society", body: tr("Los avisos funcionan en este dispositivo."), url: "/admin" });
   return n ? { ok: true as const } : { error: tr("No hay ningún dispositivo activado.") };
 }
+
+// Portal «Mi colección» del cliente: crear el enlace o cambiarlo (el anterior deja de funcionar)
+export async function portalLinkAction(customerId: string, renew: boolean) {
+  await requireAdmin("leads");
+  const { portalToken } = await import("@/lib/portal");
+  await portalToken(customerId, renew);
+  refresh();
+}
+
+// Lista de precios para dealers: crear o cambiar el enlace, y el descuento general sobre el precio de venta
+export async function pricelistAction(renew: boolean) {
+  await requireAdmin("leads");
+  const { pricelistToken } = await import("@/lib/pricelist");
+  await pricelistToken(renew);
+  refresh();
+}
+
+export async function dealerDiscountAction(form: FormData) {
+  await requireAdmin("leads");
+  const pct = Number(String(form.get("discount") ?? "").replace(/[^\d.]/g, ""));
+  if (!Number.isFinite(pct)) return;
+  const { setDealerDiscount } = await import("@/lib/pricelist");
+  await setDealerDiscount(pct);
+  refresh();
+}
