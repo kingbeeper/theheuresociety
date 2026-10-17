@@ -116,6 +116,16 @@ export async function saveDocument(id: string | null, _: unknown, f: FormData) {
       seller_id_type: text(f, "seller_id_type"),
       seller_id_number: text(f, "seller_id_number"),
       seller_dob: date(f, "seller_dob"),
+      seller_details: {
+        address: text(f, "client_address"),
+        sex: text(f, "sd_sex"),
+        race: text(f, "sd_race"),
+        height: text(f, "sd_height"),
+        weight: text(f, "sd_weight"),
+        hair: text(f, "sd_hair"),
+        eyes: text(f, "sd_eyes"),
+        thumb_path: (text(f, "sd_thumb") ?? "").startsWith("inspections/") ? text(f, "sd_thumb") : null,
+      },
     }),
     items,
     discount: num(f, "discount"),
@@ -195,6 +205,9 @@ export async function markPaid(id: string, _: unknown, f: FormData) {
   const user = await requireAdmin("documentos");
   const d = await getDoc(id);
   if (!d || d.kind !== "invoice" || d.status === "paid" || d.status === "void") return { error: tr("Esta factura no se puede marcar como pagada.") };
+  // Compra de segunda mano aún en retención: no se puede vender
+  const held = await (await import("@/lib/secondhand")).holdBlock(d.items.map((l) => l.item_id));
+  if (held) return { error: held };
   await payInvoice(d, text(f, "payment_method"), date(f, "paid_at") ?? today(), user);
   refresh();
   return { ok: true };
@@ -214,6 +227,8 @@ export async function proformaPaymentAction(id: string, _: unknown, f: FormData)
   const user = await requireAdmin("documentos");
   const d = await getDoc(id);
   if (!d || d.kind !== "proforma" || !["draft", "sent"].includes(d.status)) return { error: tr("Esta proforma ya está cerrada.") };
+  const held = await (await import("@/lib/secondhand")).holdBlock(d.items.map((l) => l.item_id));
+  if (held) return { error: held };
   const amount = num(f, "amount");
   if (amount <= 0) return { error: tr("Indica el importe del depósito.") };
   await addProformaPayment(d, { date: date(f, "paid_at") ?? today(), amount, method: text(f, "payment_method") }, user);

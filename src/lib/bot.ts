@@ -113,6 +113,9 @@ export async function handleMessage(msg: TgMessage) {
   // Encargo con anticipo a medias
   const { onSourcingText } = await import("./bot-sourcing");
   if (await onSourcingText(chatId, text)) return;
+  // Calculadora del oro («12.5 14k»)
+  const { onGoldText } = await import("./bot-gold");
+  if (await onGoldText(chatId, text)) return;
   // Número de rastreo de un envío
   const { onShippingText } = await import("./bot-shipping");
   if (await onShippingText(chatId, text)) return;
@@ -702,6 +705,7 @@ async function handleCommand(chatId: number, text: string, user: string) {
       await (await import("./bot-offers")).clearOffer(chatId);
       await (await import("./bot-shipping")).clearShipping(chatId);
       await (await import("./bot-card")).clearCard(chatId);
+      await (await import("./bot-gold")).clearGold(chatId);
       return sendMessage(chatId, draft || flow ? "Cancelado." : "Listo: no queda nada en curso.");
     }
 

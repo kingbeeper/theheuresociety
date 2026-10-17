@@ -33,7 +33,8 @@ export type Item = {
   cost: number | null;
   extra_costs: number;
   asking_price: number | null;
-  dealer_price?: number | null; // precio para la lista de dealers (vacío = venta − descuento de dealer)
+  dealer_price?: number | null;
+  hold_until?: string | null; // compra de segunda mano: no se puede vender antes de esta fecha // precio para la lista de dealers (vacío = venta − descuento de dealer)
   memo_due: string | null;
   trade_for_item_id: string | null;
   watch_id: string | null;
@@ -148,6 +149,9 @@ export async function returnToOwner(item: Item, user: string, reason: string | n
 // la columna sell_request_id (migración pendiente), se guarda sin ella.
 export async function createStockItem(fields: Record<string, unknown>, user: string, log: string) {
   const db = adminDb();
+  // Compra a un particular: queda retenida unos días antes de poder venderse (Florida, cap. 538)
+  const hold = await (await import("./secondhand")).holdUntil(fields);
+  if (hold) fields = { ...fields, hold_until: hold };
   let res = await db.from("inventory_items").insert(fields).select("id, sku").single();
   if (res.error && "sell_request_id" in fields && /sell_request_id/.test(res.error.message)) {
     const rest = { ...fields };

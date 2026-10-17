@@ -542,6 +542,9 @@ export async function onCallback(chatId: number, cbId: string, messageId: number
     return card.startCard(chatId);
   }
 
+  // Precio del oro
+  if (action === "dgold") return (await import("./bot-gold")).onGoldCallback(chatId, cbId, messageId, arg);
+
   // Órdenes de servicio
   if (action === "dsvc") return (await import("./bot-service")).onServiceCallback(chatId, cbId, messageId, arg, user);
 
@@ -674,6 +677,11 @@ export async function onCallback(chatId: number, cbId: string, messageId: number
       });
     }
     if (action === "dpm") {
+      const held = await (await import("./secondhand")).holdBlock(d.items.map((l) => l.item_id));
+      if (held) {
+        await answer();
+        return sendMessage(chatId, `⛔ ${h(held)}`);
+      }
       await answer("Registrando el pago…");
       await clearButtons();
       const method = PAYMENT[extra as keyof typeof PAYMENT] ?? null;

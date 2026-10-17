@@ -56,6 +56,9 @@ export async function startSale(chatId: number, itemId: string, user: string) {
   const { data: i } = await adminDb().from("inventory_items").select("id, sku, brand, model, reference, asking_price, status").eq("id", itemId).single();
   if (!i) return sendMessage(chatId, "No encontré ese reloj en el inventario.");
   if (i.status === "sold") return sendMessage(chatId, `${h(i.sku)} ya figura como vendido.`);
+  // Compra de segunda mano aún en retención: no se puede vender
+  const held = await (await import("./secondhand")).holdBlock([itemId]);
+  if (held) return sendMessage(chatId, `⛔ ${h(held)}`);
   const title = `${i.sku} · ${[i.brand, i.model, i.reference].filter(Boolean).join(" ")}`;
   const open = await openInvoiceFor(itemId);
   if (open) {

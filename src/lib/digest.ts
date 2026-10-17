@@ -156,6 +156,28 @@ export async function sendDigest() {
   if (new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", day: "numeric" }).format(new Date()) === "1") {
     await (await import("./monthly-pdf")).sendMonthlyPdf().catch((e) => console.error("Informe mensual:", e));
   }
+  // Servicios: piezas listas sin recoger (7+ días) y órdenes atrasadas, con el recordatorio preparado
+  try {
+    const s = await (await import("./service")).servicesDigest();
+    if (s) {
+      const { keyboard } = await import("./telegram");
+      await notifyAdmins(s.text, s.buttons.length ? { reply_markup: keyboard(s.buttons.map((b) => [b])) } : {});
+    }
+  } catch (e) {
+    console.error("Servicios:", e);
+  }
+  // Oro: aviso si se mueve un 3 % o más de un día para otro
+  try {
+    const g = await import("./gold");
+    const p = await g.metalPrices(30);
+    const ch = p ? g.goldChange(p) : null;
+    if (p && ch != null && Math.abs(ch) >= 3) {
+      const gram14 = ((g.perGram(p, "gold") ?? 0) * 14) / 24;
+      await notifyAdmins(`🥇 <b>El oro ${ch > 0 ? "sube" : "baja"} un ${Math.abs(ch).toFixed(1)}%</b>: $${Math.round(p.gold).toLocaleString("en-US")}/oz (14k: $${gram14.toFixed(2)}/g). Revisa los precios de tu joyería de oro y lo que ofreces al comprar.`);
+    }
+  } catch (e) {
+    console.error("Oro:", e);
+  }
   // Domingos: copia de seguridad de todo (Excel en el almacenamiento privado)
   if (new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", weekday: "short" }).format(new Date()) === "Sun") {
     await (await import("./backup")).weeklyBackup().catch((e) => console.error("Copia de seguridad:", e));

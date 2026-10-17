@@ -107,7 +107,9 @@ export async function saveItem(id: string | null, _: unknown, f: FormData) {
   if (fields.watch_id && fields.asking_price == null) fields.asking_price = await webPrice(fields.watch_id);
 
   if (!id) {
-    const { data, error } = await db.from("inventory_items").insert(fields).select("id, sku").single();
+    // Compra a un particular: queda retenida unos días antes de poder venderse (Florida, cap. 538)
+    const hold = await (await import("@/lib/secondhand")).holdUntil(fields);
+    const { data, error } = await db.from("inventory_items").insert({ ...fields, ...(hold && { hold_until: hold }) }).select("id, sku").single();
     if (error) return { error: error.message };
     await logItem(data.id, "entry", `Entrada · ${ACQUISITION[fields.acquisition]}${fields.cost != null ? ` · costo ${usd(fields.cost)}` : ""}${fields.supplier_name ? ` · de ${fields.supplier_name}` : ""}`, user);
     await syncWebPrice(fields.watch_id, fields.asking_price);
@@ -156,6 +158,9 @@ export async function sellItem(id: string, _: unknown, f: FormData) {
   const price = money(f, "sale_price");
   const saleDate = date(f, "sale_date") ?? new Date().toISOString().slice(0, 10);
   if (price == null) return { error: tr("Falta el precio de venta.") };
+  // Compra de segunda mano aún en retención: no se puede vender
+  const held = await (await import("@/lib/secondhand")).holdBlock([id]);
+  if (held) return { error: held };
 
   // Comprador: un cliente del CRM o uno nuevo (queda como lead ganado)
   let buyerId = text(f, "buyer_customer_id");
@@ -362,4 +367,14 @@ export async function readCardAction(image: { base64: string; mediaType: string 
     return null;
   });
   return card ? { card } : { error: tr("No se pudo leer la tarjeta. Prueba con otra foto, de frente y sin reflejos.") };
+}
+
+// Días de retención de las compras a particulares (Florida: 15 por defecto; 0 = sin retención)
+export async function holdDaysAction(f: FormData) {
+  await requireAdmin("inventario");
+  const n = Number(String(f.get("days") ?? "").replace(/[^\d]/g, ""));
+  if (!Number.isFinite(n)) return;
+  const { setHoldDays } = await import("@/lib/secondhand");
+  await setHoldDays(n);
+  refresh();
 }

@@ -10,6 +10,7 @@ import { SerialWarning } from "./SerialCheck";
 import { InspectionFields } from "./InspectionFields";
 import { ServiceFields } from "./ServiceFields";
 import { JewelrySourcing } from "./JewelrySourcing";
+import { SellerRegistry } from "./SellerRegistry";
 
 const field =
   "w-full border border-line bg-ink/60 px-3 py-2.5 text-sm text-ivory placeholder:text-stone/50 outline-none transition-colors focus:border-brass/70";
@@ -165,6 +166,7 @@ export function DocumentForm({
             <label><span className={label}>{tr("Número")}</span><input name="seller_id_number" defaultValue={doc?.seller_id_number ?? ""} autoComplete="off" className={field} /></label>
             <label><span className={label}>{tr("Fecha de nacimiento")}</span><input name="seller_dob" type="date" defaultValue={doc?.seller_dob ?? ""} className={field} /></label>
             <p className="text-xs text-stone sm:col-span-3">{tr("El número completo y la fecha de nacimiento quedan solo en el CRM; el documento muestra los 4 últimos caracteres.")}</p>
+            <SellerRegistry value={doc?.seller_details} />
           </div>
         )}
         {kind === "purchase" && <p className="text-xs text-stone">{tr("El precio de cada línea es lo que")} <b>{tr("pagamos al vendedor")}</b>.</p>}

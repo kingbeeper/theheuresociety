@@ -7,6 +7,7 @@ import { requireUser } from "@/lib/admin-auth";
 import { can } from "@/lib/crm-perms";
 import { daysInStock, margin, totalCost, type Item } from "@/lib/stock";
 import { ACQUISITION, ITEM_STATUS, JEWELRY_TYPE, isOwnerStock, jewelrySummary } from "@/lib/stock-labels";
+import { meltValue, metalPrices } from "@/lib/gold";
 import { Card, fieldClass, fmtDate, fmtDateTime, ghostButtonClass, money, PageTitle, requestTime } from "@/components/admin/ui";
 import { ItemForm, ReturnForm, SaleForm } from "@/components/admin/ItemForms";
 import { STATUS_LABEL, type DocKind, type DocStatus } from "@/lib/doc-labels";
@@ -84,6 +85,9 @@ export default async function ItemPage({ params, searchParams }: PageProps<"/adm
           </div>
         }
       />
+      {item.hold_until && item.hold_until > new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date(requestTime())) && (
+        <p className="mb-6 border border-amber-300/40 bg-amber-300/5 p-4 text-sm text-amber-200">⛔ {tr("Compra de segunda mano: en retención hasta el {d}. No se puede vender antes.", { d: fmtDate(`${item.hold_until}T12:00:00`) })}</p>
+      )}
 
       <div className="grid grid-cols-2 gap-px border border-line bg-line md:grid-cols-5">
         {[
@@ -120,6 +124,7 @@ export default async function ItemPage({ params, searchParams }: PageProps<"/adm
             <Card title="💍 Joya">
               <p className="text-sm">{tr(JEWELRY_TYPE[item.jewelry.type] ?? "Joya")}</p>
               <p className="mt-1 text-sm text-stone">{jewelrySummary(item.jewelry) || "—"}</p>
+              <MeltValue metal={item.jewelry.metal} weight={item.jewelry.weight} />
             </Card>
           )}
 
@@ -307,5 +312,18 @@ export default async function ItemPage({ params, searchParams }: PageProps<"/adm
         </Card>
       </div>
     </>
+  );
+}
+
+// Valor del metal al precio de hoy (oro, plata o platino), si la joya tiene metal y peso
+async function MeltValue({ metal, weight }: { metal: string | null; weight: string | null }) {
+  const prices = await metalPrices();
+  const m = prices ? meltValue(prices, metal, weight) : null;
+  if (!m) return weight ? null : <p className="mt-3 text-xs text-stone">{tr("Pon el peso en gramos para ver el valor del metal al precio de hoy.")}</p>;
+  return (
+    <p className="mt-3 text-sm">
+      🥇 {tr("Valor del metal hoy")}: <b>{money(m.value)}</b> <span className="text-xs text-stone">({m.label} · {m.weight} g)</span>
+      <Link href={`/admin/inventario/oro?g=${m.weight}&k=${m.label}`} className="ml-2 text-xs text-brass hover:text-ivory">{tr("Calculadora →")}</Link>
+    </p>
   );
 }

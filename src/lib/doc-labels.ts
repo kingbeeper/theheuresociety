@@ -49,6 +49,8 @@ export type Doc = {
   seller_id_type?: string | null;
   seller_id_number?: string | null;
   seller_dob?: string | null;
+  // Registro de compras de segunda mano: dirección, descripción física y huella del vendedor (solo en el CRM)
+  seller_details?: SellerDetails | null;
   // Firma electrónica del cliente y foto de la identificación (archivos privados)
   signed_at?: string | null;
   signer_name?: string | null;
@@ -112,6 +114,7 @@ export const STATE_LABEL: Record<"en" | "es", Record<PartState, string>> = {
   en: { ok: "Good", wear: "Signs of wear", damage: "Damage", na: "N/A" },
   es: { ok: "Bien", wear: "Marcas de uso", damage: "Daño", na: "No aplica" },
 };
+export type SellerDetails = { address: string | null; sex: string | null; race: string | null; height: string | null; weight: string | null; hair: string | null; eyes: string | null; thumb_path: string | null };
 export type DocPayment = { date: string; amount: number; method: string | null };
 
 export const SIGNABLE: DocKind[] = ["memo", "consignment", "purchase", "invoice", "quote", "sourcing", "proforma", "return", "inspection", "service"];

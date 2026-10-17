@@ -99,6 +99,8 @@ export default async function InventarioPage({ searchParams }: PageProps<"/admin
             <Link href="/admin/inventario/serial" className={ghostButtonClass}>{tr("Buscar serial")}</Link>
             <Link href="/admin/inventario/conteo" className={ghostButtonClass}>{tr("Conteo")}</Link>
             <Link href="/admin/inventario/mercado" className={ghostButtonClass}>{tr("📈 Mercado")}</Link>
+            <Link href="/admin/inventario/registro" className={ghostButtonClass}>{tr("📒 Registro de compras")}</Link>
+            <Link href="/admin/inventario/oro" className={ghostButtonClass}>{tr("🥇 Oro")}</Link>
             <a href="/admin/etiquetas" target="_blank" rel="noreferrer" className={ghostButtonClass}>{tr("Etiquetas QR")}</a>
             <Link href="/admin/inventario/nuevo?cat=jewelry" className={ghostButtonClass}>{tr("+ Añadir joya")}</Link>
             <Link href="/admin/inventario/nuevo" className={buttonClass}>{tr("+ Añadir reloj")}</Link>
