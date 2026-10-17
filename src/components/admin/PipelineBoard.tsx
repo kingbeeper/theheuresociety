@@ -25,8 +25,9 @@ export function PipelineBoard({ cards }: { cards: PipelineCard[] }) {
     });
 
   return (
-    <div className="overflow-x-auto pb-4">
-      <div className="grid min-w-[1100px] grid-cols-6 gap-3">
+    // Móvil: columnas de ancho fijo que se deslizan de lado (y encajan al soltar); escritorio: las 6 a la vista
+    <div className="-mx-5 snap-x snap-mandatory overflow-x-auto px-5 pb-4 md:mx-0 md:px-0">
+      <div className="grid grid-cols-[repeat(6,minmax(230px,1fr))] gap-3 md:grid-cols-[repeat(6,minmax(170px,1fr))]">
         {COLUMNS.map((stage) => {
           const col = list.filter((c) => c.stage === stage);
           const total = col.reduce((a, c) => a + c.value, 0);
@@ -38,7 +39,7 @@ export function PipelineBoard({ cards }: { cards: PipelineCard[] }) {
                 const id = e.dataTransfer.getData("text/plain");
                 if (id && list.find((c) => c.id === id)?.stage !== stage) change(id, stage);
               }}
-              className="min-h-[60vh] border border-line bg-forest/50"
+              className="min-h-[60vh] min-w-0 snap-start border border-line bg-forest/50"
               aria-label={tr(STAGE_LABEL[stage])}
             >
               <header className="sticky top-0 border-b border-line bg-forest px-3 py-2.5">
@@ -51,7 +52,7 @@ export function PipelineBoard({ cards }: { cards: PipelineCard[] }) {
                     key={c.id}
                     draggable
                     onDragStart={(e) => e.dataTransfer.setData("text/plain", c.id)}
-                    className="cursor-grab border border-line bg-ink/70 p-2.5 text-sm active:cursor-grabbing"
+                    className="min-w-0 cursor-grab overflow-hidden border border-line bg-ink/70 p-2.5 text-sm active:cursor-grabbing"
                   >
                     <Link href={`/admin/leads/${c.id}`} className="block truncate hover:text-brass">{c.name}</Link>
                     {c.wants && <p className="mt-0.5 line-clamp-2 text-xs text-stone">{c.wants}</p>}
@@ -64,7 +65,7 @@ export function PipelineBoard({ cards }: { cards: PipelineCard[] }) {
                       value={c.stage}
                       onChange={(e) => change(c.id, e.target.value as Stage)}
                       aria-label={tr("Mover a otra etapa")}
-                      className="mt-2 w-full border border-line bg-ink px-1.5 py-1 text-[0.7rem] text-stone md:hidden"
+                      className="mt-2 w-full min-w-0 border border-line bg-ink px-2 py-1.5 text-base text-stone md:hidden"
                     >
                       {[...COLUMNS, "lost" as Stage].map((s) => <option key={s} value={s}>{tr(STAGE_LABEL[s])}</option>)}
                     </select>
