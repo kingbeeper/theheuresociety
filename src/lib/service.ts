@@ -29,11 +29,12 @@ export function newService(input: Partial<ServiceOrder>): ServiceOrder {
 // Mensaje para el cliente cuando su pieza está lista (en el idioma del documento)
 export function readyMessage(d: Doc) {
   const first = (d.client_name ?? "").split(" ")[0];
-  const piece = d.service?.piece || d.items[0]?.title || "";
+  // El trabajo («Pulido y reparación de cierre»), no la descripción interna de la pieza
+  const work = d.items.map((l) => l.title).filter(Boolean).join(", ");
   const link = `${SITE}/d/${d.token}`;
   return d.lang === "es"
-    ? `Hola ${first}, le avisamos de que su ${piece} ya está lista para recoger en nuestra oficina (169 East Flagler St, Suite 1122, Miami). Orden ${d.number}: ${link}`
-    : `Hi ${first}, your ${piece} is ready for collection at our office (169 East Flagler St, Suite 1122, Miami). Order ${d.number}: ${link}`;
+    ? `Hola ${first}, le avisamos de que su pieza ya está lista para recoger en nuestra oficina (169 East Flagler St, Suite 1122, Miami)${work ? `: ${work}` : ""}. Orden ${d.number}: ${link}`
+    : `Hi ${first}, your piece is ready for collection at our office (169 East Flagler St, Suite 1122, Miami)${work ? `: ${work}` : ""}. Order ${d.number}: ${link}`;
 }
 
 // Avanzar la orden: al taller, lista o entregada (entregada = factura pagada con el importe de la orden)
