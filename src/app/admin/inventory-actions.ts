@@ -118,6 +118,8 @@ export async function saveItem(id: string | null, _: unknown, f: FormData) {
     await syncWebPrice(fields.watch_id, fields.asking_price);
     // Clientes que buscaban una pieza así (búsquedas, recordatorios, cotizaciones, encargos…)
     await import("@/lib/interest").then((m) => m.notifyInterest(data.id as string, user)).catch((e) => console.error("Interesados:", e));
+    // Recordatorio al dar de alta (p. ej. «el vendedor me debe la caja»)
+    if (text(f, "body") && date(f, "date")) await addItemReminderAction(data.id as string, f).catch((e) => console.error("Recordatorio de la pieza:", e));
     redirect(`/admin/inventario/${data.id}`);
   }
 
@@ -382,5 +384,34 @@ export async function holdDaysAction(f: FormData) {
   if (!Number.isFinite(n)) return;
   const { setHoldDays } = await import("@/lib/secondhand");
   await setHoldDays(n);
+  refresh();
+}
+
+// Recordatorio de una pieza (p. ej. «el vendedor me debe la caja»): queda enlazado a la pieza y a su
+// cliente (el vendedor o, si ya se vendió, el comprador). Si el vendedor no está en el CRM, se crea su ficha.
+export async function addItemReminderAction(itemId: string, f: FormData) {
+  const user = await requireAdmin("inventario");
+  const body = text(f, "body");
+  const day = date(f, "date");
+  if (!body || !day) return;
+  const time = text(f, "time");
+  const item = await getItem(itemId);
+  const db = adminDb();
+  let customerId = (text(f, "who") === "buyer" ? item.buyer_customer_id : item.supplier_customer_id) ?? item.supplier_customer_id ?? item.buyer_customer_id ?? null;
+  if (!customerId && item.supplier_name) {
+    const lead = await upsertLead({ name: item.supplier_name, source: "walk_in", intent: "sell", notify: false });
+    customerId = lead.id;
+    await db.from("inventory_items").update({ supplier_customer_id: lead.id }).eq("id", itemId);
+  }
+  const { miamiToUtc } = await import("@/lib/booking");
+  const due = miamiToUtc(day, time ?? "09:00");
+  const fullBody = `${item.sku}: ${body}`.slice(0, 500);
+  const { data: r, error } = await db.from("reminders").insert({ customer_id: customerId, item_id: itemId, body: fullBody, due_at: due.toISOString(), all_day: !time, created_by: user }).select("id").single();
+  if (error) throw error;
+  if (customerId) {
+    await db.from("customers").update({ follow_up_at: day, follow_up_note: `⏰ ${fullBody}`.slice(0, 300) }).eq("id", customerId);
+    await addEvent(customerId, "follow_up", `Recordatorio para el ${day}${time ? ` a las ${time}` : ""}: ${fullBody}`, { reminder: r.id, item: itemId }, user);
+  }
+  await logItem(itemId, "status", `⏰ Recordatorio para el ${day}${time ? ` a las ${time}` : ""}: ${body}`, user);
   refresh();
 }

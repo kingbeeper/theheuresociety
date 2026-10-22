@@ -131,7 +131,7 @@ export default async function DocumentPage({ params }: PageProps<"/admin/documen
         <div className="flex flex-wrap items-center gap-2">
           {d.status === "draft" && (
             <form action={sendDocument.bind(null, d.id)}>
-              <button className={button}>{d.kind === "memo" ? tr("Marcar como entregado") : d.kind === "invoice" ? tr("Emitir factura") : (d.kind === "consignment" || d.kind === "purchase" || sourcing) ? tr("Marcar como firmado") : proforma ? tr("Emitir proforma (reserva el reloj)") : tr("Marcar como enviada")}</button>
+              <button className={button}>{d.kind === "memo" ? tr("Marcar como entregado") : d.kind === "invoice" ? tr("Emitir factura") : (d.kind === "consignment" || d.kind === "purchase" || sourcing) ? tr("Marcar como firmado") : proforma ? tr("Crear proforma (reserva la pieza)") : tr("Marcar como enviada")}</button>
             </form>
           )}
           {d.kind === "quote" && d.status === "sent" && (

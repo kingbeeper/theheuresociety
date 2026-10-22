@@ -343,3 +343,12 @@ export function localizeDetails(text: string | null | undefined, lang: "en" | "e
   for (const [re, en] of WORDS) out = out.replace(re, en);
   return out.split(" · ").map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join(" · ");
 }
+
+// Forma de pago en el idioma del documento: en el CRM se elige en español («Transferencia») y en un
+// documento en inglés sale «Wire transfer». Varias formas («Transferencia + Zelle») se traducen una a una.
+const PAYMENT_EN: Record<string, string> = { transferencia: "Wire transfer", efectivo: "Cash", tarjeta: "Card", cripto: "Crypto", intercambio: "Trade-in", otro: "Other", zelle: "Zelle", cheque: "Check" };
+export function localizePayment(method: string | null | undefined, lang: "en" | "es") {
+  if (!method) return method ?? "";
+  if (lang !== "en") return method;
+  return method.split(/\s*\+\s*/).map((m) => PAYMENT_EN[m.trim().toLowerCase()] ?? m).join(" + ");
+}

@@ -127,6 +127,12 @@ export function ItemForm({ item, watches, showCosts = true, prefill }: { item?: 
           </select>
         </label>
         <label><span className={label}>{tr("Notas internas")}</span><input name="notes" defaultValue={v("notes")} className={field} /></label>
+        {!item && (
+          <div className="grid gap-2 sm:col-span-2 sm:grid-cols-[1fr_160px]">
+            <label><span className={label}>{tr("⏰ Recordatorio (opcional)")}</span><input name="body" placeholder={tr("Qué falta (ej. que el vendedor entregue la caja)")} className={field} /></label>
+            <label><span className={label}>{tr("Para el día")}</span><input name="date" type="date" className={field} /></label>
+          </div>
+        )}
       </div>
 
       <div className="flex items-center gap-4">

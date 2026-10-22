@@ -12,12 +12,13 @@ import { Card, fieldClass, fmtDate, fmtDateTime, ghostButtonClass, money, PageTi
 import { ItemForm, ReturnForm, SaleForm } from "@/components/admin/ItemForms";
 import { STATUS_LABEL, type DocKind, type DocStatus } from "@/lib/doc-labels";
 import { priceVsMarket } from "@/lib/market";
-import { deleteItem, marketCheckAction, markCountedAction, markOwnerPaid, reopenItem, returnFromServiceAction, sendToServiceAction, setLocation, setReserved } from "../../../inventory-actions";
+import { addItemReminderAction, deleteItem, marketCheckAction, markCountedAction, markOwnerPaid, reopenItem, returnFromServiceAction, sendToServiceAction, setLocation, setReserved } from "../../../inventory-actions";
 import { itemServices, providers } from "@/lib/services";
 import { LOCATIONS, type Location } from "@/lib/locations";
 import { team } from "@/lib/team";
 import { stripeConfigured } from "@/lib/stripe";
 import { DepositForm } from "@/components/admin/DepositForm";
+import { reminderDoneAction, snoozeReminderAction } from "../../../actions";
 import { awayItems, openCount } from "@/lib/stock-count";
 
 export const metadata = { title: "Reloj del inventario" };
@@ -160,6 +161,8 @@ export default async function ItemPage({ params, searchParams }: PageProps<"/adm
               </form>
             </Card>
           )}
+
+          <ItemReminders item={item} />
 
           {available && (
             <Card title="Ubicación">
@@ -325,5 +328,45 @@ async function MeltValue({ metal, weight }: { metal: string | null; weight: stri
       🥇 {tr("Valor del metal hoy")}: <b>{money(m.value)}</b> <span className="text-xs text-stone">({m.label} · {m.weight} g)</span>
       <Link href={`/admin/inventario/oro?g=${m.weight}&k=${m.label}`} className="ml-2 text-xs text-brass hover:text-ivory">{tr("Calculadora →")}</Link>
     </p>
+  );
+}
+
+// ⏰ Recordatorios de la pieza (p. ej. «el vendedor me debe la caja»), con su cliente
+async function ItemReminders({ item }: { item: Item }) {
+  const { data } = await adminDb().from("reminders").select("id, body, due_at, all_day, done_at").eq("item_id", item.id).order("due_at", { ascending: true });
+  const list = data ?? [];
+  const tomorrow = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date(requestTime() + 86_400_000));
+  const small = "border border-line px-2 py-1 text-[0.6rem] tracking-[0.14em] uppercase text-stone hover:text-ivory";
+  return (
+    <Card title="⏰ Recordatorios de la pieza">
+      {list.length > 0 && (
+        <ul className="mb-4 divide-y divide-line/60 text-sm">
+          {list.map((r) => (
+            <li key={r.id} className={`flex flex-wrap items-center justify-between gap-2 py-2 ${r.done_at ? "text-stone line-through" : ""}`}>
+              <span className="min-w-0">{String(r.body).replace(`${item.sku}: `, "")} <span className="text-xs text-stone">· {r.all_day ? fmtDate(r.due_at) : fmtDateTime(r.due_at)}</span></span>
+              {!r.done_at && (
+                <span className="flex gap-1.5">
+                  <form action={reminderDoneAction.bind(null, r.id)}><button className={small}>{tr("✓ Hecho")}</button></form>
+                  <form action={snoozeReminderAction.bind(null, r.id, 1)}><button className={small}>{tr("Mañana")}</button></form>
+                </span>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      <form action={addItemReminderAction.bind(null, item.id)} className="grid gap-2 sm:grid-cols-[1fr_150px_110px_auto] sm:items-end">
+        <input name="body" required placeholder={tr("Qué falta (ej. que el vendedor entregue la caja)")} className={fieldClass} />
+        <input name="date" type="date" required defaultValue={tomorrow} className={fieldClass} />
+        <input name="time" type="time" className={fieldClass} aria-label={tr("Hora (opcional)")} />
+        <button className={ghostButtonClass}>{tr("Recordar")}</button>
+        {item.buyer_customer_id && item.supplier_customer_id && (
+          <select name="who" defaultValue="supplier" className={`${fieldClass} sm:col-span-4`}>
+            <option value="supplier">{tr("Con el vendedor")}</option>
+            <option value="buyer">{tr("Con el comprador")}</option>
+          </select>
+        )}
+      </form>
+      <p className="mt-2 text-xs text-stone">{tr("Te aviso por Telegram a su hora (sin hora: a las 9:00). También sale en Tareas, en tu calendario y en la ficha del cliente.")}</p>
+    </Card>
   );
 }

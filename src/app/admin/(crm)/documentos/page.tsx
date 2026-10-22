@@ -51,6 +51,7 @@ export default async function DocumentsPage({ searchParams }: PageProps<"/admin/
             <Link href="/admin/documentos/nuevo?tipo=proforma" className={ghostButtonClass}>{tr("+ Proforma")}</Link>
             <Link href="/admin/documentos/nuevo?tipo=inspection" className={ghostButtonClass}>{tr("+ Inspección")}</Link>
             <Link href="/admin/documentos/nuevo?tipo=service" className={ghostButtonClass}>{tr("+ Orden de servicio")}</Link>
+            <Link href="/admin/documentos/importar" className={ghostButtonClass}>{tr("⬆ Importar facturas")}</Link>
             <Link href="/admin/documentos/nuevo?tipo=invoice" className={buttonClass}>{tr("+ Factura")}</Link>
           </div>
         }

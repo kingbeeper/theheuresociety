@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { adminDb } from "@/lib/supabase";
 import { getDocSettings } from "@/lib/documents";
-import { INSPECTION_PARTS, PART_LABEL, PRINT, SIGNABLE, STATE_LABEL, localizeDetails, balanceDue, docTotals, maskedId, paidSoFar, usd, type Doc } from "@/lib/doc-labels";
+import { INSPECTION_PARTS, PART_LABEL, PRINT, SIGNABLE, STATE_LABEL, localizeDetails, localizePayment, balanceDue, docTotals, maskedId, paidSoFar, usd, type Doc } from "@/lib/doc-labels";
 import { PrintButton } from "./PrintButton";
 import { SignaturePad } from "./SignaturePad";
 import { downloadPrivate } from "@/lib/private-files";
@@ -235,7 +235,7 @@ async function SharedDocument({ params, searchParams }: { params: Promise<{ toke
             {d.kind === "proforma" && (
               <>
                 {(d.payments ?? []).map((p, i) => (
-                  <Fragment key={i}><dt className="text-[#5d625e]">{t.paymentLine} {date(p.date)}{p.method ? ` · ${p.method}` : ""}</dt><dd className="text-right tabular-nums">−{usd(p.amount)}</dd></Fragment>
+                  <Fragment key={i}><dt className="text-[#5d625e]">{t.paymentLine} {date(p.date)}{p.method ? ` · ${localizePayment(p.method, d.lang)}` : ""}</dt><dd className="text-right tabular-nums">−{usd(p.amount)}</dd></Fragment>
                 ))}
                 <dt className="font-display text-lg">{t.balance}</dt><dd className="text-right font-display text-lg tabular-nums">{usd(Math.max(0, Number(d.total) - paidSoFar(d)))}</dd>
               </>
@@ -256,7 +256,7 @@ async function SharedDocument({ params, searchParams }: { params: Promise<{ toke
           {d.kind !== "memo" && !consign && !noPrice && (d.payment_method || (!purchase && s.doc_payment_info)) && (
             <div>
               <p className="mb-1 text-[0.6rem] tracking-[0.2em] uppercase text-[#8a7a52]">{t.payment}</p>
-              <p className="whitespace-pre-line">{[d.payment_method, d.status === "paid" || purchase ? null : s.doc_payment_info].filter(Boolean).join("\n")}</p>
+              <p className="whitespace-pre-line">{[localizePayment(d.payment_method, d.lang), d.status === "paid" || purchase ? null : s.doc_payment_info].filter(Boolean).join("\n")}</p>
             </div>
           )}
           {d.terms && (

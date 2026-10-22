@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { PDFDocument, degrees, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import fontkit from "@pdf-lib/fontkit";
-import { INSPECTION_PARTS, PART_LABEL, PRINT, STATE_LABEL, localizeDetails, balanceDue, docTotals, maskedId, paidSoFar, usd, type Doc, type DocSettings } from "./doc-labels";
+import { INSPECTION_PARTS, PART_LABEL, PRINT, STATE_LABEL, localizeDetails, localizePayment, balanceDue, docTotals, maskedId, paidSoFar, usd, type Doc, type DocSettings } from "./doc-labels";
 import { downloadPrivate } from "./private-files";
 
 // PDF de cotizaciones, memos, facturas y consignaciones, con el mismo diseño que la página del
@@ -195,7 +195,7 @@ export async function renderDocPdf(d: Doc, s: Required<DocSettings>) {
   // Proforma: cada pago recibido y el saldo
   if (d.kind === "proforma") {
     const short = (iso: string) => new Intl.DateTimeFormat(d.lang === "es" ? "es-ES" : "en-US", { day: "numeric", month: "short", timeZone: "UTC" }).format(new Date(`${iso}T12:00:00Z`));
-    for (const p of d.payments ?? []) after.push([`${t.paymentLine} ${short(p.date)}${p.method ? ` · ${p.method}` : ""}`, `-${usd(p.amount)}`, false]);
+    for (const p of d.payments ?? []) after.push([`${t.paymentLine} ${short(p.date)}${p.method ? ` · ${localizePayment(p.method, d.lang)}` : ""}`, `-${usd(p.amount)}`, false]);
     after.push([t.balance, usd(Math.max(0, Number(d.total) - paidSoFar(d))), true]);
   }
   for (const [k, v, big] of after) {
@@ -314,7 +314,7 @@ export async function renderDocPdf(d: Doc, s: Required<DocSettings>) {
     }
   };
   if (d.notes) block(receipt ? t.conditionNote : t.notes, d.notes);
-  const payment = [d.payment_method, d.status === "paid" || purchase ? null : s.doc_payment_info].filter(Boolean).join("\n");
+  const payment = [localizePayment(d.payment_method, d.lang), d.status === "paid" || purchase ? null : s.doc_payment_info].filter(Boolean).join("\n");
   if (d.kind !== "memo" && !consign && !noPrice && payment) block(t.payment, payment);
   if (d.terms) block(t.terms, d.terms);
 
