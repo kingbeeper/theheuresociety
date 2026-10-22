@@ -9,6 +9,7 @@ import { PrintButton } from "./PrintButton";
 import { SignaturePad } from "./SignaturePad";
 import { downloadPrivate } from "@/lib/private-files";
 import { stripeConfigured } from "@/lib/stripe";
+import { adminEmail } from "@/lib/admin-auth";
 
 // Lo que ve el cliente: solo los datos del documento (nunca costos, proveedores ni notas internas)
 export default function Page({ params, searchParams }: PageProps<"/d/[token]">) {
@@ -25,7 +26,10 @@ async function SharedDocument({ params, searchParams }: { params: Promise<{ toke
   if (!/^[\w-]{20,40}$/.test(token)) notFound();
   const { data } = await adminDb().from("documents").select("*").eq("token", token).maybeSingle();
   const d = data as Doc | null;
-  if (!d || d.status === "draft") notFound();
+  if (!d) notFound();
+  // Borrador: solo lo ve el equipo con sesión en el CRM (vista previa); el cliente, cuando se emite
+  const preview = d.status === "draft" && Boolean(await adminEmail("documentos"));
+  if (d.status === "draft" && !preview) notFound();
   const s = await getDocSettings();
   const t = PRINT[d.lang];
   const totals = docTotals(d);
@@ -52,6 +56,11 @@ async function SharedDocument({ params, searchParams }: { params: Promise<{ toke
 
   return (
     <main className="mx-auto max-w-[860px] px-4 py-8 print:max-w-none print:p-0">
+      {preview && (
+        <p className="mb-4 border border-[#c9a227] bg-[#fbf3d9] px-4 py-3 text-sm text-[#5c4a12] print:hidden">
+          {d.lang === "es" ? "Vista previa de un BORRADOR: el cliente aún no puede ver este enlace. Emítelo desde el CRM para compartirlo." : "Preview of a DRAFT: the client can't open this link yet. Issue it from the CRM to share it."}
+        </p>
+      )}
       {(await searchParams).pagado && d.status !== "paid" && (
         <p className="mb-4 border border-emerald-700/30 bg-emerald-50 p-3 text-sm text-emerald-900 print:hidden">
           {d.lang === "es" ? "Pago recibido. En unos minutos la factura aparecerá como pagada." : "Payment received. The invoice will show as paid in a few minutes."}
