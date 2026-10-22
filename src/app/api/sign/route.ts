@@ -2,11 +2,11 @@ import { adminDb } from "@/lib/supabase";
 import { addEvent } from "@/lib/crm";
 import { uploadPrivate } from "@/lib/private-files";
 import { escapeHtml as h, notifyAdmins } from "@/lib/telegram";
-import { KIND_LABEL, type Doc } from "@/lib/doc-labels";
+// Los tipos que se firman son los mismos que muestran el recuadro de firma (SIGNABLE)
+import { KIND_LABEL, SIGNABLE, type Doc } from "@/lib/doc-labels";
 
 // Firma electrónica desde el enlace del cliente: guarda la imagen de la firma (privada), el nombre,
 // la fecha, la IP y el navegador, y avisa al equipo.
-const SIGNABLE = ["memo", "consignment", "purchase", "invoice", "quote"];
 const SITE = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://theheuresociety.vercel.app").replace(/\/$/, "");
 
 export async function POST(request: Request) {
