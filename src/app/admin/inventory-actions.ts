@@ -64,6 +64,9 @@ function itemFields(f: FormData) {
   };
 }
 
+// La casilla de compra de segunda mano solo cuenta si el formulario la trae (compra o intercambio)
+const secondhandFlag = (f: FormData) => (f.has("secondhand_field") ? f.get("secondhand") === "on" : undefined);
+
 // Tipo de pieza. Una joya guarda sus datos aparte y, si no se escribe marca o modelo, se rellenan con el
 // tipo y el resumen («Anillo» · «Oro 18k amarillo · Diamante 1.02 ct»): así se ve bien en todo el CRM.
 type PieceFields = Partial<{ category: "watch" | "jewelry" | "other"; jewelry: Jewelry | null; brand: string; model: string | null; reference: string | null; papers_date: string | null; links: string | null; watch_id: string | null }>;
@@ -108,7 +111,7 @@ export async function saveItem(id: string | null, _: unknown, f: FormData) {
 
   if (!id) {
     // Compra a un particular: queda retenida unos días antes de poder venderse (Florida, cap. 538)
-    const hold = await (await import("@/lib/secondhand")).holdUntil(fields);
+    const hold = await (await import("@/lib/secondhand")).holdUntil(fields, secondhandFlag(f));
     const { data, error } = await db.from("inventory_items").insert({ ...fields, ...(hold && { hold_until: hold }) }).select("id, sku").single();
     if (error) return { error: error.message };
     await logItem(data.id, "entry", `Entrada · ${ACQUISITION[fields.acquisition]}${fields.cost != null ? ` · costo ${usd(fields.cost)}` : ""}${fields.supplier_name ? ` · de ${fields.supplier_name}` : ""}`, user);
@@ -119,7 +122,10 @@ export async function saveItem(id: string | null, _: unknown, f: FormData) {
   }
 
   const before = await getItem(id);
-  const { error } = await db.from("inventory_items").update({ ...fields, updated_at: new Date().toISOString() }).eq("id", id);
+  // Casilla «compra de segunda mano a un particular»: desmarcada quita la retención; marcada la pone si no la tenía
+  const flag = secondhandFlag(f);
+  const holdPatch = flag === false ? { hold_until: null } : flag === true && !before.hold_until ? { hold_until: await (await import("@/lib/secondhand")).holdUntil(fields, true) } : {};
+  const { error } = await db.from("inventory_items").update({ ...fields, ...holdPatch, updated_at: new Date().toISOString() }).eq("id", id);
   if (error) return { error: error.message };
   // Cambios relevantes en el historial (y el precio nuevo pasa a la web)
   const priceChanged = Number(before.asking_price ?? NaN) !== Number(fields.asking_price ?? NaN) && (before.asking_price != null || fields.asking_price != null);

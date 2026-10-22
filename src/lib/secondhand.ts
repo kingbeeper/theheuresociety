@@ -21,11 +21,15 @@ const addDays = (iso: string, n: number) => new Date(Date.parse(`${iso}T12:00:00
 export const miamiToday = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date());
 
 // ¿Hasta cuándo queda retenida una pieza que entra? Solo compras e intercambios a particulares
-export async function holdUntil(fields: { acquisition?: unknown; purchase_date?: unknown; supplier_customer_id?: unknown }) {
+// secondhand: true/false si se marcó a mano en el formulario; sin indicar, se decide solo (un proveedor
+// con empresa o un dealer no es un particular: no hay retención)
+export async function holdUntil(fields: { acquisition?: unknown; purchase_date?: unknown; supplier_customer_id?: unknown; supplier_company?: unknown }, secondhand?: boolean) {
   if (fields.acquisition !== "purchase" && fields.acquisition !== "trade") return null;
+  if (secondhand === false) return null;
   const days = await holdDays();
   if (!days) return null;
-  if (fields.supplier_customer_id) {
+  if (secondhand === undefined && typeof fields.supplier_company === "string" && fields.supplier_company.trim()) return null;
+  if (secondhand === undefined && fields.supplier_customer_id) {
     const { data } = await adminDb().from("customers").select("tags").eq("id", fields.supplier_customer_id as string).maybeSingle();
     if (((data?.tags ?? []) as string[]).some((t) => t.toLowerCase() === "dealer")) return null; // a un dealer: no aplica
   }

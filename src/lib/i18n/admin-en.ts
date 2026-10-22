@@ -254,6 +254,7 @@ export const EN: Record<string, string> = {
   "Competencia": "Competitors",
   "Completo, +2…": "Full, +2…",
   "Compra": "Purchase",
+  "Compra de segunda mano a un particular (retención antes de vender)": "Secondhand purchase from an individual (hold before selling)",
   "Compra de segunda mano: en retención hasta el {d}. No se puede vender antes.": "Secondhand purchase: on hold until {d}. It can't be sold before then.",
   "Compra más reciente": "Most recent purchase",
   "Comprador": "Buyer",

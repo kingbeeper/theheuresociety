@@ -25,6 +25,10 @@ export function ItemForm({ item, watches, showCosts = true, prefill }: { item?: 
   const [acq, setAcq] = useState(item?.acquisition ?? "purchase");
   const owner = acq === "consignment" || acq === "memo";
   const v = (k: keyof Item) => (item?.[k] ?? prefill?.[k] ?? "") as string;
+  // Compra de segunda mano a un particular: se deduce del proveedor (con empresa = no) salvo que se marque a mano
+  const [company, setCompany] = useState(v("supplier_company"));
+  const [shOverride, setShOverride] = useState<boolean | null>(item ? Boolean(item.hold_until) : null);
+  const secondhand = shOverride ?? !company.trim();
   const [cat, setCat] = useState<Category>(item?.category ?? (prefill?.category as Category | undefined) ?? "watch");
   const j = item?.jewelry ?? null;
 
@@ -93,10 +97,17 @@ export function ItemForm({ item, watches, showCosts = true, prefill }: { item?: 
           </label>
           <label><span className={label}>{tr("Fecha de entrada")}</span><input name="purchase_date" type="date" defaultValue={v("purchase_date")} className={field} /></label>
           {acq === "memo" && <label><span className={label}>{tr("Devolver antes de")}</span><input name="memo_due" type="date" defaultValue={v("memo_due")} className={field} /></label>}
+          {(acq === "purchase" || acq === "trade") && (
+            <label className="flex items-center gap-2 self-end pb-2.5 text-sm text-stone">
+              <input type="hidden" name="secondhand_field" value="1" />
+              <input type="checkbox" name="secondhand" checked={secondhand} onChange={(e) => setShOverride(e.target.checked)} className="h-4 w-4" />
+              {tr("Compra de segunda mano a un particular (retención antes de vender)")}
+            </label>
+          )}
           {showCosts && (
             <>
               <label><span className={label}>{owner ? tr("Dueño / dealer (contacto)") : tr("Proveedor (contacto)")}</span><input name="supplier_name" defaultValue={v("supplier_name")} className={field} /></label>
-              <label><span className={label}>{tr("Empresa")}</span><input name="supplier_company" defaultValue={v("supplier_company")} className={field} /></label>
+              <label><span className={label}>{tr("Empresa")}</span><input name="supplier_company" defaultValue={v("supplier_company")} onChange={(e) => setCompany(e.target.value)} className={field} /></label>
               <label><span className={label}>{tr("Ubicación")}</span><input name="supplier_location" defaultValue={v("supplier_location")} placeholder={tr("Miami, FL")} className={field} /></label>
               <label><span className={label}>{owner ? tr("A pagar al dueño al vender (USD)") : tr("Costo (USD)")}</span><input name="cost" inputMode="decimal" defaultValue={v("cost")} className={field} /></label>
               <label><span className={label}>{tr("Gastos extra (USD)")}</span><input name="extra_costs" inputMode="decimal" defaultValue={item?.extra_costs ?? ""} placeholder={tr("Servicio, pulido, envío…")} className={field} /></label>
