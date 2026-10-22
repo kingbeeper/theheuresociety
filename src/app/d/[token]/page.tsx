@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { adminDb } from "@/lib/supabase";
 import { getDocSettings } from "@/lib/documents";
-import { INSPECTION_PARTS, PART_LABEL, PRINT, SIGNABLE, STATE_LABEL, balanceDue, docTotals, maskedId, paidSoFar, usd, type Doc } from "@/lib/doc-labels";
+import { INSPECTION_PARTS, PART_LABEL, PRINT, SIGNABLE, STATE_LABEL, localizeDetails, balanceDue, docTotals, maskedId, paidSoFar, usd, type Doc } from "@/lib/doc-labels";
 import { PrintButton } from "./PrintButton";
 import { SignaturePad } from "./SignaturePad";
 import { downloadPrivate } from "@/lib/private-files";
@@ -128,7 +128,7 @@ async function SharedDocument({ params, searchParams }: { params: Promise<{ toke
           {d.items.map((l, i) => (
             <div key={i} className="border-b border-[#ece7dc] py-4">
               <p className="font-display text-lg leading-tight">{l.title}</p>
-              {l.details && <p className="mt-1 text-xs text-[#5d625e]">{l.details}</p>}
+              {l.details && <p className="mt-1 text-xs text-[#5d625e]">{localizeDetails(l.details, d.lang)}</p>}
               {d.show_serial && l.serial && <p className="mt-1 text-xs text-[#5d625e]">{t.serial}: {l.serial}</p>}
               {!noPrice && (
                 <p className="mt-2 flex justify-between text-sm tabular-nums">
@@ -154,7 +154,7 @@ async function SharedDocument({ params, searchParams }: { params: Promise<{ toke
               <tr key={i} className="border-b border-[#ece7dc] align-top">
                 <td className="py-4 pr-4">
                   <p className="font-display text-lg leading-tight">{l.title}</p>
-                  {l.details && <p className="mt-1 text-xs text-[#5d625e]">{l.details}</p>}
+                  {l.details && <p className="mt-1 text-xs text-[#5d625e]">{localizeDetails(l.details, d.lang)}</p>}
                   {d.show_serial && l.serial && <p className="mt-1 text-xs text-[#5d625e]">{t.serial}: {l.serial}</p>}
                 </td>
                 <td className="py-4 text-center tabular-nums">{l.qty}</td>

@@ -3,7 +3,7 @@ import { randomBytes } from "node:crypto";
 import { adminDb } from "./supabase";
 import { addEvent, STAGES, STAGE_LABEL, type Stage } from "./crm";
 import { logItem, recordPurchase, syncWebStatus, type Item } from "./stock";
-import { isOwnerStock } from "./stock-labels";
+import { isOwnerStock, lineDetails } from "./stock-labels";
 import { DOC_DEFAULTS, DOC_SETTING_KEYS, KIND_LABEL, KIND_PREFIX, docTotals, paidSoFar, returnTerms, termsFor, usd, type Doc, type DocKind, type DocLine, type DocPayment, type DocSettings } from "./doc-labels";
 import { escapeHtml as h, notifyAdmins } from "./telegram";
 
@@ -350,7 +350,7 @@ export async function formOptions() {
   const db = adminDb();
   const [customers, stock] = await Promise.all([
     db.from("customers").select("id, name, phone, email").order("last_activity_at", { ascending: false }).limit(500),
-    db.from("inventory_items").select("id, sku, brand, model, reference, serial, condition, comes_with, papers_date, asking_price, cost").in("status", ["in_stock", "reserved"]).order("sku"),
+    db.from("inventory_items").select("id, sku, brand, model, reference, serial, condition, comes_with, papers_date, asking_price, cost, category, jewelry, description").in("status", ["in_stock", "reserved"]).order("sku"),
   ]);
   return {
     customers: (customers.data ?? []).map((c) => ({
@@ -361,7 +361,7 @@ export async function formOptions() {
       id: i.id as string,
       sku: i.sku as string,
       title: [i.brand, i.model, i.reference].filter(Boolean).join(" "),
-      details: [i.condition, i.papers_date ? `Papers ${String(i.papers_date).slice(0, 7)}` : null, i.comes_with].filter(Boolean).join(" · "),
+      details: lineDetails(i) ?? "",
       serial: i.serial as string | null,
       price: i.asking_price == null ? null : Number(i.asking_price),
       cost: i.cost == null ? null : Number(i.cost),
@@ -400,7 +400,7 @@ export async function sellViaInvoice(itemId: string, sale: Sale, user: string) {
     if (open.status === "draft") await issueDoc(open, user);
     return payInvoice({ ...open, status: "sent" }, sale.method ?? open.payment_method, sale.date, user);
   }
-  const { data: i } = await adminDb().from("inventory_items").select("id, sku, brand, model, reference, serial, condition, comes_with, papers_date").eq("id", itemId).single();
+  const { data: i } = await adminDb().from("inventory_items").select("id, sku, brand, model, reference, serial, condition, comes_with, papers_date, category, jewelry, description").eq("id", itemId).single();
   if (!i) throw new Error("Reloj no encontrado");
   const settings = await getDocSettings();
   const lang = sale.lang ?? "en";
@@ -414,7 +414,7 @@ export async function sellViaInvoice(itemId: string, sale: Sale, user: string) {
     items: [{
       item_id: i.id, sku: i.sku, serial: i.serial, qty: 1, price: sale.price,
       title: [i.brand, i.model, i.reference].filter(Boolean).join(" "),
-      details: [i.condition, i.papers_date ? `Papers ${String(i.papers_date).slice(0, 7)}` : null, i.comes_with].filter(Boolean).join(" · ") || null,
+      details: lineDetails(i),
     }],
     tax_rate: sale.taxRate,
     show_serial: true,

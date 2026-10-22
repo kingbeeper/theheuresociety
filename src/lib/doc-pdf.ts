@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { PDFDocument, degrees, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import fontkit from "@pdf-lib/fontkit";
-import { INSPECTION_PARTS, PART_LABEL, PRINT, STATE_LABEL, balanceDue, docTotals, maskedId, paidSoFar, usd, type Doc, type DocSettings } from "./doc-labels";
+import { INSPECTION_PARTS, PART_LABEL, PRINT, STATE_LABEL, localizeDetails, balanceDue, docTotals, maskedId, paidSoFar, usd, type Doc, type DocSettings } from "./doc-labels";
 import { downloadPrivate } from "./private-files";
 
 // PDF de cotizaciones, memos, facturas y consignaciones, con el mismo diseño que la página del
@@ -150,7 +150,7 @@ export async function renderDocPdf(d: Doc, s: Required<DocSettings>) {
 
   for (const l of d.items) {
     const titleLines = wrap(l.title, display, 12, descW);
-    const detailLines = [...(l.details ? wrap(l.details, light, 8, descW) : []), ...(d.show_serial && l.serial ? [`${t.serial}: ${l.serial}`] : [])];
+    const detailLines = [...(l.details ? wrap(localizeDetails(l.details, d.lang), light, 8, descW) : []), ...(d.show_serial && l.serial ? [`${t.serial}: ${l.serial}`] : [])];
     ensure(24 + titleLines.length * 14 + detailLines.length * 11);
     y -= 18;
     const top = y;

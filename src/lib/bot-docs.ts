@@ -4,7 +4,7 @@ import { adminDb } from "./supabase";
 import { normalizePhone, upsertLead } from "./crm";
 import { createStockItem, returnToOwner, type Item } from "./stock";
 import { receiptForItem } from "./documents";
-import { PAYMENT } from "./stock-labels";
+import { PAYMENT, lineDetails } from "./stock-labels";
 import { todayInMiami } from "./booking";
 import { closeReturned, consignorPaid, getDoc, getDocSettings, insertDoc, issueDoc, payInvoice, toInvoice } from "./documents";
 import { pdfName, renderDocPdf } from "./doc-pdf";
@@ -186,7 +186,7 @@ async function setItem(chatId: number, id: string, flow: DocFlow) {
   flow.item = {
     id: i.id, sku: i.sku,
     title: [i.brand, i.model, i.reference].filter(Boolean).join(" "),
-    details: [i.condition, i.papers_date ? `Papers ${String(i.papers_date).slice(0, 7)}` : null, i.comes_with].filter(Boolean).join(" · "),
+    details: lineDetails(i) ?? "",
     serial: i.serial, price: i.asking_price == null ? null : Number(i.asking_price), cost: i.cost == null ? null : Number(i.cost),
     ownerId: i.supplier_customer_id, ownerName: i.supplier_name,
   };

@@ -328,3 +328,18 @@ export const SOURCING_NO_DEPOSIT_TERMS = {
   en: "The Client asks The Heure Society to locate the timepiece described above, at a purchase price not exceeding the agreed price, within the search period shown. No deposit is required and neither party is obliged until a specific timepiece is offered and accepted. When a timepiece matching the description is located, The Heure Society will notify the Client, who may then confirm the purchase.",
   es: "El Cliente encarga a The Heure Society la búsqueda del reloj descrito, por un precio de compra que no supere el precio acordado, dentro del plazo de búsqueda indicado. No se pide anticipo y ninguna de las partes queda obligada hasta que se ofrezca y acepte un reloj concreto. Cuando se localice un reloj que cumpla la descripción, The Heure Society avisará al Cliente, que podrá confirmar la compra.",
 } as const;
+
+// Detalles de una línea en un documento en inglés: los datos de joyería se escriben en español en el CRM
+// («Oro 18k amarillo · talla 7») y aquí se pasan al inglés («18k yellow gold · size 7»)
+const COLORS: Record<string, string> = { amarillo: "yellow", blanco: "white", rosa: "rose", "dos tonos": "two-tone" };
+const WORDS: [RegExp, string][] = [
+  [/\bplata 925\b/gi, "sterling silver"], [/\bplatino\b/gi, "platinum"], [/\bacero\b/gi, "steel"],
+  [/\bdiamante(s)?\b/gi, "diamond$1"], [/\besmeralda(s)?\b/gi, "emerald$1"], [/\bzafiro(s)?\b/gi, "sapphire$1"], [/\brub[ií](es)?\b/gi, "ruby"],
+  [/\btalla\b/gi, "size"], [/\bcaja\b/gi, "box"], [/\bpapeles\b/gi, "papers"], [/\bestuche\b/gi, "case"], [/\bcertificado\b/gi, "certificate"],
+];
+export function localizeDetails(text: string | null | undefined, lang: "en" | "es") {
+  if (!text || lang !== "en") return text ?? "";
+  let out = text.replace(/\boro\s+(\d{1,2}\s*k)(?:\s+(amarillo|blanco|rosa|dos tonos))?/gi, (_m, k: string, c?: string) => `${k.replace(/\s/g, "")}${c ? ` ${COLORS[c.toLowerCase()]}` : ""} gold`);
+  for (const [re, en] of WORDS) out = out.replace(re, en);
+  return out.split(" · ").map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join(" · ");
+}

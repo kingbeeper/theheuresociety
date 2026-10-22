@@ -39,8 +39,21 @@ export function jewelrySummary(j: Partial<Jewelry> | null | undefined) {
   if (!j) return "";
   return [
     [j.metal, j.color?.toLowerCase()].filter(Boolean).join(" "),
-    j.stone ? `${j.stone}${j.carats ? ` ${j.carats} ct` : ""}${j.quality ? ` (${j.quality})` : ""}` : "",
+    // Quilates: si ya traen «ct» escrito no se repite («1ct», «1,02 CT»)
+    j.stone ? `${j.stone}${j.carats ? ` ${String(j.carats).trim().replace(/\s*ct\.?$/i, "")} ct` : ""}${j.quality ? ` (${j.quality})` : ""}` : "",
     j.size ? (j.type === "chain" || j.type === "bracelet" ? `${j.size}` : `talla ${j.size}`) : "",
     j.weight ? `${j.weight} g` : "",
   ].filter(Boolean).join(" · ");
+}
+
+// Línea debajo del nombre en cotizaciones, proformas y facturas: en una joya, metal, piedra, quilates,
+// calidad, talla y peso; en un reloj, estado, papeles y lo que incluye. Y la descripción de la ficha.
+export function lineDetails(i: { category?: string | null; jewelry?: Partial<Jewelry> | null; condition?: string | null; papers_date?: string | null; comes_with?: string | null; description?: string | null }) {
+  const parts =
+    i.category === "jewelry"
+      ? [jewelrySummary(i.jewelry), i.condition, i.comes_with]
+      : [i.condition, i.papers_date ? `Papers ${String(i.papers_date).slice(0, 7)}` : null, i.comes_with];
+  const line = parts.filter(Boolean).join(" · ");
+  const desc = i.description?.trim();
+  return [line, desc].filter(Boolean).join(" · ") || null;
 }
