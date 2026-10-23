@@ -104,6 +104,26 @@ export async function buildDigest(now = Date.now()) {
     for (const s of sourcingEnding) lines.push(`• ⏳ Encargo ${h(s.number)} de ${h(s.client_name ?? "")} (${h((s.items as { title: string }[])[0]?.title ?? "")}) ${s.due_date! < today ? "<b>plazo vencido</b>" : `termina el ${s.due_date}`}: ampliar o devolver el anticipo`);
   }
 
+  // Memos con dealers: vencidos o que vencen en 2 días, con el mensaje para recordárselo listo en WhatsApp
+  try {
+    const { dealers } = await import("./dealers");
+    const { dealerAccounts, memoFromHimMessage, memoToHimMessage } = await import("./dealer-account");
+    const list = await dealers();
+    const accounts = await dealerAccounts(list.map((d) => d.id), today);
+    const memoLines: string[] = [];
+    for (const d of list) {
+      const a = accounts.get(d.id);
+      const num = d.wa_id ?? d.phone?.replace(/\D/g, "");
+      const link = (text: string) => (num ? ` · <a href="https://wa.me/${num}?text=${encodeURIComponent(text)}">📲 Recordarle</a>` : "");
+      const state = (days: number | null) => (days != null && days > 0 ? `<b>vencido hace ${days} d</b>` : days === 0 ? "<b>vence hoy</b>" : `vence en ${-(days ?? 0)} d`);
+      for (const m of a?.memoToHim ?? []) if (m.days != null && m.days >= -2) memoLines.push(`• Tiene en memo ${h(m.title)} (${h(m.number)}) · ${h(d.name ?? "dealer")} · ${state(m.days)}${link(memoToHimMessage(d.name, m.title, m.days, m.due))}`);
+      for (const m of a?.memoFromHim ?? []) if (m.days != null && m.days >= -2) memoLines.push(`• Tenemos en memo ${h(m.title)} (${h(m.sku)}) de ${h(d.name ?? "dealer")} · ${state(m.days)}: devolver o ampliar${link(memoFromHimMessage(d.name, m.title, m.days, m.due))}`);
+    }
+    if (memoLines.length) lines.push("", "🤝 <b>Memos con dealers</b>", ...memoLines);
+  } catch (e) {
+    console.error("Memos de dealers en el resumen:", e);
+  }
+
   // Tareas del equipo para hoy o vencidas
   const { openTasks } = await import("./staff-tasks");
   const dueTasks = (await openTasks()).filter((t) => t.due_date && t.due_date <= today);

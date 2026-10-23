@@ -9,6 +9,8 @@ import { salesByChannel, type Item } from "@/lib/stock";
 import { topCustomers } from "@/lib/customer-value";
 import { miamiToUtc, todayInMiami } from "@/lib/booking";
 import { openTasks } from "@/lib/staff-tasks";
+import { dealerAccounts } from "@/lib/dealer-account";
+import { dealers as dealerList } from "@/lib/dealers";
 import { completeTaskAction } from "../actions";
 import { ago, Card, fmtDateTime, money, PageTitle, SourceTag, StageBadge, requestTime } from "@/components/admin/ui";
 
@@ -46,6 +48,9 @@ export default async function Dashboard({ searchParams }: PageProps<"/admin">) {
     can(user, "documentos") ? db.from("documents").select("id", { count: "exact", head: true }).eq("kind", "invoice").eq("status", "sent").lt("due_date", today) : null,
     can(user, "inventario") ? db.from("inventory_items").select("id", { count: "exact", head: true }).eq("status", "in_stock").lt("purchase_date", new Date(now - 120 * 86_400_000).toISOString().slice(0, 10)) : null,
   ]);
+  // Memos con dealers ya vencidos (de ellos con nosotros o nuestros con ellos)
+  const dealerIds = can(user, "leads") ? (await dealerList()).map((d) => d.id) : [];
+  const memosLate = [...(await dealerAccounts(dealerIds, today)).values()].reduce((n, a) => n + [...a.memoFromHim, ...a.memoToHim].filter((m) => m.days != null && m.days > 0).length, 0);
   const tasksDue = myTasks.filter((t) => t.due_date && t.due_date <= today);
   const apptsToday = (appointments.data ?? []).filter((a) => (a.starts_at as string) <= endOfToday && (a.starts_at as string) >= startOfToday);
   const todo: { n: number; emoji: string; text: string; sub?: string; href: string; cta: string }[] = [
@@ -55,6 +60,7 @@ export default async function Dashboard({ searchParams }: PageProps<"/admin">) {
     { n: !can(user, "leads") ? 0 : follow.length, emoji: "👤", text: tr("{n} clientes a los que dar seguimiento", { n: follow.length }), sub: follow[0]?.name ?? undefined, href: "/admin/leads?follow=1", cta: tr("Ver seguimientos") },
     { n: !can(user, "compras") ? 0 : sells.data?.length ?? 0, emoji: "🤲", text: tr("{n} ofertas de clientes sin responder", { n: sells.data?.length ?? 0 }), href: "/admin/compras", cta: tr("Ver ofertas") },
     { n: !can(user, "leads") ? 0 : waiting.data?.length ?? 0, emoji: "💬", text: tr("{n} chats esperando a una persona", { n: waiting.data?.length ?? 0 }), href: "/admin/leads?bot=off", cta: tr("Ver chats") },
+    { n: memosLate, emoji: "🤝", text: tr("{n} memos con dealers vencidos", { n: memosLate }), href: "/admin/dealers?ver=dealers", cta: tr("Ver dealers") },
     { n: lateInvoices?.count ?? 0, emoji: "💵", text: tr("{n} facturas vencidas sin cobrar", { n: lateInvoices?.count ?? 0 }), href: "/admin/cobros", cta: tr("Ver cobros") },
     { n: staleStock?.count ?? 0, emoji: "⌚", text: tr("{n} piezas llevan más de 4 meses en el inventario", { n: staleStock?.count ?? 0 }), href: "/admin/inventario", cta: tr("Ver inventario") },
   ].filter((x) => x.n > 0);

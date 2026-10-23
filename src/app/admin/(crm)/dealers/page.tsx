@@ -3,8 +3,10 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { requireUser } from "@/lib/admin-auth";
 import { adminDb } from "@/lib/supabase";
+import { dealerAccounts, memosDueSoon, sum, type DealerAccount } from "@/lib/dealer-account";
+import { todayInMiami } from "@/lib/booking";
 import { companyOf, dealers, statsFor, waLink, type DealerRequest } from "@/lib/dealers";
-import { Card, fmtDate, PageTitle } from "@/components/admin/ui";
+import { Card, fmtDate, PageTitle, requestTime } from "@/components/admin/ui";
 import { DealerAsk } from "@/components/admin/DealerAsk";
 import { dealerDiscount, dealerItems, pricelistMessage, pricelistUrl } from "@/lib/pricelist";
 import { dealerDiscountAction, pricelistAction } from "../../actions";
@@ -38,17 +40,19 @@ export default async function DealersPage({ searchParams }: PageProps<"/admin/de
   const requests = (reqRows ?? []) as DealerRequest[];
   const byId = new Map(list.map((d) => [d.id, d]));
   const pending = requests.filter((r) => r.status === "asked").length;
+  const accounts = await dealerAccounts(list.map((d) => d.id), todayInMiami(new Date(requestTime())));
+  const lateMemos = [...accounts.values()].reduce((n, a) => n + [...a.memoFromHim, ...a.memoToHim].filter((m) => m.days != null && m.days > 0).length, 0);
 
   return (
     <>
       <PageTitle eyebrow="Contactos" title="Dealers" />
       <nav className="mb-6 flex gap-6 border-b border-line">
         <Link href="/admin/dealers" className={tab(view === "pedir")}>{tr("🔎 Pedir una pieza")}{pending ? tr(" · {n} sin respuesta", { n: pending }) : ""}</Link>
-        <Link href="/admin/dealers?ver=dealers" className={tab(view === "dealers")}>{tr("🤝 Mis dealers ·")} {list.length}</Link>
+        <Link href="/admin/dealers?ver=dealers" className={tab(view === "dealers")}>{tr("🤝 Mis dealers ·")} {list.length}{lateMemos ? ` · ⏳ ${lateMemos}` : ""}</Link>
       </nav>
 
       {view === "dealers" ? (
-        <DealerDirectory list={list} requests={requests} q={q} />
+        <DealerDirectory list={list} requests={requests} accounts={accounts} q={q} />
       ) : (
         <AskView list={list} requests={requests} byId={byId} doc={doc} forQuery={forQuery} client={client} />
       )}
@@ -56,7 +60,7 @@ export default async function DealersPage({ searchParams }: PageProps<"/admin/de
   );
 }
 
-function DealerDirectory({ list, requests, q }: { list: Awaited<ReturnType<typeof dealers>>; requests: DealerRequest[]; q: string }) {
+function DealerDirectory({ list, requests, accounts, q }: { list: Awaited<ReturnType<typeof dealers>>; requests: DealerRequest[]; accounts: Map<string, DealerAccount>; q: string }) {
   const rows = list
     .map((d) => ({ d, company: companyOf(d.notes), s: statsFor(requests.filter((r) => r.dealer_id === d.id)) }))
     .filter(({ d, company }) => !q || [d.name, d.phone, d.email, company].some((v) => v?.toLowerCase().includes(q)));
@@ -82,6 +86,7 @@ function DealerDirectory({ list, requests, q }: { list: Awaited<ReturnType<typeo
                 <th className="px-3 py-2.5 text-right">{tr("Respondió")}</th>
                 <th className="px-3 py-2.5 text-right">{tr("La tenía")}</th>
                 <th className="px-3 py-2.5">{tr("Mejor oferta")}</th>
+                <th className="px-3 py-2.5">{tr("Cuenta")}</th>
                 <th className="px-3 py-2.5">{tr("Último pedido")}</th>
               </tr>
             </thead>
@@ -97,6 +102,26 @@ function DealerDirectory({ list, requests, q }: { list: Awaited<ReturnType<typeo
                   <td className="px-3 py-2.5 text-right">{s.asked ? `${Math.round((s.answered / s.asked) * 100)}%` : "—"}</td>
                   <td className="px-3 py-2.5 text-right">{s.has || "—"}</td>
                   <td className="px-3 py-2.5 text-xs">{s.best ? `${money(s.best.price!)} · ${s.best.query}` : "—"}</td>
+                  <td className="px-3 py-2.5 text-xs">
+                    {(() => {
+                      const a = accounts.get(d.id);
+                      if (!a) return "—";
+                      const owes = sum(a.owesUs);
+                      const late = [...a.memoFromHim, ...a.memoToHim].filter((m) => m.days != null && m.days > 0).length;
+                      const soon = memosDueSoon(a).length - late;
+                      const memos = a.memoFromHim.length + a.memoToHim.length;
+                      return (
+                        <Link href={`/admin/dealers/${d.id}`} className="grid gap-0.5">
+                          {owes > 0 && <span className="text-amber-200">{tr("Nos debe {m}", { m: money(owes) })}</span>}
+                          {a.weOwe.length > 0 && <span className="text-amber-200">{tr("Le debemos {n} pieza(s)", { n: a.weOwe.length })}</span>}
+                          {late > 0 && <span className="text-red-200">{tr("⏳ {n} memo(s) vencido(s)", { n: late })}</span>}
+                          {soon > 0 && <span className="text-stone">{tr("{n} memo(s) vencen pronto", { n: soon })}</span>}
+                          {late === 0 && soon === 0 && memos > 0 && <span className="text-stone">{tr("{n} memo(s) en curso", { n: memos })}</span>}
+                          {!owes && !a.weOwe.length && !memos && <span className="text-stone">—</span>}
+                        </Link>
+                      );
+                    })()}
+                  </td>
                   <td className="px-3 py-2.5 text-xs text-stone">{s.last ? fmtDate(s.last) : "—"}</td>
                 </tr>
               ))}
