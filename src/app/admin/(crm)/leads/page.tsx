@@ -92,7 +92,7 @@ export default async function LeadsPage({ searchParams }: PageProps<"/admin/lead
           <div className="flex flex-wrap items-start gap-2">
           <Link href="/admin/leads/embudo" className="border border-line px-4 py-2.5 text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">{tr("Embudo")}</Link>
           <Link href="/admin/leads/duplicados" className="border border-line px-4 py-2.5 text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">{tr("Duplicados")}</Link>
-          <details className="group relative">
+          <details className="group relative" open={one(sp.nuevo) === "1"}>
             <summary className={`${buttonClass} cursor-pointer list-none`}>{tr("+ Nuevo lead")}</summary>
             <form action={createLead} className="absolute right-0 z-20 mt-2 grid w-[min(92vw,420px)] gap-4 border border-line bg-forest p-5 shadow-2xl">
               <label><span className={labelClass}>{tr("Nombre")}</span><input name="name" className={fieldClass} required /></label>

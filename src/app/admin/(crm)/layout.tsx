@@ -4,6 +4,7 @@ import { CircleUser, LogOut } from "lucide-react";
 import { requireUser } from "@/lib/admin-auth";
 import { ALL_SECTIONS, can, ROLE_LABEL } from "@/lib/crm-perms";
 import { AdminNav, SectionTabs } from "@/components/admin/AdminNav";
+import { QuickCreate } from "@/components/admin/QuickCreate";
 import { GlobalSearch } from "@/components/admin/GlobalSearch";
 import { setLangAction, signOut } from "../actions";
 import { adminLang, tr } from "@/lib/admin-i18n";
@@ -69,6 +70,7 @@ async function Guard({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
       <main className="min-w-0 px-5 py-8 md:px-10 md:py-10"><SectionTabs allowed={allowed} />{children}</main>
+      <QuickCreate allowed={allowed} />
     </div>
     </AdminLangProvider>
   );

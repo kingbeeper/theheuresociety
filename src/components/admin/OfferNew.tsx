@@ -9,9 +9,9 @@ const field = "w-full border border-line bg-ink/60 px-3 py-2.5 text-sm text-ivor
 const label = "mb-1.5 block text-[0.62rem] tracking-[0.22em] uppercase text-stone";
 
 // Registrar a mano un reloj que un cliente nos ofrece (en persona o por teléfono), con sus fotos
-export function OfferNew() {
+export function OfferNew({ startOpen = false }: { startOpen?: boolean }) {
   const tr = useTr();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(startOpen);
   const [kind, setKind] = useState<"sell" | "trade" | "consign">("sell");
   const [files, setFiles] = useState<File[]>([]);
   const [msg, setMsg] = useState<{ error?: string; ok?: string } | null>(null);

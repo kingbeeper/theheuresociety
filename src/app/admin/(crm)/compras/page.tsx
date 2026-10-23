@@ -23,10 +23,11 @@ const COLUMNS = [
 ] as const;
 const KIND = { sell: "Venta", trade: "Intercambio", consign: "Consignación" } as Record<string, string>;
 
-export default async function ComprasPage() {
+export default async function ComprasPage({ searchParams }: PageProps<"/admin/compras">) {
   await connection();
   // La plantilla y la página se generan en paralelo: cada página comprueba la sesión antes de leer datos
   await requireAdmin("compras");
+  const sp = await searchParams;
   const { data } = await adminDb().from("sell_requests").select("*").order("created_at", { ascending: false }).limit(300);
   const rows = data ?? [];
   // Relojes que ya entraron al inventario desde una solicitud (si falta la migración, queda vacío)
@@ -45,7 +46,7 @@ export default async function ComprasPage() {
     <>
       <PageTitle eyebrow="Redes" title="Ofertas de clientes" />
       <p className="mb-5 text-sm text-stone">{tr("Relojes que te ofrecen para comprar, cambiar o consignar. Al recibirlo, entra solo al inventario.")}</p>
-      <div className="mb-6"><OfferNew /></div>
+      <div className="mb-6"><OfferNew startOpen={sp.nueva === "1"} /></div>
       <div className="flex gap-4 overflow-x-auto pb-4">
         {COLUMNS.map((col) => {
           const items = rows.filter((r) => (r.status ?? "new") === col.key);

@@ -129,7 +129,7 @@ export default async function TasksPage({ searchParams }: PageProps<"/admin/tare
 
         <Card title="Nueva tarea">
           <form action={createStaffTask} className="grid gap-4">
-            <label><span className={labelClass}>{tr("Qué hay que hacer *")}</span><input name="title" required placeholder={tr("Llamar a Juan para la cita del viernes")} className={fieldClass} /></label>
+            <label><span className={labelClass}>{tr("Qué hay que hacer *")}</span><input name="title" required autoFocus={sp.nueva === "1"} placeholder={tr("Llamar a Juan para la cita del viernes")} className={fieldClass} /></label>
             <div className="grid gap-4 sm:grid-cols-2">
               <label>
                 <span className={labelClass}>{tr("Para")}</span>

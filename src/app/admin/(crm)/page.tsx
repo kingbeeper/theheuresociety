@@ -7,7 +7,8 @@ import { can } from "@/lib/crm-perms";
 import { followUpsDue, SOURCE_LABEL, STAGES, STAGE_LABEL, type Customer } from "@/lib/crm";
 import { salesByChannel, type Item } from "@/lib/stock";
 import { topCustomers } from "@/lib/customer-value";
-import { todayInMiami } from "@/lib/booking";
+import { miamiToUtc, todayInMiami } from "@/lib/booking";
+import { openTasks } from "@/lib/staff-tasks";
 import { completeTaskAction } from "../actions";
 import { ago, Card, fmtDateTime, money, PageTitle, SourceTag, StageBadge, requestTime } from "@/components/admin/ui";
 
@@ -35,6 +36,28 @@ export default async function Dashboard({ searchParams }: PageProps<"/admin">) {
     followUpsDue(now, todayInMiami(new Date(now))),
     db.from("inventory_items").select("*").eq("status", "sold"),
   ]);
+  // «Hoy»: lo que hay que hacer ahora, con un botón para cada cosa
+  const today = todayInMiami(new Date(now));
+  const endOfToday = miamiToUtc(today, "23:59").toISOString();
+  const startOfToday = miamiToUtc(today, "00:00").toISOString();
+  const [myTasks, dueReminders, lateInvoices, staleStock] = await Promise.all([
+    openTasks(user.email),
+    db.from("reminders").select("id, body", { count: "exact" }).is("done_at", null).lte("due_at", endOfToday).order("due_at").limit(3),
+    can(user, "documentos") ? db.from("documents").select("id", { count: "exact", head: true }).eq("kind", "invoice").eq("status", "sent").lt("due_date", today) : null,
+    can(user, "inventario") ? db.from("inventory_items").select("id", { count: "exact", head: true }).eq("status", "in_stock").lt("purchase_date", new Date(now - 120 * 86_400_000).toISOString().slice(0, 10)) : null,
+  ]);
+  const tasksDue = myTasks.filter((t) => t.due_date && t.due_date <= today);
+  const apptsToday = (appointments.data ?? []).filter((a) => (a.starts_at as string) <= endOfToday && (a.starts_at as string) >= startOfToday);
+  const todo: { n: number; emoji: string; text: string; sub?: string; href: string; cta: string }[] = [
+    { n: tasksDue.length, emoji: "✅", text: tr("{n} tareas para hoy o vencidas", { n: tasksDue.length }), sub: tasksDue[0]?.title, href: "/admin/tareas", cta: tr("Ver tareas") },
+    { n: dueReminders.count ?? 0, emoji: "⏰", text: tr("{n} recordatorios para hoy o vencidos", { n: dueReminders.count ?? 0 }), sub: dueReminders.data?.[0]?.body as string | undefined, href: "/admin/tareas", cta: tr("Ver recordatorios") },
+    { n: !can(user, "citas") ? 0 : apptsToday.length, emoji: "📅", text: tr("{n} citas hoy", { n: apptsToday.length }), sub: apptsToday[0] ? `${fmtDateTime(apptsToday[0].starts_at as string)} · ${apptsToday[0].name as string}` : undefined, href: "/admin/citas", cta: tr("Ver citas") },
+    { n: !can(user, "leads") ? 0 : follow.length, emoji: "👤", text: tr("{n} clientes a los que dar seguimiento", { n: follow.length }), sub: follow[0]?.name ?? undefined, href: "/admin/leads?follow=1", cta: tr("Ver seguimientos") },
+    { n: !can(user, "compras") ? 0 : sells.data?.length ?? 0, emoji: "🤲", text: tr("{n} ofertas de clientes sin responder", { n: sells.data?.length ?? 0 }), href: "/admin/compras", cta: tr("Ver ofertas") },
+    { n: !can(user, "leads") ? 0 : waiting.data?.length ?? 0, emoji: "💬", text: tr("{n} chats esperando a una persona", { n: waiting.data?.length ?? 0 }), href: "/admin/leads?bot=off", cta: tr("Ver chats") },
+    { n: lateInvoices?.count ?? 0, emoji: "💵", text: tr("{n} facturas vencidas sin cobrar", { n: lateInvoices?.count ?? 0 }), href: "/admin/cobros", cta: tr("Ver cobros") },
+    { n: staleStock?.count ?? 0, emoji: "⌚", text: tr("{n} piezas llevan más de 4 meses en el inventario", { n: staleStock?.count ?? 0 }), href: "/admin/inventario", cta: tr("Ver inventario") },
+  ].filter((x) => x.n > 0);
   const [channels, best] = await Promise.all([salesByChannel((stock.data ?? []) as Item[], now - 365 * 86_400_000), topCustomers(6)]);
 
   const all = (customers.data ?? []) as Pick<Customer, "stage" | "source" | "created_at">[];
@@ -60,6 +83,24 @@ export default async function Dashboard({ searchParams }: PageProps<"/admin">) {
       {(await searchParams)["sin-permiso"] && (
         <p className="mb-6 border border-amber-300/40 bg-amber-300/5 p-4 text-sm">{tr("No tienes permiso para esa sección. Pídeselo a un administrador.")}</p>
       )}
+
+      <Card title="☀️ Hoy" className="mb-6">
+        {todo.length ? (
+          <ul className="divide-y divide-line/60">
+            {todo.map((x) => (
+              <li key={x.href + x.emoji} className="flex flex-wrap items-center justify-between gap-3 py-3">
+                <div className="min-w-0 flex-1 text-sm">
+                  <p><span aria-hidden>{x.emoji}</span> {x.text}</p>
+                  {x.sub && <p className="truncate text-xs text-stone">{x.sub}</p>}
+                </div>
+                <Link href={x.href} className="whitespace-nowrap border border-line px-3 py-1.5 text-[0.62rem] tracking-[0.18em] uppercase text-brass hover:text-ivory">{x.cta} →</Link>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm text-stone">{tr("Todo al día. 🎉 No tienes nada pendiente para hoy.")}</p>
+        )}
+      </Card>
 
       <div className="grid grid-cols-2 gap-px border border-line bg-line lg:grid-cols-6">
         {kpis.map((k) => (
