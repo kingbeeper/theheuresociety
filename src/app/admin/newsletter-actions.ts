@@ -2,6 +2,7 @@
 
 import { tr } from "@/lib/admin-i18n";
 import { requireAdmin } from "@/lib/admin-auth";
+import { isRegion } from "@/lib/regions";
 import { audience, defaultIntro, recentWatches, sendNewsletter } from "@/lib/newsletter";
 
 // Envío de los correos de novedades (prueba al propio usuario, o a todos los destinatarios)
@@ -20,7 +21,7 @@ export async function sendNewsletterAction(_: unknown, f: FormData) {
     }
     if (f.get("confirm") !== "on") return { error: tr("Marca la casilla de confirmación para enviar.") };
     const brands = f.get("marca") === "1" ? [...new Set(watches.map((w) => w.brand))] : null;
-    const people = await audience(brands, f.getAll("etiqueta").map(String).filter(Boolean));
+    const people = await audience(brands, f.getAll("etiqueta").map(String).filter(Boolean), f.getAll("region").map(String).filter(isRegion));
     if (!people.length) return { error: tr("No hay destinatarios con estos filtros.") };
     const n = await sendNewsletter(watches, people, subject, intro, user);
     return { ok: `Enviado a ${n} cliente(s).` };

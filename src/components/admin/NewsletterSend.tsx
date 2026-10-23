@@ -9,7 +9,7 @@ const field =
   "w-full border border-line bg-ink/60 px-3 py-2.5 text-sm text-ivory placeholder:text-stone/50 outline-none transition-colors focus:border-brass/70";
 const label = "mb-1.5 block text-[0.62rem] tracking-[0.22em] uppercase text-stone";
 
-export function NewsletterSend({ ids, tags = [], byBrand, count, introEn, introEs, configured }: { ids: string[]; tags?: string[]; byBrand: boolean; count: number; introEn: string; introEs: string; configured: boolean }) {
+export function NewsletterSend({ ids, tags = [], regions = [], byBrand, count, introEn, introEs, configured }: { ids: string[]; tags?: string[]; regions?: string[]; byBrand: boolean; count: number; introEn: string; introEs: string; configured: boolean }) {
   const tr = useTr();
   const [state, action, pending] = useActionState(sendNewsletterAction, null);
   return (
@@ -17,6 +17,7 @@ export function NewsletterSend({ ids, tags = [], byBrand, count, introEn, introE
       {ids.map((id) => <input key={id} type="hidden" name="w" value={id} />)}
       <input type="hidden" name="marca" value={byBrand ? "1" : "0"} />
       {tags.map((t) => <input key={t} type="hidden" name="etiqueta" value={t} />)}
+      {regions.map((r) => <input key={r} type="hidden" name="region" value={r} />)}
       <div className="grid gap-4 sm:grid-cols-2">
         <label><span className={label}>{tr("Asunto (español)")}</span><input name="subject_es" defaultValue="Nuevas llegadas · The Heure Society" className={field} /></label>
         <label><span className={label}>{tr("Asunto (inglés)")}</span><input name="subject_en" defaultValue="New arrivals · The Heure Society" className={field} /></label>

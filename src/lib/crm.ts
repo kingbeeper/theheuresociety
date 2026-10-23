@@ -28,6 +28,7 @@ export type Customer = {
   notes: string | null;
   follow_up_at?: string | null;
   follow_up_note?: string | null;
+  region?: string | null; // miami, orlando, pr, rd, ny, boston, otra (ver lib/regions)
   last_activity_at: string;
   created_at: string;
 };

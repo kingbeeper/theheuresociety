@@ -6,6 +6,7 @@ import { useActionState } from "react";
 import { INTENT_LABEL, STAGES, STAGE_LABEL } from "@/lib/crm-labels";
 import { updateLead } from "@/app/admin/actions";
 import type { Customer } from "@/lib/crm";
+import { REGIONS, guessRegion } from "@/lib/regions";
 
 const field =
   "w-full border border-line bg-ink/60 px-3 py-2.5 text-sm text-ivory placeholder:text-stone/50 outline-none transition-colors focus:border-brass/70";
@@ -32,6 +33,13 @@ export function LeadForm({ c }: { c: Customer }) {
           <select name="intent" defaultValue={c.intent ?? ""} className={field}>
             <option value="">—</option>
             {Object.entries(INTENT_LABEL).map(([k, v]) => <option key={k} value={k}>{tr(v)}</option>)}
+          </select>
+        </label>
+        <label>
+          <span className={label}>{tr("Región")}</span>
+          <select name="region" defaultValue={c.region ?? ""} className={field}>
+            <option value="">{(() => { const g = guessRegion(c.phone); return g ? tr("— (sugerida: {r})", { r: tr(REGIONS[g]) }) : "—"; })()}</option>
+            {Object.entries(REGIONS).map(([k, v]) => <option key={k} value={k}>{tr(v)}</option>)}
           </select>
         </label>
         <label><span className={label}>{tr("Presupuesto (USD)")}</span><input name="budget" defaultValue={c.budget ?? ""} inputMode="numeric" className={field} /></label>

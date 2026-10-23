@@ -2,6 +2,7 @@ import { tr } from "@/lib/admin-i18n";
 import { CUSTOMER_TAGS } from "@/lib/crm-labels";
 import { connection } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
+import { REGIONS, isRegion, type Region } from "@/lib/regions";
 import { audience, buildEmail, defaultIntro, emailConfigured, recentWatches } from "@/lib/newsletter";
 import { Card, money, PageTitle, requestTime } from "@/components/admin/ui";
 import { NewsletterSend } from "@/components/admin/NewsletterSend";
@@ -19,7 +20,8 @@ export default async function NewsletterPage({ searchParams }: PageProps<"/admin
   const byBrand = sp.w ? sp.marca === "1" : true;
   const lang = sp.idioma === "en" ? "en" : "es";
   const tags = (Array.isArray(sp.etiqueta) ? sp.etiqueta : sp.etiqueta ? [sp.etiqueta] : []).filter((t) => (CUSTOMER_TAGS as readonly string[]).includes(t));
-  const people = await audience(byBrand ? [...new Set(selected.map((w) => w.brand))] : null, tags);
+  const regions = (Array.isArray(sp.region) ? sp.region : sp.region ? [sp.region] : []).filter(isRegion);
+  const people = await audience(byBrand ? [...new Set(selected.map((w) => w.brand))] : null, tags, regions);
   const configured = emailConfigured();
   const preview = buildEmail(selected, { id: "00000000-0000-0000-0000-000000000000", name: lang === "es" ? "Cliente" : "Client", lang }, defaultIntro(lang === "es"));
 
@@ -59,6 +61,12 @@ export default async function NewsletterPage({ searchParams }: PageProps<"/admin
                     <label key={t} className="flex items-center gap-1.5"><input type="checkbox" name="etiqueta" value={t} defaultChecked={tags.includes(t)} className="h-4 w-4" />{t}</label>
                   ))}
                 </div>
+                <div className="flex flex-wrap items-center gap-3 text-sm text-stone">
+                  <span>{tr("Solo a clientes de:")}</span>
+                  {(Object.keys(REGIONS) as Region[]).map((r) => (
+                    <label key={r} className="flex items-center gap-1.5"><input type="checkbox" name="region" value={r} defaultChecked={regions.includes(r)} className="h-4 w-4" />{tr(REGIONS[r])}</label>
+                  ))}
+                </div>
                 <input type="hidden" name="idioma" value={lang} />
                 <button className="mt-2 justify-self-start border border-line px-4 py-2 text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">{tr("Actualizar")}</button>
               </form>
@@ -69,14 +77,14 @@ export default async function NewsletterPage({ searchParams }: PageProps<"/admin
 
           <Card title={`2 · Destinatarios · ${people.length}`}>
             <p className="text-sm text-stone">
-              {tr("Clientes con correo que no se han dado de baja")}{tags.length ? tr(", con la etiqueta {t}", { t: tags.join(tr(" o ")) }) : ""}{byBrand ? tr(", interesados en {b}", { b: [...new Set(selected.map((w) => w.brand))].join(", ") || "—" }) : ""}
+              {tr("Clientes con correo que no se han dado de baja")}{tags.length ? tr(", con la etiqueta {t}", { t: tags.join(tr(" o ")) }) : ""}{regions.length ? tr(", de {r}", { r: regions.map((r) => tr(REGIONS[r])).join(tr(" o ")) }) : ""}{byBrand ? tr(", interesados en {b}", { b: [...new Set(selected.map((w) => w.brand))].join(", ") || "—" }) : ""}
               {byBrand ? tr(" (por lo que buscan, sus avisos o lo que compraron)") : ""}.
             </p>
             {people.length > 0 && <p className="mt-2 text-xs text-stone">{people.slice(0, 15).map((p) => p.name ?? p.email).join(" · ")}{people.length > 15 ? tr(" · y {n} más", { n: people.length - 15 }) : ""}</p>}
           </Card>
 
           <Card title="3 · Enviar">
-            <NewsletterSend ids={selected.map((w) => w.id)} tags={tags} byBrand={byBrand} count={people.length} introEn={defaultIntro(false)} introEs={defaultIntro(true)} configured={configured} />
+            <NewsletterSend ids={selected.map((w) => w.id)} tags={tags} regions={regions} byBrand={byBrand} count={people.length} introEn={defaultIntro(false)} introEs={defaultIntro(true)} configured={configured} />
           </Card>
         </div>
 

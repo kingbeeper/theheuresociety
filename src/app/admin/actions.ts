@@ -1,5 +1,6 @@
 "use server";
 
+import { isRegion } from "@/lib/regions";
 import { tr } from "@/lib/admin-i18n";
 import { redirect } from "next/navigation";
 import { refresh } from "next/cache";
@@ -72,6 +73,7 @@ export async function updateLead(id: string, _: unknown, form: FormData) {
     notes: text(form, "notes"),
     budget: money(text(form, "budget")),
     tags: (text(form, "tags") ?? "").split(",").map((t) => t.trim()).filter(Boolean),
+    ...(form.has("region") && { region: isRegion(text(form, "region")) ? text(form, "region") : null }),
     ...(stage && STAGES.includes(stage) && { stage }),
     updated_at: new Date().toISOString(),
   };
@@ -563,5 +565,21 @@ export async function dealerDiscountAction(form: FormData) {
   if (!Number.isFinite(pct)) return;
   const { setDealerDiscount } = await import("@/lib/pricelist");
   await setDealerDiscount(pct);
+  refresh();
+}
+
+// Clientes sin región: guardar la sugerida (por dirección o código de área)
+export async function saveGuessedRegionsAction() {
+  await requireAdmin("leads");
+  const { guessRegion } = await import("@/lib/regions");
+  const { lastAddresses } = await import("@/lib/region-data");
+  const db = adminDb();
+  const [{ data }, addr] = await Promise.all([db.from("customers").select("id, phone").is("region", null).limit(5000), lastAddresses()]);
+  const groups = new Map<string, string[]>();
+  for (const c of data ?? []) {
+    const r = guessRegion(c.phone as string | null, addr.get(c.id as string));
+    if (r) groups.set(r, [...(groups.get(r) ?? []), c.id as string]);
+  }
+  for (const [region, ids] of groups) for (let i = 0; i < ids.length; i += 200) await db.from("customers").update({ region }).in("id", ids.slice(i, i + 200));
   refresh();
 }

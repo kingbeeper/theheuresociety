@@ -24,8 +24,9 @@ export default async function TasksPage({ searchParams }: PageProps<"/admin/tare
   // Recordatorios de clientes (Telegram o ficha del cliente): todos los pendientes, del equipo entero
   const { data: remRows } = await adminDb().from("reminders").select("id, body, due_at, all_day, created_by, customer:customers(id, name, phone, wa_id)").is("done_at", null).order("due_at").limit(100);
   type Rem = { id: string; body: string; due_at: string; all_day: boolean; created_by: string | null; customer: { id: string; name: string | null; phone: string | null; wa_id: string | null } | null };
-  const reminders = (remRows ?? []) as unknown as Rem[];
   const nowMs = requestTime();
+  // Primero lo que está en curso o pendiente; lo vencido, debajo
+  const reminders = [...((remRows ?? []) as unknown as Rem[])].sort((a, b) => Number(new Date(a.due_at).getTime() < nowMs) - Number(new Date(b.due_at).getTime() < nowMs));
   const remWhen = (r: Rem) => {
     const d = new Date(r.due_at);
     return `${monthFirst(new Intl.DateTimeFormat("sv-SE", { timeZone: "America/New_York" }).format(d))}${r.all_day ? "" : ` · ${hour12(d)}`}`;
@@ -36,6 +37,11 @@ export default async function TasksPage({ searchParams }: PageProps<"/admin/tare
     adminDb().from("customers").select("id, name").order("last_activity_at", { ascending: false }).limit(300),
     adminDb().from("inventory_items").select("id, sku, brand, model").in("status", ["in_stock", "reserved"]).order("sku"),
   ]);
+  const taskLate = (t: { due_date: string | null }) => Boolean(t.due_date && t.due_date < today);
+  const sortedTasks = [...tasks].sort((a, b) => Number(taskLate(a)) - Number(taskLate(b)));
+  const lateHeading = (n: number) => (
+    <li key="late-heading" className="pt-4 pb-1 text-[0.62rem] tracking-[0.2em] uppercase text-red-200/80">{tr("Vencidas · {n}", { n })}</li>
+  );
   const name = (email: string) => members.find((m) => m.email === email)?.name ?? email;
   const customerName = new Map((customers.data ?? []).map((c) => [c.id as string, c.name as string | null]));
   const itemName = new Map((items.data ?? []).map((i) => [i.id as string, `${i.sku} ${i.brand} ${i.model ?? ""}`]));
@@ -47,11 +53,13 @@ export default async function TasksPage({ searchParams }: PageProps<"/admin/tare
         <Card title={`⏰ Recordatorios de clientes · ${reminders.length}`} className="xl:col-span-2">
           {reminders.length ? (
             <ul className="divide-y divide-line/60">
-              {reminders.map((r) => {
+              {reminders.flatMap((r, i) => {
                 const late = new Date(r.due_at).getTime() < nowMs;
+                const first = late && (i === 0 || new Date(reminders[i - 1].due_at).getTime() >= nowMs);
                 const wa = r.customer?.wa_id ?? r.customer?.phone?.replace(/\D/g, "");
-                return (
-                  <li key={r.id} className="flex flex-wrap items-start justify-between gap-3 py-3">
+                return [
+                  first && lateHeading(reminders.filter((x) => new Date(x.due_at).getTime() < nowMs).length),
+                  <li key={r.id} className={`flex flex-wrap items-start justify-between gap-3 py-3 ${late ? "opacity-80" : ""}`}>
                     <div className="min-w-0 flex-1 text-sm">
                       <p>{r.body}</p>
                       <p className={`text-xs ${late ? "text-red-200" : "text-stone"}`}>
@@ -70,8 +78,8 @@ export default async function TasksPage({ searchParams }: PageProps<"/admin/tare
                         <button className="whitespace-nowrap border border-line px-3 py-1.5 text-[0.62rem] tracking-[0.18em] uppercase text-stone hover:text-ivory">{tr("✓ Hecho")}</button>
                       </form>
                     </div>
-                  </li>
-                );
+                  </li>,
+                ];
               })}
             </ul>
           ) : (
@@ -88,10 +96,12 @@ export default async function TasksPage({ searchParams }: PageProps<"/admin/tare
           )}
           {tasks.length ? (
             <ul className="divide-y divide-line/60">
-              {tasks.map((t) => {
-                const late = t.due_date && t.due_date < today;
-                return (
-                  <li key={t.id} className="flex items-start justify-between gap-3 py-3">
+              {sortedTasks.flatMap((t, i) => {
+                const late = taskLate(t);
+                const first = late && (i === 0 || !taskLate(sortedTasks[i - 1]));
+                return [
+                  first && lateHeading(sortedTasks.filter(taskLate).length),
+                  <li key={t.id} className={`flex items-start justify-between gap-3 py-3 ${late ? "opacity-80" : ""}`}>
                     <div className="min-w-0 text-sm">
                       <p>{t.title}</p>
                       <p className={`text-xs ${late ? "text-red-200" : "text-stone"}`}>
@@ -108,8 +118,8 @@ export default async function TasksPage({ searchParams }: PageProps<"/admin/tare
                     <form action={completeStaffTaskAction.bind(null, t.id)}>
                       <button className="whitespace-nowrap border border-line px-3 py-1.5 text-[0.62rem] tracking-[0.18em] uppercase text-stone hover:text-ivory">{tr("✓ Hecha")}</button>
                     </form>
-                  </li>
-                );
+                  </li>,
+                ];
               })}
             </ul>
           ) : (

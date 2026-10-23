@@ -28,12 +28,18 @@ export async function recentWatches(days = 30) {
 
 // Clientes con correo que no se han dado de baja. Con marcas: solo a quien le interesan
 // (por lo que busca, sus avisos o lo que ya compró).
-export async function audience(brands: string[] | null, tags: string[] = []) {
+export async function audience(brands: string[] | null, tags: string[] = [], regions: string[] = []) {
   const db = adminDb();
-  let q = db.from("customers").select("id, name, email, lang, interests").not("email", "is", null).eq("email_opt_out", false);
+  let q = db.from("customers").select(`id, name, email, lang, interests${regions.length ? ", region, phone" : ""}`).not("email", "is", null).eq("email_opt_out", false);
   if (tags.length) q = q.overlaps("tags", tags); // solo los que tengan alguna de estas etiquetas (VIP, Dealer…)
   const { data } = await q;
-  let people = (data ?? []) as (Recipient & { interests: string | null })[];
+  let people = (data ?? []) as unknown as (Recipient & { interests: string | null; region?: string | null; phone?: string | null })[];
+  // Solo los de estas regiones (la guardada o, si no tiene, la sugerida por su teléfono o dirección)
+  if (regions.length) {
+    const { regionOf } = await import("./regions");
+    const addresses = await (await import("./region-data")).lastAddresses();
+    people = people.filter((p) => regions.includes(regionOf(p, addresses.get(p.id)).region ?? ""));
+  }
   if (brands?.length) {
     const want = brands.map((b) => b.toLowerCase());
     const [{ data: alerts }, { data: bought }] = await Promise.all([
