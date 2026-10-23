@@ -15,9 +15,9 @@ export default async function DemandPage() {
 
   return (
     <>
-      <PageTitle eyebrow="CRM" title="Demanda frente a inventario" />
+      <PageTitle eyebrow="Redes" title="Demanda" />
       <p className="-mt-4 mb-6 max-w-2xl text-sm text-stone">
-        {tr("Lo que buscan tus clientes (búsquedas «avísenme» y el «qué busca» de los leads abiertos de los últimos 6 meses), agrupado por modelo, frente a lo que tienes disponible. Arriba, lo que conviene comprar.")}
+        {tr("Lo que buscan tus clientes frente a lo que tienes. Arriba, lo que conviene comprar.")}
       </p>
 
       {rows.length ? (

@@ -143,8 +143,8 @@ export default async function EngagementPage() {
 
   return (
     <>
-      <Link href="/admin/redes" className="text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">{tr("← Redes")}</Link>
-      <PageTitle eyebrow="Redes" title="Engagement" />
+      <Link href="/admin/redes" className="text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">{tr("← Instagram")}</Link>
+      <PageTitle eyebrow="Instagram" title="Engagement" />
 
       {/* 1 · Pulso */}
       <div className={`border p-5 ${tone}`}>
@@ -262,7 +262,7 @@ export default async function EngagementPage() {
           <form action={saveEngagementSettings} className="mt-4 grid gap-3 sm:grid-cols-2">
             <label><span className="mb-1.5 block text-[0.62rem] tracking-[0.22em] uppercase text-stone">{tr("Cuentas de la competencia (Instagram, separadas por comas)")}</span><input name="competitors" defaultValue={s.competitors ?? ""} placeholder={tr("bobswatches, watchbox, crownandcaliber")} className={fieldClass} /></label>
             <label><span className="mb-1.5 block text-[0.62rem] tracking-[0.22em] uppercase text-stone">{tr("Palabras de campaña («comenta PRECIO…»)")}</span><input name="comment_keywords" defaultValue={s.comment_keywords ?? ""} placeholder={tr("PRECIO, INFO, PRICE")} className={fieldClass} /></label>
-            <p className="text-xs text-stone sm:col-span-2">{tr("Quien comente una palabra de campaña recibe la respuesta privada automática (actívala en Redes → Ajustes). Las cuentas de la competencia deben ser profesionales; sus datos se actualizan cada día.")}</p>
+            <p className="text-xs text-stone sm:col-span-2">{tr("Quien comente una palabra de campaña recibe la respuesta privada automática (actívala en Instagram → Ajustes). Las cuentas de la competencia deben ser profesionales; sus datos se actualizan cada día.")}</p>
             <button className={`${ghostButtonClass} justify-self-start`}>{tr("Guardar")}</button>
           </form>
         </Card>

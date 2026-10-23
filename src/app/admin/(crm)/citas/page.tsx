@@ -96,7 +96,7 @@ export default async function CitasPage({ searchParams }: PageProps<"/admin/cita
 
   return (
     <>
-      <PageTitle eyebrow="CRM" title="Citas" />
+      <PageTitle eyebrow="Agenda" title="Citas" />
       <details id="nueva" open={Boolean(preset)} className="mb-6 border border-line bg-forest/60">
         <summary className="cursor-pointer px-5 py-4 text-[0.66rem] tracking-[0.24em] uppercase text-brass">{tr("+ Nueva cita")}</summary>
         <div className="border-t border-line px-5 py-5">

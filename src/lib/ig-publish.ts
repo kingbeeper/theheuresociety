@@ -122,7 +122,7 @@ export async function publishDue(now = Date.now()) {
     } catch (e) {
       const msg = (e as Error).message.slice(0, 300);
       await db.from("content_ideas").update({ publish_error: msg }).eq("id", i.id);
-      await notifyAdmins(`⚠️ <b>No se pudo publicar</b> · ${h(i.title)}\n${h(msg)}\nRevísalo en Redes → Engagement (puedes reintentarlo o publicarlo a mano).`).catch(() => {});
+      await notifyAdmins(`⚠️ <b>No se pudo publicar</b> · ${h(i.title)}\n${h(msg)}\nRevísalo en Instagram → Engagement (puedes reintentarlo o publicarlo a mano).`).catch(() => {});
       out.push({ id: i.id, result: `error: ${msg}` });
     }
   }

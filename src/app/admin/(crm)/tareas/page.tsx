@@ -48,7 +48,7 @@ export default async function TasksPage({ searchParams }: PageProps<"/admin/tare
 
   return (
     <>
-      <PageTitle eyebrow="CRM" title="Tareas" />
+      <PageTitle eyebrow="Agenda" title="Tareas" />
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
         <Card title={`⏰ Recordatorios de clientes · ${reminders.length}`} className="xl:col-span-2">
           {reminders.length ? (

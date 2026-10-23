@@ -43,10 +43,8 @@ export default async function ComprasPage() {
 
   return (
     <>
-      <PageTitle eyebrow="CRM" title="Ofertas de clientes" />
-      <p className="mb-5 max-w-3xl text-sm text-stone">
-        {tr("Relojes que los clientes te ofrecen para que se los")} <b>compres</b>{tr(", los")} <b>cambies</b> {tr("o los tengas en")} <b>{tr("consignación")}</b>{tr(". Llegan solas desde la web (Sell / Consign), WhatsApp e Instagram/Facebook, y puedes añadir a mano las que te hacen en persona o por teléfono. Al marcar una como «Reloj recibido» entra sola al inventario.")}
-      </p>
+      <PageTitle eyebrow="Redes" title="Ofertas de clientes" />
+      <p className="mb-5 text-sm text-stone">{tr("Relojes que te ofrecen para comprar, cambiar o consignar. Al recibirlo, entra solo al inventario.")}</p>
       <div className="mb-6"><OfferNew /></div>
       <div className="flex gap-4 overflow-x-auto pb-4">
         {COLUMNS.map((col) => {

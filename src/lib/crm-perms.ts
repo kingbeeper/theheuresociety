@@ -10,7 +10,7 @@ export const SECTIONS = {
   demanda: "Demanda",
   informes: "Informes para el contador",
   correos: "Correos de novedades",
-  redes: "Redes sociales",
+  redes: "Instagram",
   usuarios: "Usuarios y permisos",
 } as const;
 export type Section = keyof typeof SECTIONS;

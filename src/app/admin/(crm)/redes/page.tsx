@@ -9,7 +9,7 @@ import { ago, Card, fmtDate, PageTitle, requestTime } from "@/components/admin/u
 import { ConnectMeta, SyncButton } from "@/components/admin/ConnectMeta";
 import { disconnectSocial, saveSocialSettings } from "../../actions";
 
-export const metadata = { title: "Redes" };
+export const metadata = { title: "Instagram" };
 
 type Daily = { day: string; platform: string; data: Record<string, number> };
 type Post = {
@@ -73,7 +73,7 @@ export default async function RedesPage({ searchParams }: PageProps<"/admin/rede
     <>
       <PageTitle
         eyebrow="CRM"
-        title="Redes"
+        title="Instagram"
         action={connected ? <div className="flex flex-wrap gap-2"><Link href="/admin/redes/engagement" className="bg-ivory px-5 py-2.5 text-[0.68rem] tracking-[0.22em] uppercase text-ink hover:bg-brass">{tr("📣 Engagement")}</Link><SyncButton /></div> : undefined}
       />
 

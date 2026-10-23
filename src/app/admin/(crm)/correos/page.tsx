@@ -27,7 +27,7 @@ export default async function NewsletterPage({ searchParams }: PageProps<"/admin
 
   return (
     <>
-      <PageTitle eyebrow="CRM" title="Correos de novedades" />
+      <PageTitle eyebrow="Redes" title="Correos de novedades" />
       {!configured && (
         <div className="mb-6 border border-amber-300/40 bg-amber-300/5 p-4 text-sm leading-relaxed">
           <p className="font-medium">{tr("Falta activar el envío de correos")}</p>

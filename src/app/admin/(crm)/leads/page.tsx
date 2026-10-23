@@ -86,13 +86,11 @@ export default async function LeadsPage({ searchParams }: PageProps<"/admin/lead
   return (
     <>
       <PageTitle
-        eyebrow="CRM"
+        eyebrow="Contactos"
         title="Leads"
         action={
           <div className="flex flex-wrap items-start gap-2">
-          <Link href="/admin/clientes" className="border border-line px-4 py-2.5 text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">{tr("Clientes")}</Link>
           <Link href="/admin/leads/embudo" className="border border-line px-4 py-2.5 text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">{tr("Embudo")}</Link>
-          <Link href="/admin/dealers" className="border border-line px-4 py-2.5 text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">{tr("Dealers")}</Link>
           <Link href="/admin/leads/duplicados" className="border border-line px-4 py-2.5 text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">{tr("Duplicados")}</Link>
           <details className="group relative">
             <summary className={`${buttonClass} cursor-pointer list-none`}>{tr("+ Nuevo lead")}</summary>

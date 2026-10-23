@@ -41,8 +41,7 @@ export default async function DealersPage({ searchParams }: PageProps<"/admin/de
 
   return (
     <>
-      <Link href="/admin/leads" className="text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">{tr("← Leads")}</Link>
-      <PageTitle eyebrow="CRM" title="Dealers" />
+      <PageTitle eyebrow="Contactos" title="Dealers" />
       <nav className="mb-6 flex gap-6 border-b border-line">
         <Link href="/admin/dealers" className={tab(view === "pedir")}>{tr("🔎 Pedir una pieza")}{pending ? tr(" · {n} sin respuesta", { n: pending }) : ""}</Link>
         <Link href="/admin/dealers?ver=dealers" className={tab(view === "dealers")}>{tr("🤝 Mis dealers ·")} {list.length}</Link>

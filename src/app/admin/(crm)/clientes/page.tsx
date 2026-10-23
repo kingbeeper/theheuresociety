@@ -57,14 +57,8 @@ export default async function ClientsPage({ searchParams }: PageProps<"/admin/cl
 
   return (
     <>
-      <PageTitle
-        eyebrow="CRM"
-        title="Clientes"
-        action={<Link href="/admin/leads" className="border border-line px-4 py-2.5 text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">{tr("Ver leads →")}</Link>}
-      />
-      <p className="mb-5 max-w-3xl text-sm text-stone">
-        {tr("Quien ya hizo negocio contigo: te compró, te vendió o consignó un reloj, o lo marcaste como")} <b>{tr("Ganado")}</b>{tr(". Un lead pasa aquí solo cuando compra. Los prospectos están en")} <Link href="/admin/leads" className="underline hover:text-ivory">{tr("Leads")}</Link> {tr("y los dealers en")} <Link href="/admin/dealers?ver=dealers" className="underline hover:text-ivory">{tr("Dealers")}</Link>.
-      </p>
+      <PageTitle eyebrow="Contactos" title="Clientes" />
+      <p className="mb-5 text-sm text-stone">{tr("Quien ya te compró, te vendió o consignó.")}</p>
 
       <div className="mb-6 grid grid-cols-3 gap-3 md:max-w-xl">
         <div className="border border-line px-4 py-3"><p className="text-[0.6rem] tracking-[0.2em] uppercase text-stone">{tr("Clientes")}</p><p className="mt-1 text-xl">{all.length}</p></div>
