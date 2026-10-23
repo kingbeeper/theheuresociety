@@ -68,9 +68,10 @@ async function dealerFoundForClient(r: DealerRequest & { customer_id: string }, 
 // Alta de un dealer (CRM o Telegram): si ya existe por teléfono o correo, solo se le pone la etiqueta
 export async function addDealer(input: { name: string; phone?: string | null; email?: string | null; company?: string | null }, user: string) {
   const { upsertLead } = await import("./crm");
-  const c = await upsertLead({ name: input.name, phone: input.phone || null, email: input.email || null, source: "other", stage: "contacted", notify: false });
+  const c = await upsertLead({ name: input.name, phone: input.phone || null, email: input.email || null, source: "other", stage: "won", notify: false });
   const tags = (c.tags ?? []) as string[];
-  const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  // Un dealer en la lista es un contacto ya ganado: sin etapa de venta
+  const patch: Record<string, unknown> = { updated_at: new Date().toISOString(), stage: "won" };
   const isNew = !tags.some((t) => t.toLowerCase() === "dealer");
   if (isNew) patch.tags = [...tags, "Dealer"];
   if (input.company && !(c.notes ?? "").includes(input.company)) patch.notes = c.notes ? `${c.notes}\nEmpresa: ${input.company}` : `Empresa: ${input.company}`;
@@ -93,4 +94,4 @@ export async function requestsOf(dealerId: string, limit = 100) {
   return (data ?? []) as DealerRequest[];
 }
 
-export const companyOf = (notes: string | null | undefined) => notes?.match(/Empresa: (.+)/)?.[1]?.trim() ?? null;
+export { companyOf } from "./company";

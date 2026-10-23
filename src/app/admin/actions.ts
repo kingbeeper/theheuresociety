@@ -1,6 +1,7 @@
 "use server";
 
 import { isRegion } from "@/lib/regions";
+import { joinCompany } from "@/lib/company";
 import { tr } from "@/lib/admin-i18n";
 import { redirect } from "next/navigation";
 import { refresh } from "next/cache";
@@ -70,7 +71,7 @@ export async function updateLead(id: string, _: unknown, form: FormData) {
     email: text(form, "email")?.toLowerCase() ?? null,
     intent: text(form, "intent"),
     interests: text(form, "interests"),
-    notes: text(form, "notes"),
+    notes: form.has("company") ? joinCompany(text(form, "company"), text(form, "notes")) : text(form, "notes"),
     budget: money(text(form, "budget")),
     tags: (text(form, "tags") ?? "").split(",").map((t) => t.trim()).filter(Boolean),
     ...(form.has("region") && { region: isRegion(text(form, "region")) ? text(form, "region") : null }),

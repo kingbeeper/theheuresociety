@@ -1,6 +1,7 @@
 import { tr } from "@/lib/admin-i18n";
 import Link from "next/link";
 import { kindOf } from "@/lib/clients";
+import { companyOf } from "@/lib/company";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { adminDb } from "@/lib/supabase";
@@ -105,11 +106,12 @@ export default async function LeadPage({ params }: PageProps<"/admin/leads/[id]"
       <div className="mt-4 mb-8 flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="font-display text-3xl font-light sm:text-4xl">{c.name ?? tr("Sin nombre")}</h1>
+          {companyOf(c.notes) && <p className="mt-1 text-sm text-brass">{companyOf(c.notes)}</p>}
           <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-stone">
             {value?.vip && <span className="border border-brass/60 px-2 py-0.5 text-[0.6rem] tracking-[0.2em] uppercase text-brass">{tr("⭐ VIP")}</span>}
-            <StageBadge stage={c.stage} />
+            {kind === "dealer" ? <span className="border border-line px-2 py-0.5 text-[0.6rem] tracking-[0.2em] uppercase text-stone">{tr("🤝 Dealer")}</span> : <StageBadge stage={c.stage} />}
             <SourceTag source={c.source} />
-            <span>{tr("· cliente desde")} {ago(c.created_at, now)}</span>
+            <span>{kind === "dealer" ? tr("· dealer desde") : tr("· cliente desde")} {ago(c.created_at, now)}</span>
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -199,7 +201,7 @@ export default async function LeadPage({ params }: PageProps<"/admin/leads/[id]"
               </ul>
             </Card>
           )}
-          <Card title="Datos del cliente"><LeadForm c={c} /></Card>
+          <Card title={kind === "dealer" ? "Datos del dealer" : "Datos del cliente"}><LeadForm c={c} /></Card>
           <Card title="🔗 Mi colección (portal del cliente)">
             {c.portal_token ? (
               <div className="grid gap-2 text-sm">
