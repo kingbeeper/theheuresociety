@@ -80,7 +80,7 @@ export default async function MoneyPage() {
   const row = "flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b border-line/60 py-2.5 text-sm";
   return (
     <>
-      <PageTitle eyebrow="CRM" title="Dinero" action={<Link href="/admin/informes" className="border border-line px-4 py-2 text-[0.66rem] tracking-[0.2em] uppercase text-stone hover:text-ivory">{tr("Informe del mes →")}</Link>} />
+      <PageTitle eyebrow="Dinero" title="Resumen" />
 
       <div className="grid grid-cols-2 gap-px border border-line bg-line lg:grid-cols-5">
         {kpis.map((k) => (

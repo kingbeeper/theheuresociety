@@ -33,9 +33,14 @@ const ITEMS: Item[] = [
   { href: "/admin/inventario", label: "Inventario", icon: Watch, section: "inventario" },
   { href: "/admin/documentos", label: "Documentos", icon: FileText, section: "documentos" },
   { href: "/admin/servicios", label: "Servicios", icon: Wrench, section: "documentos" },
-  { href: "/admin/cobros", label: "Cobros", icon: Receipt, section: "documentos" },
-  { href: "/admin/dinero", label: "Dinero", icon: Wallet, section: "costos" },
-  { href: "/admin/informes", label: "Informes", icon: ChartColumn, section: "informes" },
+  {
+    href: "/admin/dinero", label: "Dinero", icon: Wallet,
+    tabs: [
+      { href: "/admin/dinero", label: "Resumen", icon: Wallet, section: "costos" },
+      { href: "/admin/cobros", label: "Cobros", icon: Receipt, section: "documentos" },
+      { href: "/admin/informes", label: "Informes", icon: ChartColumn, section: "informes" },
+    ],
+  },
   {
     href: "/admin/compras", label: "Redes", icon: Megaphone,
     tabs: [
@@ -85,7 +90,7 @@ export function AdminNav({ allowed }: { allowed: Section[] }) {
   );
 }
 
-// Pestañas de la sección agrupada (Agenda, Contactos, Redes), arriba de su página principal
+// Pestañas de la sección agrupada (Agenda, Contactos, Redes, Dinero), arriba de su página principal
 export function SectionTabs({ allowed }: { allowed: Section[] }) {
   const path = usePathname();
   const tr = useTr();

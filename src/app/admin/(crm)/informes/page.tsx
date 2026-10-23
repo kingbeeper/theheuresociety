@@ -37,7 +37,7 @@ export default async function ReportsPage({ searchParams }: PageProps<"/admin/in
   return (
     <>
       <PageTitle
-        eyebrow="CRM"
+        eyebrow="Dinero"
         title={`${tr("Informe de")} ${label}`}
         action={
           <div className="flex flex-wrap items-end gap-2">

@@ -998,6 +998,7 @@ export const EN: Record<string, string> = {
   "Respondió": "Replied",
   "Respuesta pública…": "Public reply…",
   "Respuestas rápidas": "Quick replies",
+  "Resumen": "Summary",
   "Retención": "Hold",
   "Retención de las compras a particulares": "Hold on purchases from individuals",
   "Revisa a mano: {f} (no se leía con seguridad).": "Check by hand: {f} (couldn't be read reliably).",

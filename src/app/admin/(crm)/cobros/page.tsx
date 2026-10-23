@@ -29,7 +29,7 @@ export default async function CollectionsPage() {
 
   return (
     <>
-      <PageTitle eyebrow="CRM" title="Cobros pendientes" />
+      <PageTitle eyebrow="Dinero" title="Cobros pendientes" />
       <div className="mb-6 grid grid-cols-3 gap-3 md:max-w-2xl">
         <div className="border border-line px-4 py-3"><p className="text-[0.6rem] tracking-[0.2em] uppercase text-stone">{tr("Por cobrar")}</p><p className="mt-1 text-xl">{usd(total)}</p><p className="text-xs text-stone">{list.length} {tr("documento(s)")}</p></div>
         <div className="border border-line px-4 py-3"><p className="text-[0.6rem] tracking-[0.2em] uppercase text-stone">{tr("Vencido")}</p><p className={`mt-1 text-xl ${lateTotal ? "text-red-200" : ""}`}>{usd(lateTotal)}</p><p className="text-xs text-stone">{late.length} {tr("documento(s)")}</p></div>
