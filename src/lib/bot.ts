@@ -614,11 +614,12 @@ export async function promoAuto() {
 }
 
 export async function promoJob(chatId: number, watchId: string, opening = "auto", scenario = "auto") {
-  const { startPromoVideo, pollPromoVideo, label } = await import("./promo-video");
+  const { startPromoVideo, handOff, label } = await import("./promo-video");
   try {
     await sendMessage(chatId, `🎬 Preparando el video promocional · ${label(opening)} → ${label(scenario)}… Tarda 3-4 minutos; te lo envío aquí cuando esté.`);
     const id = await startPromoVideo(watchId, chatId, opening, scenario);
-    await pollPromoVideo(id, 90_000);
+    // Higgsfield tarda minutos: lo espera y lo monta la ruta /api/promo-video/poll (la única con ffmpeg)
+    await handOff(id, 0);
   } catch (e) {
     await sendMessage(chatId, `⚠️ No se pudo empezar el video: ${h((e as Error).message.slice(0, 200))}`);
   }

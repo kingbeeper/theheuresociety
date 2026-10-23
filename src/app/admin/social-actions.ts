@@ -23,10 +23,10 @@ export async function ideaStatusAction(id: string, status: "approved" | "dismiss
 // Video promocional desde una idea: se genera en segundo plano (3-4 min) y aparece en su vista previa
 export async function ideaVideoAction(watchId: string, f: FormData) {
   await requireAdmin("redes");
-  const { promoConfigured, startPromoVideo, pollPromoVideo } = await import("@/lib/promo-video");
+  const { promoConfigured, startPromoVideo, handOff } = await import("@/lib/promo-video");
   if (!promoConfigured()) throw new Error("Falta la clave de la API de Higgsfield");
   const id = await startPromoVideo(watchId, null, String(f.get("opening") ?? "auto"), String(f.get("closing") ?? "auto"));
-  after(() => pollPromoVideo(id, 30_000));
+  after(() => handOff(id, 0));
   refresh();
 }
 

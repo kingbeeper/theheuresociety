@@ -1,4 +1,5 @@
-import { pollPromoVideo, validPollToken } from "@/lib/promo-video";
+import { validPollToken } from "@/lib/promo-video";
+import { pollPromoVideo } from "@/lib/promo-render";
 
 // Espera el video de Higgsfield y, cuando está, le pone el texto y lo envía por Telegram
 export const maxDuration = 300;
