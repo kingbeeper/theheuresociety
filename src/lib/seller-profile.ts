@@ -31,3 +31,22 @@ export async function lastSellerProfile(customerId: string | null | undefined): 
 
 // Lo que ve el formulario del CRM (sin la ruta de la foto del ID)
 export type SellerPrefill = SellerProfile & { hasIdPhoto: boolean };
+
+// Completa los datos del vendedor con los de su contrato de compra anterior (lo que se deja vacío se hereda;
+// si escribe otro número de ID, se toma como una identificación nueva y no se copia nada)
+export async function inheritSeller(customerId: string | null | undefined, f: { idType?: string | null; idNumber?: string | null; dob?: string | null; address?: string | null; details?: SellerDetails }) {
+  const prev = await lastSellerProfile(customerId);
+  const same = prev && (!f.idNumber || f.idNumber === prev.idNumber);
+  if (!prev || !same) return { ...f, idPhoto: null as string | null, from: null as string | null };
+  const details = { ...f.details } as Record<string, string | null | undefined>;
+  for (const [k, v] of Object.entries(prev.details ?? {})) if (!details[k] && v) details[k] = v as string;
+  return {
+    idType: f.idType ?? prev.idType,
+    idNumber: f.idNumber ?? prev.idNumber,
+    dob: f.dob ?? prev.dob,
+    address: f.address ?? prev.address,
+    details: details as SellerDetails,
+    idPhoto: prev.idPhoto,
+    from: prev.number,
+  };
+}

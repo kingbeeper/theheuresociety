@@ -8,6 +8,7 @@ import { SOURCE_LABEL } from "@/lib/crm-labels";
 import { returnItem, saveItem, sellItem } from "@/app/admin/inventory-actions";
 import type { Item } from "@/lib/stock";
 import { WarrantyScan } from "./WarrantyScan";
+import { SellerIdentity } from "./SellerIdentity";
 import { SerialInput } from "./SerialCheck";
 
 const field =
@@ -107,6 +108,7 @@ export function ItemForm({ item, watches, showCosts = true, prefill }: { item?: 
               {tr("Compra de segunda mano a un particular (retención antes de vender)")}
             </label>
           )}
+          {!item && (acq === "purchase" || acq === "trade") && secondhand && <div className="sm:col-span-3"><SellerIdentity /></div>}
           {showCosts && (
             <>
               <label><span className={label}>{owner ? tr("Dueño / dealer (contacto)") : tr("Proveedor (contacto)")}</span><input name="supplier_name" defaultValue={v("supplier_name")} className={field} /></label>

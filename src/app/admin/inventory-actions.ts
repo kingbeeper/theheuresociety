@@ -118,6 +118,22 @@ export async function saveItem(id: string | null, _: unknown, f: FormData) {
     await syncWebPrice(fields.watch_id, fields.asking_price);
     // Clientes que buscaban una pieza así (búsquedas, recordatorios, cotizaciones, encargos…)
     await import("@/lib/interest").then((m) => m.notifyInterest(data.id as string, user)).catch((e) => console.error("Interesados:", e));
+    // Compra a un particular con los datos del vendedor: su contrato de compra y el registro de segunda mano
+    const sellerName = text(f, "seller_name");
+    if (sellerName && secondhandFlag(f) !== false && (fields.acquisition === "purchase" || fields.acquisition === "trade")) {
+      try {
+        const sd = (k: string) => text(f, k);
+        const made = await (await import("@/lib/item-purchase")).createPurchaseContract(data.id as string, {
+          name: sellerName, phone: sd("seller_phone"), email: sd("seller_email")?.toLowerCase() ?? null, address: sd("seller_address"),
+          idType: sd("seller_id_type"), idNumber: sd("seller_id_number"), dob: date(f, "seller_dob"),
+          details: { sex: sd("sd_sex"), race: sd("sd_race"), height: sd("sd_height"), weight: sd("sd_weight"), hair: sd("sd_hair"), eyes: sd("sd_eyes"), thumb_path: (sd("sd_thumb") ?? "").startsWith("inspections/") ? sd("sd_thumb") : null } as never,
+          idPhoto: (sd("seller_id_photo") ?? "").startsWith("inspections/") ? sd("seller_id_photo") : null,
+        }, user);
+        if (made) await logItem(data.id as string, "entry", `Contrato de compra ${made.doc.number} creado${made.from ? ` (identificación tomada de ${made.from})` : ""}`, user);
+      } catch (e) {
+        console.error("Contrato de compra del alta:", e);
+      }
+    }
     // Recordatorio al dar de alta (p. ej. «el vendedor me debe la caja»)
     if (text(f, "body") && date(f, "date")) await addItemReminderAction(data.id as string, f).catch((e) => console.error("Recordatorio de la pieza:", e));
     redirect(`/admin/inventario/${data.id}`);
