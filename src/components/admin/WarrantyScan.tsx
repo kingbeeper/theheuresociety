@@ -44,6 +44,10 @@ export function WarrantyScan() {
         const c = r.card;
         const form = ref.current?.closest("form");
         if (!form) return;
+        // Primero «Papers» en lo que incluye: así aparece el campo de la fecha de papeles, que se rellena después
+        const comes = form.elements.namedItem("comes_with") as HTMLInputElement | null;
+        if (comes && !/papel|paper/i.test(comes.value)) setField(form, "comes_with", [comes.value, "Papers"].filter(Boolean).join(", "));
+        await new Promise((r) => setTimeout(r, 80));
         const filled = [
           setField(form, "brand", c.brand) && tr("marca"),
           setField(form, "model", c.model) && tr("modelo"),
@@ -51,8 +55,6 @@ export function WarrantyScan() {
           setField(form, "serial", c.serial) && tr("serial"),
           setField(form, "papers_date", c.papers_date && /^\d{4}-\d{2}-\d{2}$/.test(c.papers_date) ? c.papers_date : null) && tr("fecha de papeles"),
         ].filter(Boolean);
-        const comes = form.elements.namedItem("comes_with") as HTMLInputElement | null;
-        if (comes && !/papel|paper/i.test(comes.value)) setField(form, "comes_with", [comes.value, "Papers"].filter(Boolean).join(", "));
         setMsg({
           ok: filled.length ? `${tr("Rellenado:")} ${filled.join(", ")}. ${c.notes}` : c.notes,
           warn: c.doubtful.length ? tr("Revisa a mano: {f} (no se leía con seguridad).", { f: c.doubtful.join(", ") }) : undefined,

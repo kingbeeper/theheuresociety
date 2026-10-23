@@ -540,6 +540,7 @@ export const EN: Record<string, string> = {
   "Fecha de nacimiento": "Date of birth",
   "Fecha de pago": "Payment date",
   "Fecha de papeles": "Papers date",
+  "Fecha de papeles (opcional)": "Papers date (optional)",
   "Fecha del pago final": "Final payment date",
   "Ficha completa": "Full profile",
   "Ficha de dealer": "Dealer profile",

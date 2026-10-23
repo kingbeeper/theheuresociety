@@ -27,6 +27,9 @@ export function ItemForm({ item, watches, showCosts = true, prefill }: { item?: 
   const v = (k: keyof Item) => (item?.[k] ?? prefill?.[k] ?? "") as string;
   // Compra de segunda mano a un particular: se deduce del proveedor (con empresa = no) salvo que se marque a mano
   const [company, setCompany] = useState(v("supplier_company"));
+  // La fecha de papeles solo se pide si la pieza trae papeles (o ya tiene una fecha guardada)
+  const [comesWith, setComesWith] = useState(v("comes_with"));
+  const hasPapers = /papel|paper|tarjeta|card|garant|warrant/i.test(comesWith) || Boolean(v("papers_date"));
   const [shOverride, setShOverride] = useState<boolean | null>(item ? Boolean(item.hold_until) : null);
   const secondhand = shOverride ?? !company.trim();
   const [cat, setCat] = useState<Category>(item?.category ?? (prefill?.category as Category | undefined) ?? "watch");
@@ -74,14 +77,14 @@ export function ItemForm({ item, watches, showCosts = true, prefill }: { item?: 
           <label><span className={label}>{cat === "watch" ? tr("Modelo") : tr("Nombre")}</span><input name="model" defaultValue={v("model")} placeholder={cat === "jewelry" ? tr("Vacío: metal, piedra y talla") : undefined} className={field} /></label>
           {cat === "watch" && <label><span className={label}>{tr("Ref #")}</span><input name="reference" defaultValue={v("reference")} className={field} /></label>}
           <div><label htmlFor="serial" className={label}>{cat === "watch" ? tr("Serial #") : tr("N.º de serie o certificado (opcional)")}</label><SerialInput id="serial" name="serial" defaultValue={v("serial")} itemId={item?.id} className={field} /></div>
-          {cat === "watch" && <label><span className={label}>{tr("Fecha de papeles")}</span><input name="papers_date" type="date" defaultValue={v("papers_date")} className={field} /></label>}
+          {cat === "watch" && hasPapers && <label><span className={label}>{tr("Fecha de papeles (opcional)")}</span><input name="papers_date" type="date" defaultValue={v("papers_date")} className={field} /></label>}
           {cat === "watch" && <label><span className={label}>{tr("Eslabones (Links #)")}</span><input name="links" defaultValue={v("links")} placeholder={tr("Full links, +2…")} className={field} /></label>}
           <label>
             <span className={label}>{tr("Condición")}</span>
             <input name="condition" list="conditions" defaultValue={v("condition")} className={field} />
             <datalist id="conditions">{CONDITIONS.map((c) => <option key={c} value={c} />)}</datalist>
           </label>
-          <label className="sm:col-span-2"><span className={label}>{tr("Incluye (Comes with)")}</span><input name="comes_with" defaultValue={v("comes_with")} placeholder={cat === "watch" ? tr("Caja, papeles, etiquetas…") : tr("Estuche, certificado…")} className={field} /></label>
+          <label className="sm:col-span-2"><span className={label}>{tr("Incluye (Comes with)")}</span><input name="comes_with" value={comesWith} onChange={(e) => setComesWith(e.target.value)} placeholder={cat === "watch" ? tr("Caja, papeles, etiquetas…") : tr("Estuche, certificado…")} className={field} /></label>
         </div>
         <label><span className={label}>{tr("Descripción")}</span><textarea name="description" rows={2} defaultValue={v("description")} className={field} /></label>
       </div>
