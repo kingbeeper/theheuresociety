@@ -26,7 +26,7 @@ export function SellerIdentity() {
       else setIdPhoto(r.path);
     });
   return (
-    <div className="grid gap-4 border border-brass/30 p-4">
+    <div className="grid grid-cols-1 gap-4 border border-brass/30 p-4">
       <p className="text-[0.66rem] tracking-[0.24em] uppercase text-brass">{tr("A quién le compras (registro de segunda mano)")}</p>
       <div className="grid gap-4 sm:grid-cols-3">
         <label><span className={label}>{tr("Nombre del vendedor")}</span><input name="seller_name" autoComplete="off" className={field} /></label>
@@ -50,7 +50,8 @@ export function SellerIdentity() {
         </label>
         {err && <span className="text-xs text-amber-200">{err}</span>}
       </div>
-      <SellerRegistry />
+      {/* Contenedor normal (no grid): SellerRegistry trae sm:col-span-3, que aquí estiraría las columnas */}
+      <div><SellerRegistry /></div>
       <p className="text-xs text-stone">{tr("Es opcional: al guardar se crea su contrato de compra con estos datos. Si ya nos vendió antes (mismo teléfono o correo), su identificación se completa sola.")}</p>
     </div>
   );
