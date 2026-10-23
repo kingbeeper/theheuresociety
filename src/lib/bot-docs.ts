@@ -39,6 +39,7 @@ export type DocFlow = {
   client?: { name: string | null; phone: string | null; email: string | null };
   sellerId?: { type: string | null; number: string } | null; // compra: identificación del vendedor
   sellerIdPhoto?: string | null; // foto de la identificación (bucket privado)
+  sellerExtra?: { dob: string | null; details: import("./doc-labels").SellerDetails | null } | null; // de su compra anterior
   price?: number;
   asking?: number | null; // precio en la web (consignación y compra); null = no publicar
   lang: "en" | "es";
@@ -297,6 +298,17 @@ async function chooseClient(chatId: number, customerId: string | null, flow: Doc
     flow.client = { name: data?.name ?? null, phone: data?.phone ?? null, email: data?.email ?? null };
   }
   if (flow.kind === "purchase") {
+    // Ya nos vendió antes: se usan los datos de su último contrato (identificación, foto, registro)
+    const prev = customerId ? await (await import("./seller-profile")).lastSellerProfile(customerId) : null;
+    if (prev) {
+      flow.sellerId = prev.idNumber ? { type: prev.idType, number: prev.idNumber } : null;
+      flow.sellerIdPhoto = prev.idPhoto;
+      flow.sellerExtra = { dob: prev.dob, details: prev.details };
+      flow.step = "price";
+      await saveFlow(chatId, flow);
+      await sendMessage(chatId, `🪪 Identificación tomada de su compra anterior (${h(prev.number)})${prev.idNumber ? `: ${h(prev.idType ?? "")} •••• ${h(prev.idNumber.replace(/[^a-z0-9]/gi, "").slice(-4))}` : " (foto del ID)"}.`);
+      return askPrice(chatId, flow);
+    }
     flow.step = "sellerid";
     await saveFlow(chatId, flow);
     return sendMessage(chatId, "🪪 <b>Identificación del vendedor</b>\n📸 Envía una <b>foto</b> de su licencia o pasaporte (se guarda en privado)\n✍️ y/o escribe el tipo y número.\n<i>Ej.: Licencia FL D123-456-78-900 · Pasaporte X1234567</i>\n\nEn el contrato solo salen los 4 últimos caracteres.", {
@@ -445,6 +457,9 @@ export async function finish(chatId: number, flow: DocFlow) {
         `Entrada desde Telegram (${NAME[flow.kind].toLowerCase()})${owner ? ` · ${usd(price)}` : ""}`
       );
       itemId = created.id;
+      // Las fotos que mandaste por Telegram quedan en la pieza (prueba del estado en que se recibió)
+      const { data: ph } = await db.from("bot_draft_photos").select("url").eq("draft_id", flow.draftId).order("tg_message");
+      if (ph?.length) await db.from("inventory_items").update({ photos: ph.map((p) => p.url as string) }).eq("id", itemId);
       await updateDraft(flow.draftId, { status: "cancelled", awaiting: null }); // las fotos quedan guardadas
     }
     const { data: row } = await db.from("inventory_items").select("sku").eq("id", itemId).single();
@@ -473,6 +488,8 @@ export async function finish(chatId: number, flow: DocFlow) {
     due_date: kind === "purchase" ? null : due,
     ...(kind === "purchase" && flow.sellerId && { seller_id_type: flow.sellerId.type, seller_id_number: flow.sellerId.number }),
     ...(kind === "purchase" && flow.sellerIdPhoto && { id_photo_path: flow.sellerIdPhoto }),
+    ...(kind === "purchase" && flow.sellerExtra && { seller_dob: flow.sellerExtra.dob, seller_details: flow.sellerExtra.details }),
+    ...((kind === "purchase" || kind === "consignment") && { photos: await (await import("./item-photos")).itemPhotos([item.id]) }),
     items: [{ item_id: item.id, sku: item.sku, title: item.title, details: item.details || null, serial: item.serial, qty: 1, price }],
     tax_rate: kind === "invoice" || kind === "proforma" ? flow.tax : 0,
     show_serial: kind !== "quote",

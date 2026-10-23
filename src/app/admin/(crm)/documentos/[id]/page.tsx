@@ -13,8 +13,9 @@ import { todayInMiami } from "@/lib/booking";
 import { SITE_URL } from "@/lib/seo";
 import { Card, fmtDate, ghostButtonClass, PageTitle, requestTime } from "@/components/admin/ui";
 import { ShipmentCard } from "@/components/admin/ShipmentCard";
+import { DocPhotoUpload } from "@/components/admin/DocPhotoUpload";
 import { CloseProformaForm, DepositForm, DocumentForm, PaidForm, ProformaPaymentForm, SourcedForm } from "@/components/admin/DocumentForm";
-import { serviceStepAction, convertToInvoice, convertToProforma, deleteDocument, markConsignorPaid, refundSourcing, returnMemo, sendDocument, setQuoteResult, voidDocument } from "../../../document-actions";
+import { refreshDocPhotosAction, serviceStepAction, convertToInvoice, convertToProforma, deleteDocument, markConsignorPaid, refundSourcing, returnMemo, sendDocument, setQuoteResult, voidDocument } from "../../../document-actions";
 
 export const metadata = { title: "Documento" };
 
@@ -92,6 +93,28 @@ export default async function DocumentPage({ params }: PageProps<"/admin/documen
           {tr("✍️ Firmado electrónicamente por")} <b>{d.signer_name}</b> {tr("el")} {new Intl.DateTimeFormat(dateLocale(), { dateStyle: "long", timeStyle: "short", timeZone: "America/New_York" }).format(new Date(d.signed_at))}
           {d.signed_ip ? <span className="text-stone"> {tr("· IP")} {d.signed_ip}</span> : null}
         </p>
+      )}
+
+      {(d.kind === "purchase" || d.kind === "consignment") && (
+        <Card className="mt-6" title="📷 Fotos de la pieza al recibirla">
+          {d.photos?.length ? (
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+              {d.photos.map((_, i) => (
+                <a key={i} href={`/api/doc-photo?t=${d.token}&i=${i}`} target="_blank" rel="noreferrer">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={`/api/doc-photo?t=${d.token}&i=${i}`} alt="" loading="lazy" className="aspect-square w-full border border-line object-cover" />
+                </a>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-stone">{tr("Esta pieza todavía no tiene fotos. Súbelas aquí (quedan también en la ficha de la pieza).")}</p>
+          )}
+          <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-stone">
+            <span>{tr("Quedan guardadas en el contrato como prueba del estado en que se recibió la pieza, aunque luego cambie su ficha.")}</span>
+            <DocPhotoUpload docId={d.id} />
+            <form action={refreshDocPhotosAction.bind(null, d.id)}><button className={ghostButtonClass}>{tr("↻ Añadir las fotos nuevas de la pieza")}</button></form>
+          </div>
+        </Card>
       )}
 
       {/* Siguiente paso según el tipo y el estado */}

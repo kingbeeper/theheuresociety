@@ -89,6 +89,7 @@ export default async function RegistryPage({ searchParams }: PageProps<"/admin/i
                           <Link href={`/admin/documentos/${r.document.id}`} className="text-brass hover:text-ivory">{r.document.number}</Link>
                           <span className={r.document.signed ? "text-emerald-200" : "text-amber-200"}>{r.document.signed ? tr("firmado") : tr("sin firmar")}</span>
                           {r.document.idPhoto && <a href={`/api/private/id/${r.document.id}`} target="_blank" rel="noreferrer" className="text-stone underline hover:text-ivory">{tr("ID")}</a>}
+                          {r.document.photos > 0 && <Link href={`/admin/documentos/${r.document.id}`} className="text-stone underline hover:text-ivory">{tr("📷 {n} fotos", { n: r.document.photos })}</Link>}
                           {r.details?.thumb_path && <a href={`/api/private/thumb/${r.document.id}`} target="_blank" rel="noreferrer" className="text-stone underline hover:text-ivory">{tr("Huella")}</a>}
                         </div>
                       ) : (

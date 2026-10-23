@@ -218,6 +218,20 @@ async function SharedDocument({ params, searchParams }: { params: Promise<{ toke
           </section>
         )}
 
+        {(consign || purchase) && (d.photos?.length ?? 0) > 0 && (
+          <section className="mt-8 text-sm">
+            <p className="mb-2 text-[0.62rem] tracking-[0.24em] uppercase text-[#8a7a52]">{t.photosAtReceipt}</p>
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+              {d.photos!.map((_, i) => (
+                <a key={i} href={`/api/doc-photo?t=${d.token}&i=${i}`} target="_blank" rel="noreferrer">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={`/api/doc-photo?t=${d.token}&i=${i}`} alt="" loading="lazy" className="aspect-square w-full border border-[#d8d2c4] object-cover" />
+                </a>
+              ))}
+            </div>
+          </section>
+        )}
+
         <div className={`mt-6 flex justify-end ${noPrice ? "hidden" : ""}`}>
           <dl className="grid w-full grid-cols-[1fr_auto] gap-y-2 text-sm sm:max-w-[300px]">
             <dt className="text-[#5d625e]">{t.subtotal}</dt><dd className="text-right tabular-nums">{usd(totals.subtotal)}</dd>

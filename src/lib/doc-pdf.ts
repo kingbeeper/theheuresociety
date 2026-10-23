@@ -299,6 +299,30 @@ export async function renderDocPdf(d: Doc, s: Required<DocSettings>) {
     }
   }
 
+  // ── contrato de compra / consignación: fotos de la pieza al recibirla (hasta 8) ──
+  const received = consign || purchase ? (d.photos ?? []).slice(0, 8) : [];
+  if (received.length) {
+    const { photoBytes } = await import("./item-photos");
+    const sharp = (await import("sharp")).default;
+    const size = (W - 2 * M - 3 * 10) / 4;
+    y -= 26;
+    ensure(size + 30);
+    label(t.photosAtReceipt, M, y, { color: BRASS });
+    let n = 0;
+    for (const p of received) {
+      const bytes = await photoBytes(p).catch(() => null);
+      if (!bytes) continue;
+      const jpg = await sharp(Buffer.from(bytes)).resize(400, 400, { fit: "cover" }).jpeg({ quality: 70 }).toBuffer().catch(() => null);
+      if (!jpg) continue;
+      if (n % 4 === 0) {
+        ensure(size + 12);
+        y -= size + 8;
+      }
+      page.drawImage(await pdf.embedJpg(jpg), { x: M + (n % 4) * (size + 10), y, width: size, height: size });
+      n++;
+    }
+  }
+
   // ── notas, pago, términos ──
   y -= 26;
   rule(y);

@@ -149,7 +149,26 @@ export async function saveDocument(id: string | null, _: unknown, f: FormData) {
   const svc = kind === "service" ? parseService(f) : null;
 
   if (!id) {
-    const doc = await insertDoc({ ...fields, ...(svc && { service: (await import("@/lib/service")).newService(svc) }), created_by: user });
+    // Compra o consignación: las fotos de la pieza quedan en el contrato como prueba de su estado al recibirla
+    const photos = kind === "purchase" || kind === "consignment" ? await (await import("@/lib/item-photos")).itemPhotos(items.map((l) => l.item_id)) : [];
+    // Compra a alguien que ya nos vendió: su identificación, la foto del ID y el registro de segunda mano de su
+    // contrato anterior (lo que se deje en blanco se completa con eso)
+    if (kind === "purchase" && customerId) {
+      const prev = await (await import("@/lib/seller-profile")).lastSellerProfile(customerId);
+      const sameId = prev && (!fields.seller_id_number || fields.seller_id_number === prev.idNumber);
+      if (prev && sameId) {
+        Object.assign(fields, {
+          seller_id_type: fields.seller_id_type ?? prev.idType,
+          seller_id_number: fields.seller_id_number ?? prev.idNumber,
+          seller_dob: fields.seller_dob ?? prev.dob,
+          client_address: fields.client_address ?? prev.address,
+          id_photo_path: prev.idPhoto,
+        });
+        const sd = fields.seller_details as Record<string, string | null> | undefined;
+        if (sd) for (const [k, v] of Object.entries(prev.details ?? {})) if (!sd[k] && v) sd[k] = v as string;
+      }
+    }
+    const doc = await insertDoc({ ...fields, ...(svc && { service: (await import("@/lib/service")).newService(svc) }), ...(photos.length && { photos }), created_by: user });
     await docEvent(doc, `creada por ${usd(doc.total)}`, user);
     // Encargo: recordatorio de seguimiento en X días (Tareas, calendario y Telegram)
     const remind = Number(text(f, "sourcing_reminder") ?? 0);
@@ -400,4 +419,42 @@ export async function serviceStepAction(id: string, step: "workshop" | "ready" |
   const r = await serviceStep(id, step, user, text(f, "payment_method"));
   refresh();
   if (r.invoice) redirect(`/admin/documentos/${r.invoice.id}`);
+}
+
+// Volver a tomar las fotos de la pieza en el contrato (p. ej. si se añadieron después)
+export async function refreshDocPhotosAction(id: string) {
+  const user = await requireAdmin("documentos");
+  const d = await getDoc(id);
+  if (!d) return;
+  const { itemPhotos } = await import("@/lib/item-photos");
+  const photos = await itemPhotos(d.items.map((l) => l.item_id));
+  const merged = [...new Set([...(d.photos ?? []), ...photos])];
+  await adminDb().from("documents").update({ photos: merged, updated_at: new Date().toISOString() }).eq("id", id);
+  await docEvent(d, `fotos de la pieza en el contrato: ${merged.length}`, user);
+  refresh();
+}
+
+// Fotos subidas desde el contrato (ya en el almacenamiento privado): al contrato y a la ficha de la pieza
+export async function addDocPhotosAction(id: string, paths: string[]) {
+  const user = await requireAdmin("documentos");
+  const d = await getDoc(id);
+  if (!d || (d.kind !== "purchase" && d.kind !== "consignment")) return;
+  const added = paths.filter((p) => typeof p === "string" && /^inspections\/[\w-]+\.jpg$/.test(p)).slice(0, 20).map((p) => `private:${p}`);
+  if (!added.length) return;
+  const db = adminDb();
+  await db.from("documents").update({ photos: [...new Set([...(d.photos ?? []), ...added])], updated_at: new Date().toISOString() }).eq("id", id);
+  for (const itemId of new Set(d.items.map((l) => l.item_id).filter(Boolean) as string[])) {
+    const { data: it } = await db.from("inventory_items").select("photos").eq("id", itemId).maybeSingle();
+    if (it) await db.from("inventory_items").update({ photos: [...new Set([...((it.photos ?? []) as string[]), ...added])] }).eq("id", itemId);
+  }
+  await docEvent(d, `${added.length} foto(s) añadidas al contrato`, user);
+  refresh();
+}
+
+// Contrato de compra: datos del vendedor de su compra anterior (para no volver a pedirlos)
+export async function sellerProfileAction(customerId: string) {
+  await requireAdmin("documentos");
+  const { lastSellerProfile } = await import("@/lib/seller-profile");
+  const p = await lastSellerProfile(customerId);
+  return p && { ...p, idPhoto: null, hasIdPhoto: Boolean(p.idPhoto) };
 }

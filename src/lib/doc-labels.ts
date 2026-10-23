@@ -51,6 +51,8 @@ export type Doc = {
   seller_dob?: string | null;
   // Registro de compras de segunda mano: dirección, descripción física y huella del vendedor (solo en el CRM)
   seller_details?: SellerDetails | null;
+  // Contrato de compra o consignación: fotos de la pieza al recibirla (copia fija; «private:» = privadas)
+  photos?: string[];
   // Firma electrónica del cliente y foto de la identificación (archivos privados)
   signed_at?: string | null;
   signer_name?: string | null;
@@ -189,6 +191,7 @@ export const PRINT = {
     signature: "Received in good condition — signature", print: "Print / Save as PDF",
     netTotal: "Total net to consignor",
     signedBy: "Signed electronically by", acceptedBy: "Accepted and signed by",
+    photosAtReceipt: "Photos of the item on receipt",
     svc: { piece: "Item received", provider: "Workshop", status: "Status", sign: ["Client — signature", "The Heure Society — signature"], states: { received: "Received", workshop: "In the workshop", ready: "Ready for collection", delivered: "Delivered" } },
     insp: { title: "Condition on receipt", titleOut: "Condition on delivery", part: "Part", state: "Condition", runs: "Running", runsYes: "Yes", runsNo: "No", rate: "Rate (s/day)", power: "Power reserve", links: "Links", set: "Included", box: "Box", papers: "Papers", photos: "Photos", sign: ["Owner — signature", "The Heure Society — signature"] },
   },
@@ -211,6 +214,7 @@ export const PRINT = {
     signature: "Recibido en buen estado — firma", print: "Imprimir / Guardar PDF",
     netTotal: "Total neto al consignante",
     signedBy: "Firmado electrónicamente por", acceptedBy: "Aceptado y firmado por",
+    photosAtReceipt: "Fotos de la pieza al recibirla",
     svc: { piece: "Pieza recibida", provider: "Taller", status: "Estado", sign: ["Cliente — firma", "The Heure Society — firma"], states: { received: "Recibida", workshop: "En el taller", ready: "Lista para recoger", delivered: "Entregada" } },
     insp: { title: "Estado al recibirlo", titleOut: "Estado al entregarlo", part: "Parte", state: "Estado", runs: "Funciona", runsYes: "Sí", runsNo: "No", rate: "Marcha (s/día)", power: "Reserva de marcha", links: "Eslabones", set: "Incluye", box: "Caja", papers: "Papeles", photos: "Fotos", sign: ["Dueño — firma", "The Heure Society — firma"] },
   },

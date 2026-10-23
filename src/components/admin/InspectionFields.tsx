@@ -8,7 +8,7 @@ import { useAdminLang, useTr } from "@/components/admin/AdminLang";
 const field = "w-full border border-line bg-ink/60 px-2 py-2 text-sm text-ivory outline-none focus:border-brass/70";
 const label = "mb-1.5 block text-[0.62rem] tracking-[0.22em] uppercase text-stone";
 
-async function shrink(file: File) {
+export async function shrink(file: File) {
   const bmp = await createImageBitmap(file);
   const scale = Math.min(1, 1600 / Math.max(bmp.width, bmp.height));
   const canvas = document.createElement("canvas");

@@ -61,7 +61,7 @@ export async function purchaseBook(from: string, to: string) {
   const list = items ?? [];
   // Contrato de compra de cada pieza (datos del vendedor)
   const { data: docs } = list.length
-    ? await db.from("documents").select("id, number, items, client_name, client_address, client_phone, seller_id_type, seller_id_number, seller_dob, seller_details, issue_date, id_photo_path, signed_at").eq("kind", "purchase").neq("status", "void")
+    ? await db.from("documents").select("id, number, items, client_name, client_address, client_phone, seller_id_type, seller_id_number, seller_dob, seller_details, issue_date, id_photo_path, signed_at, photos").eq("kind", "purchase").neq("status", "void")
     : { data: [] };
   const docFor = (id: string) => (docs ?? []).find((d) => ((d.items ?? []) as { item_id?: string }[]).some((l) => l.item_id === id));
   return list.map((i) => {
@@ -82,7 +82,7 @@ export async function purchaseBook(from: string, to: string) {
       idNumber: (d?.seller_id_number as string | null) ?? null,
       dob: (d?.seller_dob as string | null) ?? null,
       details: sd,
-      document: d ? { id: d.id as string, number: d.number as string, signed: Boolean(d.signed_at), idPhoto: Boolean(d.id_photo_path) } : null,
+      document: d ? { id: d.id as string, number: d.number as string, signed: Boolean(d.signed_at), idPhoto: Boolean(d.id_photo_path), photos: ((d.photos ?? []) as string[]).length } : null,
       holdUntil: i.hold_until as string | null,
       status: i.status as string,
     };

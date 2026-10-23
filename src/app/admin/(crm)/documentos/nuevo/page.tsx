@@ -8,6 +8,7 @@ import { KIND_LABEL, type DocKind } from "@/lib/doc-labels";
 import { todayInMiami } from "@/lib/booking";
 import { Card, PageTitle, requestTime } from "@/components/admin/ui";
 import { DocumentForm } from "@/components/admin/DocumentForm";
+import { lastSellerProfile } from "@/lib/seller-profile";
 
 export const metadata = { title: "Nuevo documento" };
 
@@ -18,7 +19,7 @@ export default async function NewDocumentPage({ searchParams }: PageProps<"/admi
   const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
   const tipo = one(sp.tipo);
   const kind = (tipo && tipo in KIND_LABEL ? tipo : "quote") as DocKind;
-  const [{ customers, stock }, s] = await Promise.all([formOptions(), getDocSettings()]);
+  const [{ customers, stock }, s, seller] = await Promise.all([formOptions(), getDocSettings(), kind === "purchase" ? lastSellerProfile(one(sp.cliente)) : null]);
 
   return (
     <>
@@ -35,6 +36,7 @@ export default async function NewDocumentPage({ searchParams }: PageProps<"/admi
           today={todayInMiami(new Date(requestTime()))}
           presetCustomer={one(sp.cliente)}
           presetItem={one(sp.reloj)}
+          sellerPrefill={seller && { ...seller, idPhoto: null, hasIdPhoto: Boolean(seller.idPhoto) }}
         />
       </Card>
     </>

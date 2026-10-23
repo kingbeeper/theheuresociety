@@ -3,7 +3,7 @@
 
 import { useTr } from "@/components/admin/AdminLang";
 import { useActionState, useState } from "react";
-import { appraiseTradeAction, closeProformaAction, convertSourcing, markDepositReceived, markPaid, proformaPaymentAction, saveDocument } from "@/app/admin/document-actions";
+import { sellerProfileAction, appraiseTradeAction, closeProformaAction, convertSourcing, markDepositReceived, markPaid, proformaPaymentAction, saveDocument } from "@/app/admin/document-actions";
 import { ID_TYPES, KIND_LABEL, depositPct, docTotals, suggestedDeposit, usd, type Doc, type DocKind, type DocLine } from "@/lib/doc-labels";
 import { PAYMENT } from "@/lib/stock-labels";
 import { SerialWarning } from "./SerialCheck";
@@ -11,6 +11,7 @@ import { InspectionFields } from "./InspectionFields";
 import { ServiceFields } from "./ServiceFields";
 import { JewelrySourcing } from "./JewelrySourcing";
 import { SellerRegistry } from "./SellerRegistry";
+import type { SellerPrefill } from "@/lib/seller-profile";
 
 const field =
   "w-full border border-line bg-ink/60 px-3 py-2.5 text-sm text-ivory placeholder:text-stone/50 outline-none transition-colors focus:border-brass/70";
@@ -26,7 +27,7 @@ const DUE_DAYS: Record<DocKind, number> = { quote: 7, memo: 14, invoice: 0, cons
 const noTax = (k: DocKind) => k === "memo" || k === "consignment" || k === "purchase" || k === "sourcing" || k === "inspection";
 
 export function DocumentForm({
-  doc, kind: initialKind, customers, stock, terms, taxRate, today, presetCustomer, presetItem, showCosts = true,
+  doc, kind: initialKind, customers, stock, terms, taxRate, today, presetCustomer, presetItem, showCosts = true, sellerPrefill = null,
 }: {
   doc?: Doc;
   kind: DocKind;
@@ -38,6 +39,7 @@ export function DocumentForm({
   presetCustomer?: string;
   presetItem?: string;
   showCosts?: boolean;
+  sellerPrefill?: SellerPrefill | null;
 }) {
   const tr = useTr();
   const [state, action, pending] = useActionState(saveDocument.bind(null, doc?.id ?? null), null);
@@ -80,14 +82,22 @@ export function DocumentForm({
   };
   const used = new Set(lines.map((l) => l.item_id));
 
+  // Contrato de compra a alguien que ya nos vendió: sus datos de la compra anterior
+  const [seller, setSeller] = useState<SellerPrefill | null>(doc ? null : sellerPrefill);
+  const loadSeller = (id: string, k: DocKind) => {
+    if (doc || k !== "purchase" || !id) return setSeller(null);
+    sellerProfileAction(id).then(setSeller, () => setSeller(null));
+  };
   const pickCustomer = (id: string) => {
     setCustomer(id);
+    loadSeller(id, kind);
     const c = customers.find((x) => x.id === id);
     setClient({ client_name: c?.name ?? "", client_email: c?.email ?? "", client_phone: c?.phone ?? "" });
   };
   const changeKind = (k: DocKind) => {
     setKind(k);
     setTermsText(terms[k]);
+    loadSeller(customer, k);
     setDue(addDays(today, DUE_DAYS[k]));
     setTax(String(noTax(k) ? 0 : taxRate));
     if (k === "sourcing" && !lines.length) setLines([blank]);
@@ -139,7 +149,7 @@ export function DocumentForm({
           <label><span className={label}>{tr("Empresa")}</span><input name="client_company" defaultValue={doc?.client_company ?? ""} className={field} /></label>
           <label><span className={label}>{tr("Teléfono")}</span><input name="client_phone" value={client.client_phone} onChange={(e) => setClient({ ...client, client_phone: e.target.value })} className={field} /></label>
           <label><span className={label}>{tr("Correo")}</span><input name="client_email" type="email" value={client.client_email} onChange={(e) => setClient({ ...client, client_email: e.target.value })} className={field} /></label>
-          <label className="sm:col-span-2"><span className={label}>{tr("Dirección")}</span><input name="client_address" defaultValue={doc?.client_address ?? ""} placeholder={tr("Calle, ciudad, estado, código postal")} className={field} /></label>
+          <label className="sm:col-span-2"><span className={label}>{tr("Dirección")}</span><input key={seller?.number ?? "addr"} name="client_address" defaultValue={doc?.client_address ?? seller?.address ?? ""} placeholder={tr("Calle, ciudad, estado, código postal")} className={field} /></label>
         </div>
       </div>
 
@@ -157,17 +167,22 @@ export function DocumentForm({
         {sourcing && piece === "jewelry" && <JewelrySourcing onChange={(title, details) => setLines((ls) => [{ ...(ls[0] ?? blank), title, details }, ...ls.slice(1)])} />}
         {sourcing && <p className="text-xs text-stone">{tr("Describe el reloj (marca, modelo y referencia) y en el detalle la esfera, el año mínimo, si tiene que traer caja y papeles y el estado. El precio es el")} <b>{tr("máximo acordado")}</b> {tr("con el cliente.")}</p>}
         {kind === "purchase" && (
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div key={seller?.number ?? "new"} className="grid gap-4 sm:grid-cols-3">
+            {seller && (
+              <p className="border border-emerald-300/40 bg-emerald-300/5 p-3 text-sm sm:col-span-3">
+                {tr("🪪 Ya nos vendió antes: identificación y registro de segunda mano tomados de su contrato {n}{p}. Revisa que sigan vigentes.", { n: seller.number, p: seller.hasIdPhoto ? tr(" (incluida la foto del ID)") : "" })}
+              </p>
+            )}
             <label>
               <span className={label}>{tr("Identificación")}</span>
-              <select name="seller_id_type" defaultValue={doc?.seller_id_type ?? "Driver's license"} className={field}>
+              <select name="seller_id_type" defaultValue={doc?.seller_id_type ?? seller?.idType ?? "Driver's license"} className={field}>
                 {ID_TYPES.map((t) => <option key={t} value={t}>{tr(t)}</option>)}
               </select>
             </label>
-            <label><span className={label}>{tr("Número")}</span><input name="seller_id_number" defaultValue={doc?.seller_id_number ?? ""} autoComplete="off" className={field} /></label>
-            <label><span className={label}>{tr("Fecha de nacimiento")}</span><input name="seller_dob" type="date" defaultValue={doc?.seller_dob ?? ""} className={field} /></label>
+            <label><span className={label}>{tr("Número")}</span><input name="seller_id_number" defaultValue={doc?.seller_id_number ?? seller?.idNumber ?? ""} autoComplete="off" className={field} /></label>
+            <label><span className={label}>{tr("Fecha de nacimiento")}</span><input name="seller_dob" type="date" defaultValue={doc?.seller_dob ?? seller?.dob ?? ""} className={field} /></label>
             <p className="text-xs text-stone sm:col-span-3">{tr("El número completo y la fecha de nacimiento quedan solo en el CRM; el documento muestra los 4 últimos caracteres.")}</p>
-            <SellerRegistry value={doc?.seller_details} />
+            <SellerRegistry value={doc?.seller_details ?? seller?.details} />
           </div>
         )}
         {kind === "purchase" && <p className="text-xs text-stone">{tr("El precio de cada línea es lo que")} <b>{tr("pagamos al vendedor")}</b>.</p>}
